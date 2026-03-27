@@ -9,7 +9,7 @@
 1. 识别项目拓扑
 2. 创建项目记忆根目录
 3. 建立 docs / KB / state / reports / legacy 结构
-4. 建立薄入口 `AGENTS.md`
+4. 建立轻入口 `AGENTS.md`
 5. 建立 active work 机制
 6. 建立第一份 KB 配置和第一个 feature KB
 7. 默认从 docs 开始编码；遇到入口、调用链、事件绑定、状态流转问题时优先查询 KB；只有 docs 与 KB 都不足时才做大范围搜索
