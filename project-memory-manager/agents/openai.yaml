@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目记忆管理器"
+  short_description: "AI 项目接管、记忆与知识库系统"
+  default_prompt: "使用 $project-memory-manager 为当前仓库建立项目记忆、链路知识库与开发工作流。"

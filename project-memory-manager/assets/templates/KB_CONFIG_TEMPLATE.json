@@ -1,0 +1,22 @@
+{
+  "featureName": "",
+  "featureKey": "",
+  "summary": "",
+  "uiEntry": "",
+  "extractorAdapter": "generic",
+  "areas": [],
+  "componentRoots": [],
+  "assetRoots": [],
+  "methodRoots": [],
+  "prefabs": [],
+  "outputs": {
+    "scan": "project-memory/kb/features/<feature-key>/scan.raw.json",
+    "graph": "project-memory/kb/features/<feature-key>/chain.graph.json",
+    "lookup": "project-memory/kb/features/<feature-key>/chain.lookup.json",
+    "report": "project-memory/kb/features/<feature-key>/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/<feature-key>",
+    "featureIndex": "project-memory/docs/features/<feature-key>/FEATURE.md"
+  }
+}
