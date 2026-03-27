@@ -13,8 +13,11 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
+import uuid
 import venv
 from pathlib import Path
 
@@ -114,6 +117,7 @@ def local_temp_root(skill_path: Path, root: Path) -> Path:
 @contextlib.contextmanager
 def override_temp_env(temp_root: Path):
     temp_root.mkdir(parents=True, exist_ok=True)
+    temp_env = os.environ.copy()
     old_values = {
         "TMP": os.environ.get("TMP"),
         "TEMP": os.environ.get("TEMP"),
@@ -124,14 +128,63 @@ def override_temp_env(temp_root: Path):
     os.environ["TEMP"] = str(temp_root)
     os.environ["TMPDIR"] = str(temp_root)
     os.environ["PIP_CACHE_DIR"] = str(temp_root / "pip-cache")
+    temp_env["TMP"] = str(temp_root)
+    temp_env["TEMP"] = str(temp_root)
+    temp_env["TMPDIR"] = str(temp_root)
+    temp_env["PIP_CACHE_DIR"] = str(temp_root / "pip-cache")
     try:
-        yield
+        yield temp_env
     finally:
         for key, value in old_values.items():
             if value is None:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def create_session_dir(base_dir: Path, prefix: str) -> Path:
+    base_dir.mkdir(parents=True, exist_ok=True)
+    for _ in range(16):
+        candidate = base_dir / f"{prefix}-{uuid.uuid4().hex}"
+        try:
+            candidate.mkdir(parents=True, exist_ok=False)
+            return candidate
+        except FileExistsError:
+            continue
+    raise RuntimeError(f"无法在 {base_dir} 创建临时目录")
+
+
+def python_executable_in_venv(venv_path: Path) -> Path:
+    scripts_dir = "Scripts" if os.name == "nt" else "bin"
+    python_name = "python.exe" if os.name == "nt" else "python"
+    return venv_path / scripts_dir / python_name
+
+
+def can_import_yaml_with_python(python_exe: Path) -> bool:
+    if not python_exe.exists():
+        return False
+    result = subprocess.run(
+        [str(python_exe), "-c", "import yaml"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def probe_mkdtemp_support(temp_base: Path) -> tuple[bool, str]:
+    probe_root = create_session_dir(temp_base, "probe")
+    nested_temp = None
+    try:
+        nested_temp = Path(tempfile.mkdtemp(prefix="mkdtemp-", dir=str(probe_root)))
+        marker = nested_temp / "write-probe.txt"
+        marker.write_text("ok", encoding="utf-8")
+        return True, ""
+    except Exception as error:
+        return False, f"当前环境的 Python 临时目录能力异常，跳过 PyYAML 自举: {error}"
+    finally:
+        shutil.rmtree(probe_root, ignore_errors=True)
 
 
 def parse_simple_frontmatter(frontmatter_text: str) -> dict[str, str]:
@@ -336,14 +389,25 @@ def ensure_yaml_available(skill_path: Path, root: Path, venv_path: Path) -> tupl
         return False, f"未找到 requirements 文件: {requirements}"
 
     errors: list[str] = []
-    temp_root = local_temp_root(skill_path, root)
+    temp_base = local_temp_root(skill_path, root)
+    temp_base.mkdir(parents=True, exist_ok=True)
+
+    existing_python = python_executable_in_venv(venv_path)
+    if can_import_yaml_with_python(existing_python):
+        return True, str(existing_python)
+
+    probe_ok, probe_message = probe_mkdtemp_support(temp_base)
+    if not probe_ok:
+        return False, probe_message
+
+    temp_root = create_session_dir(temp_base, "session")
 
     venv_path.parent.mkdir(parents=True, exist_ok=True)
     builder = venv.EnvBuilder(with_pip=True)
     try:
-        with override_temp_env(temp_root):
+        with override_temp_env(temp_root) as temp_env:
             builder.create(str(venv_path))
-        python_exe = venv_path / ("Scripts" if os.name == "nt" else "bin") / ("python.exe" if os.name == "nt" else "python")
+        python_exe = python_executable_in_venv(venv_path)
         if python_exe.exists():
             install_cmd = [
                 str(python_exe),
@@ -356,8 +420,8 @@ def ensure_yaml_available(skill_path: Path, root: Path, venv_path: Path) -> tupl
                 "-r",
                 str(requirements),
             ]
-            with override_temp_env(temp_root):
-                install_result = subprocess.run(install_cmd, check=False, capture_output=True, text=True)
+            with override_temp_env(temp_root) as temp_env:
+                install_result = subprocess.run(install_cmd, check=False, capture_output=True, text=True, env=temp_env)
             if install_result.returncode == 0:
                 return True, str(python_exe)
             errors.append(install_result.stderr.strip() or install_result.stdout.strip() or "venv pip install failed")
@@ -378,8 +442,8 @@ def ensure_yaml_available(skill_path: Path, root: Path, venv_path: Path) -> tupl
         "-r",
         str(requirements),
     ]
-    with override_temp_env(temp_root):
-        user_install_result = subprocess.run(user_install_cmd, check=False, capture_output=True, text=True)
+    with override_temp_env(temp_root) as temp_env:
+        user_install_result = subprocess.run(user_install_cmd, check=False, capture_output=True, text=True, env=temp_env)
     if user_install_result.returncode == 0:
         return True, "system"
     errors.append(user_install_result.stderr.strip() or user_install_result.stdout.strip() or "user pip install failed")

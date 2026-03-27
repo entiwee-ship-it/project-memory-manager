@@ -17,6 +17,7 @@ python scripts/validate_skill_runtime.py <skill-path> --mode auto
 - 若缺少 PyYAML，先尝试本地 venv 安装 `scripts/requirements-validation.txt`
 - 若本地 venv 自举失败，再尝试 `pip install --user`
 - 两种自举都失败后，回退到内置纯 Python 便携校验
+- 若当前环境的 Python 临时目录能力不适合 `pip/ensurepip` 自举，直接快速回退到便携校验，避免长时间卡在环境安装阶段
 
 ### `strict`
 - 强制使用 PyYAML
