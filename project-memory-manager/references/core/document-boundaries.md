@@ -24,6 +24,7 @@ KB 用于保存：
 - 脚本可重建事实
 - 事件监听与派发
 - request 与 callback 链路
+- state 读写与状态流转
 - VM 路径
 - upstream / downstream 遍历
 

@@ -11,15 +11,40 @@ project-memory-manager 技能校验器。
 from __future__ import annotations
 
 import argparse
-import contextlib
 import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import uuid
 import venv
 from pathlib import Path
+
+
+SAFE_TEMP_SITECUSTOMIZE = """\
+import os
+import tempfile
+
+
+def _safe_mkdtemp(suffix=None, prefix=None, dir=None):
+    suffix = suffix or ""
+    prefix = prefix or "tmp"
+    if dir is None:
+        dir = tempfile.gettempdir()
+
+    attempts = 0
+    while attempts < tempfile.TMP_MAX:
+        candidate = os.path.join(dir, f"{prefix}{next(tempfile._get_candidate_names())}{suffix}")
+        try:
+            os.mkdir(candidate)
+            return candidate
+        except FileExistsError:
+            attempts += 1
+
+    raise FileExistsError("No usable temporary directory name found")
+
+
+tempfile.mkdtemp = _safe_mkdtemp
+"""
 
 
 def parse_args() -> argparse.Namespace:
@@ -114,35 +139,6 @@ def local_temp_root(skill_path: Path, root: Path) -> Path:
     return runtime_root(skill_path) / "validation-temp"
 
 
-@contextlib.contextmanager
-def override_temp_env(temp_root: Path):
-    temp_root.mkdir(parents=True, exist_ok=True)
-    temp_env = os.environ.copy()
-    old_values = {
-        "TMP": os.environ.get("TMP"),
-        "TEMP": os.environ.get("TEMP"),
-        "TMPDIR": os.environ.get("TMPDIR"),
-        "PIP_CACHE_DIR": os.environ.get("PIP_CACHE_DIR"),
-    }
-    os.environ["TMP"] = str(temp_root)
-    os.environ["TEMP"] = str(temp_root)
-    os.environ["TMPDIR"] = str(temp_root)
-    os.environ["PIP_CACHE_DIR"] = str(temp_root / "pip-cache")
-    temp_env["TMP"] = str(temp_root)
-    temp_env["TEMP"] = str(temp_root)
-    temp_env["TMPDIR"] = str(temp_root)
-    temp_env["PIP_CACHE_DIR"] = str(temp_root / "pip-cache")
-    try:
-        yield temp_env
-    finally:
-        for key, value in old_values.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
-        shutil.rmtree(temp_root, ignore_errors=True)
-
-
 def create_session_dir(base_dir: Path, prefix: str) -> Path:
     base_dir.mkdir(parents=True, exist_ok=True)
     for _ in range(16):
@@ -161,7 +157,33 @@ def python_executable_in_venv(venv_path: Path) -> Path:
     return venv_path / scripts_dir / python_name
 
 
-def can_import_yaml_with_python(python_exe: Path) -> bool:
+def write_safe_temp_sitecustomize(target_dir: Path) -> Path:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    patch_path = target_dir / "sitecustomize.py"
+    patch_path.write_text(SAFE_TEMP_SITECUSTOMIZE, encoding="utf-8")
+    return patch_path
+
+
+def build_bootstrap_env(temp_root: Path) -> dict[str, str]:
+    temp_root.mkdir(parents=True, exist_ok=True)
+    cache_dir = temp_root / "pip-cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    patch_dir = temp_root / "bootstrap-site"
+    write_safe_temp_sitecustomize(patch_dir)
+
+    env = os.environ.copy()
+    env["TMP"] = str(temp_root)
+    env["TEMP"] = str(temp_root)
+    env["TMPDIR"] = str(temp_root)
+    env["PIP_CACHE_DIR"] = str(cache_dir)
+
+    existing_pythonpath = env.get("PYTHONPATH", "").strip()
+    env["PYTHONPATH"] = str(patch_dir) if not existing_pythonpath else os.pathsep.join([str(patch_dir), existing_pythonpath])
+    return env
+
+
+def can_import_yaml_with_python(python_exe: Path, env: dict[str, str] | None = None) -> bool:
     if not python_exe.exists():
         return False
     result = subprocess.run(
@@ -169,22 +191,86 @@ def can_import_yaml_with_python(python_exe: Path) -> bool:
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
     return result.returncode == 0
 
 
-def probe_mkdtemp_support(temp_base: Path) -> tuple[bool, str]:
-    probe_root = create_session_dir(temp_base, "probe")
-    nested_temp = None
+def ensure_venv_python(venv_path: Path) -> tuple[Path | None, str]:
+    python_exe = python_executable_in_venv(venv_path)
+    if python_exe.exists():
+        return python_exe, ""
+
+    venv_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        nested_temp = Path(tempfile.mkdtemp(prefix="mkdtemp-", dir=str(probe_root)))
-        marker = nested_temp / "write-probe.txt"
-        marker.write_text("ok", encoding="utf-8")
+        # 先创建不带 pip 的 venv，后续自行在受控临时目录里运行 ensurepip。
+        venv.EnvBuilder(with_pip=False).create(str(venv_path))
+    except Exception as error:  # pragma: no cover
+        return None, f"venv 创建失败: {error}"
+
+    python_exe = python_executable_in_venv(venv_path)
+    if not python_exe.exists():
+        return None, f"未找到 venv python: {python_exe}"
+    return python_exe, ""
+
+
+def ensure_pip_available(python_exe: Path, temp_env: dict[str, str]) -> tuple[bool, str]:
+    pip_check = subprocess.run(
+        [str(python_exe), "-m", "pip", "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=temp_env,
+    )
+    if pip_check.returncode == 0:
         return True, ""
-    except Exception as error:
-        return False, f"当前环境的 Python 临时目录能力异常，跳过 PyYAML 自举: {error}"
-    finally:
-        shutil.rmtree(probe_root, ignore_errors=True)
+
+    ensurepip_result = subprocess.run(
+        [str(python_exe), "-m", "ensurepip", "--upgrade", "--default-pip"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=temp_env,
+    )
+    if ensurepip_result.returncode == 0:
+        return True, ""
+
+    message = ensurepip_result.stderr.strip() or ensurepip_result.stdout.strip() or "ensurepip failed"
+    return False, message
+
+
+def install_requirements_with_python(
+    python_exe: Path,
+    requirements: Path,
+    temp_env: dict[str, str],
+    cache_dir: Path,
+    install_mode: str = "",
+) -> tuple[bool, str]:
+    install_cmd = [
+        str(python_exe),
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--cache-dir",
+        str(cache_dir),
+    ]
+    if install_mode:
+        install_cmd.append(install_mode)
+    install_cmd.extend(["-r", str(requirements)])
+
+    install_result = subprocess.run(
+        install_cmd,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=temp_env,
+    )
+    if install_result.returncode == 0 and can_import_yaml_with_python(python_exe, env=temp_env):
+        return True, ""
+
+    message = install_result.stderr.strip() or install_result.stdout.strip() or "pip install failed"
+    return False, message
 
 
 def parse_simple_frontmatter(frontmatter_text: str) -> dict[str, str]:
@@ -377,7 +463,7 @@ def ensure_yaml_available(skill_path: Path, root: Path, venv_path: Path) -> tupl
     try:
         import yaml  # noqa: F401
 
-        return True, "system"
+        return True, str(Path(sys.executable).resolve())
     except ModuleNotFoundError:
         pass
 
@@ -396,62 +482,42 @@ def ensure_yaml_available(skill_path: Path, root: Path, venv_path: Path) -> tupl
     if can_import_yaml_with_python(existing_python):
         return True, str(existing_python)
 
-    probe_ok, probe_message = probe_mkdtemp_support(temp_base)
-    if not probe_ok:
-        return False, probe_message
-
     temp_root = create_session_dir(temp_base, "session")
-
-    venv_path.parent.mkdir(parents=True, exist_ok=True)
-    builder = venv.EnvBuilder(with_pip=True)
     try:
-        with override_temp_env(temp_root) as temp_env:
-            builder.create(str(venv_path))
-        python_exe = python_executable_in_venv(venv_path)
-        if python_exe.exists():
-            install_cmd = [
-                str(python_exe),
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--cache-dir",
-                str(temp_root / "pip-cache"),
-                "-r",
-                str(requirements),
-            ]
-            with override_temp_env(temp_root) as temp_env:
-                install_result = subprocess.run(install_cmd, check=False, capture_output=True, text=True, env=temp_env)
-            if install_result.returncode == 0:
-                return True, str(python_exe)
-            errors.append(install_result.stderr.strip() or install_result.stdout.strip() or "venv pip install failed")
+        temp_env = build_bootstrap_env(temp_root)
+        cache_dir = temp_root / "pip-cache"
+
+        python_exe, python_error = ensure_venv_python(venv_path)
+        if python_exe:
+            pip_ready, pip_error = ensure_pip_available(python_exe, temp_env)
+            if pip_ready:
+                install_ok, install_error = install_requirements_with_python(python_exe, requirements, temp_env, cache_dir)
+                if install_ok:
+                    return True, str(python_exe)
+                errors.append(install_error or "venv pip install failed")
+            else:
+                errors.append(pip_error or "venv ensurepip failed")
         else:
-            errors.append(f"未找到 venv python: {python_exe}")
-    except Exception as error:  # pragma: no cover
-        errors.append(f"venv 自举失败: {error}")
+            errors.append(python_error)
 
-    user_install_cmd = [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "--user",
-        "--disable-pip-version-check",
-        "--cache-dir",
-        str(temp_root / "pip-cache"),
-        "-r",
-        str(requirements),
-    ]
-    with override_temp_env(temp_root) as temp_env:
-        user_install_result = subprocess.run(user_install_cmd, check=False, capture_output=True, text=True, env=temp_env)
-    if user_install_result.returncode == 0:
-        return True, "system"
-    errors.append(user_install_result.stderr.strip() or user_install_result.stdout.strip() or "user pip install failed")
+        system_python = Path(sys.executable).resolve()
+        system_install_ok, system_install_error = install_requirements_with_python(
+            system_python,
+            requirements,
+            temp_env,
+            cache_dir,
+            install_mode="--user",
+        )
+        if system_install_ok and can_import_yaml_with_python(system_python, env=temp_env):
+            return True, str(system_python)
+        errors.append(system_install_error or "user pip install failed")
 
-    return False, " | ".join(error for error in errors if error)
+        return False, " | ".join(error for error in errors if error)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
 
 
-def rerun_in_venv(python_exe: str, args: argparse.Namespace) -> int:
+def rerun_with_python(python_exe: str, args: argparse.Namespace) -> int:
     env = os.environ.copy()
     env["PMM_VALIDATOR_BOOTSTRAPPED"] = "1"
     cmd = [python_exe, __file__, str(resolve_skill_path(args.skill_path)), "--mode", "strict"]
@@ -478,14 +544,7 @@ def main() -> int:
 
     available, provider = ensure_yaml_available(skill_path, root, local_venv_path(skill_path, root, args.venv_path))
     if available:
-        if provider.endswith("python.exe") or provider.endswith("/python"):
-            return rerun_in_venv(provider, args)
-        try:
-            return strict_validate_with_yaml(skill_path)
-        except ModuleNotFoundError as error:
-            print(f"严格校验异常失败: {error}", file=sys.stderr)
-            print("回退到纯 Python 便携校验...", file=sys.stderr)
-            return portable_validate(skill_path)
+        return rerun_with_python(provider, args)
 
     print(f"PyYAML 自举失败: {provider}", file=sys.stderr)
     print("回退到纯 Python 便携校验...", file=sys.stderr)

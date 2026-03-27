@@ -5,6 +5,30 @@ const path = require('path');
 const { createExtractContext } = require('./adapters/extract');
 
 const DEFAULT_METHOD_SKIP = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'constructor']);
+const STATE_MUTATION_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'set', 'delete', 'clear']);
+
+function loadTypeScriptRuntime() {
+    const candidates = [
+        process.env.PMM_TYPESCRIPT_PATH || '',
+        'typescript',
+        path.resolve(__dirname, '..', '.runtime', 'ts-runtime', 'node_modules', 'typescript'),
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        try {
+            const ts = require(candidate);
+            if (ts && typeof ts.createSourceFile === 'function') {
+                return ts;
+            }
+        } catch {
+            continue;
+        }
+    }
+
+    return null;
+}
+
+const TYPESCRIPT_RUNTIME = loadTypeScriptRuntime();
 
 function parseArgs(argv) {
     const args = {
@@ -66,6 +90,120 @@ function ensureArray(value) {
 function readJson(filePath) {
     const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
     return JSON.parse(raw);
+}
+
+function hasModifier(node, modifierName, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !node?.modifiers) {
+        return false;
+    }
+    return node.modifiers.some(modifier => ts.SyntaxKind[modifier.kind] === modifierName);
+}
+
+function getPropertyNameText(node, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !node) {
+        return '';
+    }
+    if (ts.isIdentifier(node) || ts.isPrivateIdentifier?.(node)) {
+        return node.text;
+    }
+    if (ts.isStringLiteral(node) || ts.isNumericLiteral(node)) {
+        return String(node.text);
+    }
+    return typeof node.getText === 'function' ? node.getText() : '';
+}
+
+function isPropertyAccessLike(node, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !node) {
+        return false;
+    }
+    return ts.isPropertyAccessExpression(node) || (typeof ts.isPropertyAccessChain === 'function' && ts.isPropertyAccessChain(node));
+}
+
+function extractBindingNamesFromAst(nameNode, acc = [], ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !nameNode) {
+        return acc;
+    }
+    if (ts.isIdentifier(nameNode)) {
+        acc.push(nameNode.text);
+        return acc;
+    }
+    if (ts.isObjectBindingPattern(nameNode) || ts.isArrayBindingPattern(nameNode)) {
+        for (const element of nameNode.elements || []) {
+            if (!element) {
+                continue;
+            }
+            extractBindingNamesFromAst(element.name, acc, ts);
+        }
+    }
+    return acc;
+}
+
+function extractAstParamNames(params = [], ts = TYPESCRIPT_RUNTIME) {
+    if (!ts) {
+        return [];
+    }
+
+    return uniqueSorted(
+        params.flatMap(param => extractBindingNamesFromAst(param.name, [], ts))
+    );
+}
+
+function extractMethodBodyTextFromAst(bodyNode, sourceFile, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !bodyNode) {
+        return '';
+    }
+    if (ts.isBlock(bodyNode)) {
+        const text = bodyNode.getText(sourceFile);
+        return text.startsWith('{') && text.endsWith('}') ? text.slice(1, -1) : text;
+    }
+    return bodyNode.getText(sourceFile);
+}
+
+function maskTextRanges(source, ranges = []) {
+    if (!ranges.length) {
+        return source;
+    }
+
+    const chars = source.split('');
+    for (const range of ranges) {
+        const start = Math.max(0, range.start || 0);
+        const end = Math.min(chars.length, range.end || 0);
+        for (let index = start; index < end; index++) {
+            if (chars[index] !== '\r' && chars[index] !== '\n') {
+                chars[index] = ' ';
+            }
+        }
+    }
+    return chars.join('');
+}
+
+function extractDirectBodyTextFromAst(functionNode, sourceFile, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !functionNode?.body) {
+        return '';
+    }
+
+    const bodyNode = functionNode.body;
+    const fullBodyText = extractMethodBodyTextFromAst(bodyNode, sourceFile, ts);
+    if (!fullBodyText) {
+        return fullBodyText;
+    }
+
+    const nestedRanges = [];
+    const baseStart = ts.isBlock(bodyNode) ? bodyNode.getStart(sourceFile) + 1 : bodyNode.getStart(sourceFile);
+
+    const visit = node => {
+        if (node !== functionNode && typeof ts.isFunctionLike === 'function' && ts.isFunctionLike(node)) {
+            nestedRanges.push({
+                start: Math.max(0, node.getStart(sourceFile) - baseStart),
+                end: Math.max(0, node.getEnd() - baseStart),
+            });
+            return;
+        }
+        ts.forEachChild(node, visit);
+    };
+
+    ts.forEachChild(bodyNode, visit);
+    return maskTextRanges(fullBodyText, nestedRanges);
 }
 
 function listFilesRecursive(rootPath, matcher, acc = []) {
@@ -560,8 +698,418 @@ function extractMethodDefinitions(source) {
     return definitions;
 }
 
+function extractMethodDefinitionsFromAst(source, scriptFile) {
+    const ts = TYPESCRIPT_RUNTIME;
+    if (!ts) {
+        return null;
+    }
+
+    const scriptKind = scriptFile.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const sourceFile = ts.createSourceFile(scriptFile, source, ts.ScriptTarget.Latest, true, scriptKind);
+    const definitions = [];
+
+    const pushDefinition = (name, node, options = {}) => {
+        if (!name || DEFAULT_METHOD_SKIP.has(name)) {
+            return;
+        }
+
+        const params = options.paramsNode ? options.paramsNode.map(param => param.getText(sourceFile)).join(', ') : '';
+        definitions.push({
+            name,
+            access: options.access || 'public',
+            static: Boolean(options.static),
+            async: Boolean(options.async),
+            params,
+            returnType: options.returnType || '',
+            paramNames: options.paramNames || extractParamNames(params),
+            startIndex: node.getStart(sourceFile),
+            openBraceIndex: options.openBraceIndex ?? -1,
+            bodyText: options.bodyText || '',
+            directBodyText: options.directBodyText || options.bodyText || '',
+            line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+            astNode: options.astNode || node,
+            astSourceFile: sourceFile,
+            astKind: options.astKind || 'method',
+        });
+    };
+
+    const visit = node => {
+        if (ts.isClassLike(node)) {
+            for (const member of node.members || []) {
+                if (ts.isMethodDeclaration(member)) {
+                    const name = getPropertyNameText(member.name, ts);
+                    pushDefinition(name, member, {
+                        access: hasModifier(member, 'PrivateKeyword', ts)
+                            ? 'private'
+                            : hasModifier(member, 'ProtectedKeyword', ts)
+                              ? 'protected'
+                              : 'public',
+                        static: hasModifier(member, 'StaticKeyword', ts),
+                        async: hasModifier(member, 'AsyncKeyword', ts),
+                        paramsNode: member.parameters || [],
+                        returnType: member.type ? member.type.getText(sourceFile) : '',
+                        paramNames: extractAstParamNames(member.parameters || [], ts),
+                        openBraceIndex: member.body ? member.body.pos - 1 : -1,
+                        bodyText: extractMethodBodyTextFromAst(member.body, sourceFile, ts),
+                        directBodyText: extractDirectBodyTextFromAst(member, sourceFile, ts),
+                        astKind: 'method',
+                    });
+                    continue;
+                }
+
+                if (
+                    ts.isPropertyDeclaration(member) &&
+                    member.initializer &&
+                    (ts.isArrowFunction(member.initializer) || ts.isFunctionExpression(member.initializer))
+                ) {
+                    const initializer = member.initializer;
+                    const name = getPropertyNameText(member.name, ts);
+                    pushDefinition(name, member, {
+                        access: hasModifier(member, 'PrivateKeyword', ts)
+                            ? 'private'
+                            : hasModifier(member, 'ProtectedKeyword', ts)
+                              ? 'protected'
+                              : 'public',
+                        static: hasModifier(member, 'StaticKeyword', ts),
+                        async: hasModifier(initializer, 'AsyncKeyword', ts),
+                        paramsNode: initializer.parameters || [],
+                        returnType: initializer.type ? initializer.type.getText(sourceFile) : '',
+                        paramNames: extractAstParamNames(initializer.parameters || [], ts),
+                        openBraceIndex: ts.isBlock(initializer.body) ? initializer.body.pos - 1 : -1,
+                        bodyText: extractMethodBodyTextFromAst(initializer.body, sourceFile, ts),
+                        directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
+                        astKind: ts.isArrowFunction(initializer) ? 'arrow-property' : 'function-property',
+                        astNode: initializer,
+                    });
+                }
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    };
+
+    visit(sourceFile);
+    return {
+        sourceFile,
+        methods: definitions,
+    };
+}
+
+function readThisAccessPathFromAst(node, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !node) {
+        return null;
+    }
+    if (node.kind === ts.SyntaxKind.ThisKeyword) {
+        return '';
+    }
+    if (isPropertyAccessLike(node, ts)) {
+        const parentPath = readThisAccessPathFromAst(node.expression, ts);
+        if (parentPath == null) {
+            return null;
+        }
+        const propName = getPropertyNameText(node.name, ts);
+        return parentPath ? `${parentPath}.${propName}` : propName;
+    }
+    return null;
+}
+
+function getExpressionPathFromAst(node, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !node) {
+        return '';
+    }
+    if (node.kind === ts.SyntaxKind.ThisKeyword) {
+        return 'this';
+    }
+    if (ts.isIdentifier(node)) {
+        return node.text;
+    }
+    if (isPropertyAccessLike(node, ts)) {
+        const base = getExpressionPathFromAst(node.expression, ts);
+        const name = getPropertyNameText(node.name, ts);
+        return [base, name].filter(Boolean).join('.');
+    }
+    if (typeof ts.isElementAccessExpression === 'function' && ts.isElementAccessExpression(node)) {
+        const base = getExpressionPathFromAst(node.expression, ts);
+        const arg =
+            node.argumentExpression && (ts.isStringLiteral(node.argumentExpression) || ts.isNumericLiteral(node.argumentExpression))
+                ? String(node.argumentExpression.text)
+                : '';
+        return [base, arg].filter(Boolean).join('.');
+    }
+    return '';
+}
+
+function stripThisPrefix(value) {
+    return String(value || '').replace(/^this\./, '');
+}
+
+function createEmptyCallInfo() {
+    return {
+        localCalls: [],
+        localCallSites: [],
+        importedCalls: [],
+        apiCalls: [],
+        fieldCalls: [],
+        eventSubscriptions: [],
+        eventDispatches: [],
+        networkRequests: [],
+        callbackInvocations: [],
+        stateReads: [],
+        stateWrites: [],
+    };
+}
+
+function analyzeInlineCallableFromAst(callbackNode, imports, fieldTypes, handlerMaps, parentParamNames = [], methodName = '__inline__', knownMethodNames = []) {
+    const ts = TYPESCRIPT_RUNTIME;
+    if (!ts || !callbackNode) {
+        return createEmptyCallInfo();
+    }
+
+    const sourceFile = callbackNode.getSourceFile?.();
+    const inlineParamNames = extractAstParamNames(callbackNode.parameters || [], ts);
+    const combinedParamNames = [...(parentParamNames || []), ...inlineParamNames];
+    const bodyText = extractMethodBodyTextFromAst(callbackNode.body, sourceFile, ts);
+    if (!bodyText) {
+        return createEmptyCallInfo();
+    }
+
+    const regexInfo = extractMethodCalls(bodyText, methodName, imports, fieldTypes, handlerMaps, combinedParamNames, knownMethodNames, bodyText);
+    const astInfo = extractMethodCallsFromAst(
+        {
+            name: methodName,
+            astNode: callbackNode,
+            astSourceFile: sourceFile,
+            bodyText,
+        },
+        imports,
+        fieldTypes,
+        handlerMaps,
+        combinedParamNames,
+        knownMethodNames
+    );
+    return mergeCallInfo(regexInfo, astInfo);
+}
+
+function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, paramNames = [], knownMethodNames = []) {
+    const ts = TYPESCRIPT_RUNTIME;
+    const sourceFile = methodDef?.astSourceFile;
+    const astNode = methodDef?.astNode;
+    if (!ts || !sourceFile || !astNode) {
+        return null;
+    }
+
+    const localCalls = [];
+    const localCallSites = [];
+    const importedCalls = [];
+    const fieldCalls = [];
+    const callbackInvocations = [];
+    const eventSubscriptions = [];
+    const eventDispatches = [];
+    const networkRequests = [];
+    const importMap = new Map();
+    const paramSet = new Set(paramNames || []);
+
+    for (const importInfo of imports) {
+        for (const identifier of importInfo.identifiers) {
+            importMap.set(identifier, importInfo);
+        }
+    }
+
+    const pushLocalCall = (methodName, callNode) => {
+        if (!methodName || methodName === methodDef.name) {
+            return;
+        }
+        localCalls.push(methodName);
+        localCallSites.push({
+            method: methodName,
+            args: (callNode.arguments || []).map(arg => arg.getText(sourceFile)),
+        });
+    };
+
+    const visit = node => {
+        if (node !== astNode && typeof ts.isFunctionLike === 'function' && ts.isFunctionLike(node)) {
+            return;
+        }
+
+        if (ts.isCallExpression(node)) {
+            const expression = node.expression;
+            const calleePath = getExpressionPathFromAst(expression, ts);
+            const normalizedPath = stripThisPrefix(calleePath);
+            const argTexts = (node.arguments || []).map(arg => arg.getText(sourceFile));
+
+            if (ts.isIdentifier(expression) && paramSet.has(expression.text)) {
+                callbackInvocations.push(expression.text);
+            }
+
+            if (isPropertyAccessLike(expression, ts)) {
+                const thisPath = readThisAccessPathFromAst(expression, ts);
+                if (thisPath) {
+                    const parts = thisPath.split('.');
+                    if (parts.length === 1) {
+                        pushLocalCall(parts[0], node);
+                    } else {
+                        const [fieldName] = parts;
+                        const fieldType = fieldTypes.get(fieldName);
+                        if (fieldType?.sourcePath) {
+                            fieldCalls.push({
+                                fieldName,
+                                fieldType: fieldType.baseType,
+                                method: parts[parts.length - 1],
+                                sourcePath: fieldType.sourcePath,
+                                sourceSpecifier: fieldType.sourceSpecifier,
+                            });
+                        }
+                    }
+                }
+
+                if (ts.isIdentifier(expression.expression)) {
+                    const importInfo = importMap.get(expression.expression.text);
+                    if (importInfo) {
+                        importedCalls.push({
+                            identifier: expression.expression.text,
+                            method: getPropertyNameText(expression.name, ts),
+                            sourcePath: importInfo.resolvedPath,
+                            sourceSpecifier: importInfo.specifier,
+                            isApi: importInfo.isApi,
+                        });
+                    }
+                }
+            }
+
+            if (['eventBus.on', 'eventBus.once', 'oops.message.on', 'oops.message.once', 'director.on', 'director.once'].includes(normalizedPath)) {
+                const eventName = normalizeInlineExpression(argTexts[0] || '');
+                const handlerArg = node.arguments?.[1];
+                const handlerPath = stripThisPrefix(readThisAccessPathFromAst(handlerArg, ts) || '');
+                if (eventName && handlerPath) {
+                    eventSubscriptions.push({
+                        bus: normalizedPath.split('.').slice(0, -1).join('.'),
+                        mode: normalizedPath.split('.').slice(-1)[0],
+                        event: eventName,
+                        handler: handlerPath,
+                        via: 'direct-ast',
+                    });
+                } else if (eventName && handlerArg && (ts.isArrowFunction(handlerArg) || ts.isFunctionExpression(handlerArg))) {
+                    const inlineCallInfo = analyzeInlineCallableFromAst(handlerArg, imports, fieldTypes, handlerMaps, paramNames, '__inline_event__', knownMethodNames);
+                    eventSubscriptions.push({
+                        bus: normalizedPath.split('.').slice(0, -1).join('.'),
+                        mode: normalizedPath.split('.').slice(-1)[0],
+                        event: eventName,
+                        handler: '',
+                        via: 'inline-ast',
+                        inlineActions: createInlineActionSummary(inlineCallInfo),
+                    });
+                }
+            }
+
+            if (normalizedPath === 'VM.bindPath') {
+                const eventName = normalizeInlineExpression(argTexts[0] || '');
+                const handlerArg = node.arguments?.[1];
+                const handlerPath = stripThisPrefix(readThisAccessPathFromAst(handlerArg, ts) || '');
+                if (eventName && handlerPath) {
+                    eventSubscriptions.push({
+                        bus: 'VM',
+                        mode: 'bindPath',
+                        event: eventName,
+                        handler: handlerPath,
+                        via: 'direct-ast',
+                    });
+                } else if (eventName && handlerArg && (ts.isArrowFunction(handlerArg) || ts.isFunctionExpression(handlerArg))) {
+                    const inlineCallInfo = analyzeInlineCallableFromAst(handlerArg, imports, fieldTypes, handlerMaps, paramNames, '__inline_vm_event__', knownMethodNames);
+                    eventSubscriptions.push({
+                        bus: 'VM',
+                        mode: 'bindPath',
+                        event: eventName,
+                        handler: '',
+                        via: 'inline-ast',
+                        inlineActions: createInlineActionSummary(inlineCallInfo),
+                    });
+                }
+            }
+
+            if (['eventBus.emit', 'eventBus.emitAsync', 'oops.message.emit', 'director.dispatchEvent', 'VM.setValue', 'VM.addValue'].includes(normalizedPath)) {
+                const eventName = normalizeInlineExpression(argTexts[0] || '');
+                if (eventName) {
+                    eventDispatches.push({
+                        bus: normalizedPath.startsWith('VM.') ? 'VM' : normalizedPath.split('.').slice(0, -1).join('.'),
+                        mode: normalizedPath.split('.').slice(-1)[0],
+                        event: eventName,
+                    });
+                }
+            }
+
+            if (['Net.inst.request', 'Net.inst.tableMsg'].includes(normalizedPath)) {
+                const callbackArg = (node.arguments || []).find(arg => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) || null;
+                const lastArg = node.arguments?.[node.arguments.length - 1] || null;
+                const lastArgText = lastArg ? lastArg.getText(sourceFile).trim() : '';
+                const callbackMethodRef = stripThisPrefix(readThisAccessPathFromAst(lastArg, ts) || '');
+                const callbackCallInfo = callbackArg
+                    ? analyzeInlineCallableFromAst(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__network_callback__', knownMethodNames)
+                    : createEmptyCallInfo();
+
+                networkRequests.push({
+                    callee: normalizedPath,
+                    target: summarizeNetworkTarget(normalizedPath, argTexts),
+                    callbackKind: callbackArg
+                        ? 'inline'
+                        : callbackMethodRef
+                          ? 'methodRef'
+                          : lastArgText && paramSet.has(lastArgText)
+                            ? 'paramRef'
+                            : 'none',
+                    callbackRef: callbackArg ? '' : callbackMethodRef || (lastArgText && paramSet.has(lastArgText) ? lastArgText : ''),
+                    callbackLocalCalls: callbackArg
+                        ? callbackCallInfo.localCalls
+                        : callbackMethodRef
+                          ? [callbackMethodRef]
+                          : [],
+                    callbackImportedCalls: callbackCallInfo.importedCalls,
+                    callbackFieldCalls: callbackCallInfo.fieldCalls,
+                    callbackEventDispatches: callbackCallInfo.eventDispatches,
+                    callbackInvocations: callbackCallInfo.callbackInvocations,
+                });
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    };
+
+    visit(astNode);
+
+    return {
+        localCalls: uniqueSorted(localCalls),
+        localCallSites: dedupeBy(localCallSites, callSite => `${callSite.method}::${(callSite.args || []).join('||')}`),
+        importedCalls: dedupeBy(
+            importedCalls,
+            call => `${call.identifier}::${call.method}::${call.sourcePath || ''}::${call.sourceSpecifier || ''}`
+        ),
+        fieldCalls: dedupeBy(
+            fieldCalls,
+            call => `${call.fieldName}::${call.method}::${call.sourcePath || ''}::${call.sourceSpecifier || ''}`
+        ),
+        eventSubscriptions: dedupeBy(
+            eventSubscriptions,
+            item => `${item.bus}::${item.mode}::${item.event}::${item.handler || '(inline)'}::${item.via || ''}`
+        ),
+        eventDispatches: dedupeBy(
+            eventDispatches,
+            item => `${item.bus}::${item.mode}::${item.event}`
+        ),
+        networkRequests: dedupeBy(
+            networkRequests,
+            item => `${item.callee}::${item.target}::${item.callbackKind}::${item.callbackRef}::${(item.callbackLocalCalls || []).join(',')}`
+        ),
+        callbackInvocations: uniqueSorted(callbackInvocations),
+        stateReads: [],
+        stateWrites: [],
+    };
+}
+
 function uniqueSorted(values) {
     return Array.from(new Set(values.filter(Boolean))).sort((left, right) => left.localeCompare(right));
+}
+
+function unique(values) {
+    return Array.from(new Set((values || []).filter(Boolean)));
 }
 
 function dedupeBy(values, keySelector) {
@@ -657,10 +1205,12 @@ function createInlineActionSummary(callInfo) {
         eventDispatches: callInfo.eventDispatches,
         networkRequests: callInfo.networkRequests,
         callbackInvocations: callInfo.callbackInvocations,
+        stateReads: callInfo.stateReads,
+        stateWrites: callInfo.stateWrites,
     };
 }
 
-function extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames) {
+function extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames = []) {
     const subscriptions = [];
     const pattern = /\b(eventBus|oops\.message|director)\.(on|once)\s*\(/g;
     let match = null;
@@ -690,17 +1240,8 @@ function extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handle
             : '';
         const inlineParamNames = callbackParamsText ? extractParamNames(callbackParamsText) : [];
         const inlineCallInfo = callbackBody
-            ? extractMethodCalls(callbackBody, '__inline_event__', imports, fieldTypes, handlerMaps, [...paramNames, ...inlineParamNames])
-            : {
-                  localCalls: [],
-                  importedCalls: [],
-                  apiCalls: [],
-                  fieldCalls: [],
-                  eventSubscriptions: [],
-                  eventDispatches: [],
-                  networkRequests: [],
-                  callbackInvocations: [],
-              };
+            ? extractMethodCalls(callbackBody, '__inline_event__', imports, fieldTypes, handlerMaps, [...paramNames, ...inlineParamNames], knownMethodNames)
+            : createEmptyCallInfo();
 
         subscriptions.push({
             bus: match[1],
@@ -796,7 +1337,57 @@ function summarizeNetworkTarget(callee, args) {
     return normalizeInlineExpression(args[0] || '');
 }
 
-function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, paramNames) {
+function isStateFieldPath(fieldPath, fieldTypes, knownMethodNames = []) {
+    const rootField = String(fieldPath || '').split('.')[0];
+    if (!rootField) {
+        return false;
+    }
+    if ((knownMethodNames || []).includes(rootField)) {
+        return false;
+    }
+
+    const fieldType = fieldTypes.get(rootField);
+    return !(fieldType && fieldType.sourcePath);
+}
+
+function extractStateAccesses(methodBody, fieldTypes, knownMethodNames = []) {
+    const reads = [];
+    const writes = [];
+    const pushState = (bucket, fieldPath) => {
+        const normalizedField = String(fieldPath || '').trim().replace(/\?+\./g, '.');
+        if (!normalizedField || !isStateFieldPath(normalizedField, fieldTypes, knownMethodNames)) {
+            return;
+        }
+        bucket.push(normalizedField);
+    };
+
+    let match = null;
+
+    const writePattern = /\bthis\.([A-Za-z_$][\w$]*(?:\??\.[A-Za-z_$][\w$]*)*)\s*(?=(?:\+\+|--|[+\-*/%]?=))/g;
+    while ((match = writePattern.exec(methodBody))) {
+        pushState(writes, match[1]);
+    }
+
+    const mutatingPattern = /\bthis\.([A-Za-z_$][\w$]*(?:\??\.[A-Za-z_$][\w$]*)*)\.(push|pop|shift|unshift|splice|sort|reverse|set|delete|clear)\s*\(/g;
+    while ((match = mutatingPattern.exec(methodBody))) {
+        if (!STATE_MUTATION_METHODS.has(match[2])) {
+            continue;
+        }
+        pushState(writes, match[1]);
+    }
+
+    const readPattern = /\bthis\.([A-Za-z_$][\w$]*(?:\??\.[A-Za-z_$][\w$]*)*)\b(?!\s*\()/g;
+    while ((match = readPattern.exec(methodBody))) {
+        pushState(reads, match[1]);
+    }
+
+    return {
+        reads: uniqueSorted(reads),
+        writes: uniqueSorted(writes),
+    };
+}
+
+function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames = []) {
     const requests = [];
     const requestPattern = /\bNet\.inst\.(tableMsg|request)\s*\(/g;
     let match = null;
@@ -809,17 +1400,8 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         const callbackArg = args.find(arg => /=>|function\b/.test(arg)) || '';
         const callbackBody = callbackArg ? extractInlineCallbackBody(callbackArg) : '';
         const callbackCallInfo = callbackBody
-            ? extractMethodCalls(callbackBody, '__network_callback__', imports, fieldTypes, handlerMaps, paramNames)
-            : {
-                  localCalls: [],
-                  importedCalls: [],
-                  apiCalls: [],
-                  fieldCalls: [],
-                  eventSubscriptions: [],
-                  eventDispatches: [],
-                  networkRequests: [],
-                  callbackInvocations: [],
-              };
+            ? extractMethodCalls(callbackBody, '__network_callback__', imports, fieldTypes, handlerMaps, paramNames, knownMethodNames)
+            : createEmptyCallInfo();
 
         requests.push({
             callee,
@@ -840,16 +1422,17 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
     );
 }
 
-function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handlerMaps, paramNames = []) {
+function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handlerMaps, paramNames = [], knownMethodNames = [], directMethodBody = '') {
+    const directBody = directMethodBody || methodBody;
     const localCalls = [];
     const localCallSites = [];
     const localPattern = /\bthis\.([A-Za-z_$][\w$]*)\s*\(/g;
     let match = null;
-    while ((match = localPattern.exec(methodBody))) {
+    while ((match = localPattern.exec(directBody))) {
         if (match[1] !== methodName) {
             localCalls.push(match[1]);
             const openParenIndex = localPattern.lastIndex - 1;
-            const argRange = extractWrappedRange(methodBody, openParenIndex, '(', ')');
+            const argRange = extractWrappedRange(directBody, openParenIndex, '(', ')');
             localCallSites.push({
                 method: match[1],
                 args: argRange ? splitTopLevelArgs(argRange.content) : [],
@@ -865,7 +1448,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         for (const identifier of importInfo.identifiers) {
             const callPattern = new RegExp(`\\b${identifier.replace(/\$/g, '\\$')}\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g');
             let callMatch = null;
-            while ((callMatch = callPattern.exec(methodBody))) {
+            while ((callMatch = callPattern.exec(directBody))) {
                 importedCalls.push({
                     identifier,
                     method: callMatch[1],
@@ -880,7 +1463,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const fieldCalls = [];
     const fieldCallPattern = /\bthis\.([A-Za-z_$][\w$]*)(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)\s*\(/g;
     let fieldMatch = null;
-    while ((fieldMatch = fieldCallPattern.exec(methodBody))) {
+    while ((fieldMatch = fieldCallPattern.exec(directBody))) {
         const fieldName = fieldMatch[1];
         const calledMethod = fieldMatch[2];
         const fieldType = fieldTypes.get(fieldName);
@@ -899,22 +1482,23 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
 
     const eventSubscriptions = dedupeBy(
         [
-            ...extractDirectEventSubscriptions(methodBody),
-            ...extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames),
-            ...extractMappedEventSubscriptions(methodBody, handlerMaps),
-            ...extractVmEventSubscriptions(methodBody),
+            ...extractDirectEventSubscriptions(directBody),
+            ...extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames),
+            ...extractMappedEventSubscriptions(directBody, handlerMaps),
+            ...extractVmEventSubscriptions(directBody),
         ],
         subscription => `${subscription.bus}::${subscription.mode}::${subscription.event}::${subscription.handler || '(inline)'}::${subscription.via}`
     );
     const eventDispatches = dedupeBy(
         [
-            ...extractEventDispatches(methodBody),
-            ...extractVmEventDispatches(methodBody),
+            ...extractEventDispatches(directBody),
+            ...extractVmEventDispatches(directBody),
         ],
         dispatch => `${dispatch.bus}::${dispatch.mode}::${dispatch.event}`
     );
-    const networkRequests = extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, paramNames);
-    const callbackInvocations = extractInvokedIdentifierNames(methodBody, paramNames);
+    const networkRequests = extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
+    const callbackInvocations = extractInvokedIdentifierNames(directBody, paramNames);
+    const stateAccesses = extractStateAccesses(directBody, fieldTypes, knownMethodNames);
 
     return {
         localCalls: uniqueSorted(localCalls),
@@ -946,7 +1530,169 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         eventDispatches,
         networkRequests,
         callbackInvocations,
+        stateReads: stateAccesses.reads,
+        stateWrites: stateAccesses.writes,
     };
+}
+
+function mergeCallInfo(regexInfo, astInfo) {
+    if (!astInfo) {
+        return regexInfo;
+    }
+
+    const mergedImportedCalls = dedupeBy(
+        [...(regexInfo.importedCalls || []), ...(astInfo.importedCalls || [])],
+        call => `${call.identifier}::${call.method}::${call.sourcePath || ''}::${call.sourceSpecifier || ''}`
+    );
+    const mergedFieldCalls = dedupeBy(
+        [...(regexInfo.fieldCalls || []), ...(astInfo.fieldCalls || [])],
+        call => `${call.fieldName}::${call.method}::${call.sourcePath || ''}::${call.sourceSpecifier || ''}`
+    );
+    const mergedEventSubscriptionsMap = new Map();
+    for (const item of [...(regexInfo.eventSubscriptions || []), ...(astInfo.eventSubscriptions || [])]) {
+        const key = `${item.bus}::${item.mode}::${item.event}::${item.handler || '(inline)'}`;
+        const existing = mergedEventSubscriptionsMap.get(key) || null;
+        if (!existing) {
+            mergedEventSubscriptionsMap.set(key, item);
+            continue;
+        }
+        const preferAst = String(item.via || '').includes('-ast') || String(item.via || '').includes('ast');
+        const current = preferAst ? item : existing;
+        current.inlineActions = current.inlineActions || existing.inlineActions || item.inlineActions || null;
+        if (!current.via && (existing.via || item.via)) {
+            current.via = existing.via || item.via;
+        }
+        mergedEventSubscriptionsMap.set(key, current);
+    }
+    const mergedEventSubscriptions = Array.from(mergedEventSubscriptionsMap.values());
+    const mergedEventDispatches = dedupeBy(
+        [...(regexInfo.eventDispatches || []), ...(astInfo.eventDispatches || [])],
+        item => `${item.bus}::${item.mode}::${item.event}`
+    );
+    const mergedNetworkRequestsMap = new Map();
+    for (const item of [...(regexInfo.networkRequests || []), ...(astInfo.networkRequests || [])]) {
+        const primaryKey = `${item.callee}::${item.target}`;
+        const secondaryKey = `${primaryKey}::${item.callbackKind}::${item.callbackRef}::${(item.callbackLocalCalls || []).join(',')}`;
+        const existing = mergedNetworkRequestsMap.get(primaryKey) || mergedNetworkRequestsMap.get(secondaryKey) || null;
+        if (!existing) {
+            mergedNetworkRequestsMap.set(primaryKey, item);
+            continue;
+        }
+
+        const currentScore =
+            (existing.callbackKind && existing.callbackKind !== 'none' ? 2 : 0) +
+            ((existing.callbackLocalCalls || []).length > 0 ? 2 : 0) +
+            ((existing.callbackRef || '').length > 0 ? 1 : 0);
+        const nextScore =
+            (item.callbackKind && item.callbackKind !== 'none' ? 2 : 0) +
+            ((item.callbackLocalCalls || []).length > 0 ? 2 : 0) +
+            ((item.callbackRef || '').length > 0 ? 1 : 0);
+        const preferred = nextScore >= currentScore ? item : existing;
+        preferred.callbackLocalCalls = unique([...(existing.callbackLocalCalls || []), ...(item.callbackLocalCalls || [])]);
+        preferred.callbackImportedCalls = dedupeBy(
+            [...(existing.callbackImportedCalls || []), ...(item.callbackImportedCalls || [])],
+            call => `${call.identifier || ''}::${call.method || ''}::${call.sourcePath || ''}`
+        );
+        preferred.callbackFieldCalls = dedupeBy(
+            [...(existing.callbackFieldCalls || []), ...(item.callbackFieldCalls || [])],
+            call => `${call.fieldName || ''}::${call.method || ''}::${call.sourcePath || ''}`
+        );
+        preferred.callbackEventDispatches = dedupeBy(
+            [...(existing.callbackEventDispatches || []), ...(item.callbackEventDispatches || [])],
+            call => `${call.bus || ''}::${call.mode || ''}::${call.event || ''}`
+        );
+        preferred.callbackInvocations = unique([...(existing.callbackInvocations || []), ...(item.callbackInvocations || [])]);
+        mergedNetworkRequestsMap.set(primaryKey, preferred);
+    }
+    const mergedNetworkRequests = Array.from(mergedNetworkRequestsMap.values());
+
+    return {
+        ...regexInfo,
+        localCalls: uniqueSorted([...(regexInfo.localCalls || []), ...(astInfo.localCalls || [])]),
+        localCallSites: dedupeBy(
+            [...(regexInfo.localCallSites || []), ...(astInfo.localCallSites || [])],
+            callSite => `${callSite.method}::${(callSite.args || []).join('||')}`
+        ),
+        importedCalls: mergedImportedCalls,
+        apiCalls: uniqueSorted(mergedImportedCalls.filter(call => call.isApi).map(call => `${call.identifier}.${call.method}`)),
+        fieldCalls: mergedFieldCalls,
+        eventSubscriptions: mergedEventSubscriptions,
+        eventDispatches: mergedEventDispatches,
+        networkRequests: mergedNetworkRequests,
+        callbackInvocations: uniqueSorted([...(regexInfo.callbackInvocations || []), ...(astInfo.callbackInvocations || [])]),
+        stateReads: uniqueSorted([...(regexInfo.stateReads || []), ...(astInfo.stateReads || [])]),
+        stateWrites: uniqueSorted([...(regexInfo.stateWrites || []), ...(astInfo.stateWrites || [])]),
+    };
+}
+
+function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
+    const normalized = {
+        ...callInfo,
+        eventSubscriptions: [],
+        eventDispatches: dedupeBy(
+            [...(callInfo.eventDispatches || [])],
+            item => `${item.bus}::${item.mode}::${item.event}`
+        ),
+        networkRequests: [],
+        stateReads: uniqueSorted(
+            (callInfo.stateReads || []).filter(item => !knownMethodNames.includes(String(item || '').split('.')[0]))
+        ),
+        stateWrites: uniqueSorted(
+            (callInfo.stateWrites || []).filter(item => !knownMethodNames.includes(String(item || '').split('.')[0]))
+        ),
+    };
+
+    const eventSubscriptionMap = new Map();
+    for (const item of callInfo.eventSubscriptions || []) {
+        const key = `${item.bus}::${item.mode}::${item.event}::${item.handler || '(inline)'}`;
+        const existing = eventSubscriptionMap.get(key) || null;
+        if (!existing) {
+            eventSubscriptionMap.set(key, item);
+            continue;
+        }
+        const preferAst = String(item.via || '').includes('-ast') || String(item.via || '').includes('ast');
+        const preferred = preferAst ? item : existing;
+        preferred.inlineActions = preferred.inlineActions || existing.inlineActions || item.inlineActions || null;
+        eventSubscriptionMap.set(key, preferred);
+    }
+    normalized.eventSubscriptions = Array.from(eventSubscriptionMap.values());
+
+    const requestMap = new Map();
+    for (const item of callInfo.networkRequests || []) {
+        const key = `${item.callee}::${item.target}`;
+        const existing = requestMap.get(key) || null;
+        if (!existing) {
+            requestMap.set(key, item);
+            continue;
+        }
+        const existingScore =
+            (existing.callbackKind && existing.callbackKind !== 'none' ? 2 : 0) +
+            ((existing.callbackLocalCalls || []).length > 0 ? 2 : 0) +
+            ((existing.callbackRef || '').length > 0 ? 1 : 0);
+        const nextScore =
+            (item.callbackKind && item.callbackKind !== 'none' ? 2 : 0) +
+            ((item.callbackLocalCalls || []).length > 0 ? 2 : 0) +
+            ((item.callbackRef || '').length > 0 ? 1 : 0);
+        const preferred = nextScore >= existingScore ? item : existing;
+        preferred.callbackLocalCalls = unique([...(existing.callbackLocalCalls || []), ...(item.callbackLocalCalls || [])]);
+        preferred.callbackImportedCalls = dedupeBy(
+            [...(existing.callbackImportedCalls || []), ...(item.callbackImportedCalls || [])],
+            call => `${call.identifier || ''}::${call.method || ''}::${call.sourcePath || ''}`
+        );
+        preferred.callbackFieldCalls = dedupeBy(
+            [...(existing.callbackFieldCalls || []), ...(item.callbackFieldCalls || [])],
+            call => `${call.fieldName || ''}::${call.method || ''}::${call.sourcePath || ''}`
+        );
+        preferred.callbackEventDispatches = dedupeBy(
+            [...(existing.callbackEventDispatches || []), ...(item.callbackEventDispatches || [])],
+            call => `${call.bus || ''}::${call.mode || ''}::${call.event || ''}`
+        );
+        preferred.callbackInvocations = unique([...(existing.callbackInvocations || []), ...(item.callbackInvocations || [])]);
+        requestMap.set(key, preferred);
+    }
+    normalized.networkRequests = Array.from(requestMap.values());
+
+    return normalized;
 }
 
 function extractExports(source) {
@@ -997,21 +1743,27 @@ function extractScriptInsights(methodRoots, context) {
     const result = [];
 
     for (const root of methodRoots) {
-        const scriptFiles = listFilesRecursive(root, filePath => filePath.endsWith('.ts'));
+        const scriptFiles = listFilesRecursive(root, filePath => /\.tsx?$/.test(filePath) && !filePath.endsWith('.d.ts'));
         for (const scriptFile of scriptFiles) {
             const normalizedScript = normalize(scriptFile);
             const source = fs.readFileSync(scriptFile, 'utf8');
+            const astContext = extractMethodDefinitionsFromAst(source, scriptFile);
             const imports = extractImports(source, scriptFile, context);
             const fieldTypes = extractFieldTypes(source, imports);
             const handlerMaps = extractHandlerMaps(source);
             const exports = extractExports(source);
             const methods = [];
-            for (const methodDef of extractMethodDefinitions(source)) {
-                const line = source.slice(0, methodDef.startIndex).split(/\r?\n/).length;
+            const methodDefinitions = astContext?.methods?.length ? astContext.methods : extractMethodDefinitions(source);
+            const knownMethodNames = methodDefinitions.map(item => item.name);
+            for (const methodDef of methodDefinitions) {
+                const line = methodDef.line || source.slice(0, methodDef.startIndex).split(/\r?\n/).length;
                 const docBlock = extractLeadingDoc(source, methodDef.startIndex);
-                const methodBody = extractBlockContent(source, methodDef.openBraceIndex);
-                const paramNames = extractParamNames(methodDef.params);
-                const callInfo = extractMethodCalls(methodBody, methodDef.name, imports, fieldTypes, handlerMaps, paramNames);
+                const methodBody = methodDef.bodyText || extractBlockContent(source, methodDef.openBraceIndex);
+                const directMethodBody = methodDef.directBodyText || methodBody;
+                const paramNames = methodDef.paramNames || extractParamNames(methodDef.params);
+                const regexCallInfo = extractMethodCalls(methodBody, methodDef.name, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames, directMethodBody);
+                const astCallInfo = extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
+                const callInfo = normalizeFinalCallInfo(mergeCallInfo(regexCallInfo, astCallInfo), knownMethodNames);
 
                 methods.push({
                     name: methodDef.name,
@@ -1032,6 +1784,8 @@ function extractScriptInsights(methodRoots, context) {
                     eventDispatches: callInfo.eventDispatches,
                     networkRequests: callInfo.networkRequests,
                     callbackInvocations: callInfo.callbackInvocations,
+                    stateReads: callInfo.stateReads,
+                    stateWrites: callInfo.stateWrites,
                 });
             }
 
@@ -1046,6 +1800,7 @@ function extractScriptInsights(methodRoots, context) {
                 })),
                 exports,
                 methods,
+                analysisMode: astContext?.methods?.length ? 'typescript-ast+regex' : 'regex',
             });
         }
     }

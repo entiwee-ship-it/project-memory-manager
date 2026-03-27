@@ -29,6 +29,52 @@ function unique(values) {
     return Array.from(new Set((values || []).filter(Boolean)));
 }
 
+const TAG_SYNONYMS = {
+    loadmore: ['loadmore', 'load-more', 'load_more', '分页', '分页加载', '加载更多', '滚动加载'],
+    page: ['page', 'pages', 'pagination', '分页'],
+    record: ['record', 'records', '记录'],
+    list: ['list', '列表'],
+    scroll: ['scroll', '滚动'],
+    refresh: ['refresh', '刷新'],
+    click: ['click', '点击'],
+    request: ['request', '请求'],
+    loading: ['loading', '加载中'],
+    state: ['state', '状态'],
+};
+
+function tokenizeText(value) {
+    return String(value || '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_./:@-]+/g, ' ')
+        .split(/\s+/)
+        .map(token => token.trim().toLowerCase())
+        .filter(Boolean);
+}
+
+function buildSearchTags(...values) {
+    const tags = new Set();
+    for (const value of values) {
+        const normalized = String(value || '').trim();
+        if (!normalized) {
+            continue;
+        }
+
+        const compact = normalized.toLowerCase();
+        tags.add(compact);
+        for (const [keyword, aliases] of Object.entries(TAG_SYNONYMS)) {
+            if (compact.includes(keyword)) {
+                tags.add(keyword);
+                aliases.forEach(alias => tags.add(alias.toLowerCase()));
+            }
+        }
+        for (const token of tokenizeText(normalized)) {
+            tags.add(token);
+            (TAG_SYNONYMS[token] || []).forEach(alias => tags.add(alias.toLowerCase()));
+        }
+    }
+    return Array.from(tags).sort((left, right) => left.localeCompare(right));
+}
+
 function mapCallbackInvocation(invocationName, argMap) {
     const mappedArg = String(argMap.get(invocationName) || '').trim();
     if (!mappedArg) {
@@ -133,18 +179,37 @@ function buildGraph(raw, config, projectProfile, root) {
     const edgeSet = new Set();
     const featureId = makeNodeId('module', config.featureKey);
     const methodMap = buildMethodMap(raw);
+    const componentNodeMap = new Map();
 
     const addNode = node => {
         if (nodeMap.has(node.id)) {
-            return nodeMap.get(node.id);
+            const existingNode = nodeMap.get(node.id);
+            existingNode.name = node.name || existingNode.name;
+            existingNode.file = node.file || existingNode.file;
+            existingNode.line = node.line != null ? node.line : existingNode.line;
+            existingNode.area = node.area && node.area !== 'unknown' ? node.area : existingNode.area;
+            existingNode.stack = (node.stack || []).length > 0 ? node.stack : existingNode.stack;
+            const mergedMeta = {
+                ...(existingNode.meta || {}),
+                ...(node.meta || {}),
+            };
+            mergedMeta.tags = unique([...(existingNode.meta?.tags || []), ...(node.meta?.tags || [])]);
+            existingNode.meta = {
+                ...mergedMeta,
+            };
+            return existingNode;
         }
         const normalizedNode = {
             line: null,
             file: '',
             area: 'unknown',
             stack: [],
-            meta: {},
+            meta: { tags: [] },
             ...node,
+        };
+        normalizedNode.meta = {
+            tags: [],
+            ...(normalizedNode.meta || {}),
         };
         nodes.push(normalizedNode);
         nodeMap.set(node.id, normalizedNode);
@@ -171,10 +236,22 @@ function buildGraph(raw, config, projectProfile, root) {
         edges.push(normalizedEdge);
     };
 
+    const inferNodeArea = filePath => inferArea(path.resolve(root, filePath), config, projectProfile, root);
+
+    const appendNodeTags = (node, ...values) => {
+        if (!node) {
+            return;
+        }
+        node.meta = {
+            ...(node.meta || {}),
+            tags: unique([...(node.meta?.tags || []), ...buildSearchTags(...values)]),
+        };
+    };
+
     const ensureScriptNode = scriptPath => {
         const absolutePath = path.resolve(root, scriptPath);
-        const area = inferArea(absolutePath, config, projectProfile, root);
-        return addNode({
+        const area = inferNodeArea(scriptPath);
+        const scriptNode = addNode({
             id: makeNodeId('script', scriptPath),
             type: 'script',
             name: path.basename(scriptPath),
@@ -182,7 +259,55 @@ function buildGraph(raw, config, projectProfile, root) {
             area,
             stack: inferStacks(area, projectProfile),
         });
+        appendNodeTags(scriptNode, scriptPath, path.basename(scriptPath));
+        return scriptNode;
     };
+
+    const ensureMethodNode = (scriptPath, methodName, options = {}) => {
+        const scriptNode = ensureScriptNode(scriptPath);
+        const methodInfo = methodMap.get(methodKey(scriptPath, methodName)) || null;
+        const area = options.area || methodInfo?.area || scriptNode.area || inferNodeArea(scriptPath);
+        const methodNode = addNode({
+            id: makeNodeId('method', scriptPath, methodName),
+            type: 'method',
+            name: `${path.basename(scriptPath, path.extname(scriptPath))}.${methodName}`,
+            file: scriptNode.file || normalize(path.resolve(root, scriptPath)),
+            line: options.line != null ? options.line : (methodInfo?.line ?? null),
+            area,
+            stack: inferStacks(area, projectProfile),
+            meta: {
+                methodName,
+                scriptPath,
+                summary: options.summary || methodInfo?.summary || methodInfo?.scriptSummary || '',
+                synthetic: !methodInfo,
+            },
+        });
+        appendNodeTags(methodNode, methodName, methodNode.name, scriptPath, options.summary || methodInfo?.summary || '');
+        addEdge({ from: scriptNode.id, to: methodNode.id, type: 'contains', sourceKind: 'script', area });
+        return methodNode;
+    };
+
+    const ensureStateNode = (scriptPath, statePath) => {
+        const scriptNode = ensureScriptNode(scriptPath);
+        const area = scriptNode.area || inferNodeArea(scriptPath);
+        const stateNode = addNode({
+            id: makeNodeId('state', scriptPath, statePath),
+            type: 'state',
+            name: `${path.basename(scriptPath, path.extname(scriptPath))}.${statePath}`,
+            file: scriptNode.file || normalize(path.resolve(root, scriptPath)),
+            area,
+            stack: inferStacks(area, projectProfile),
+            meta: {
+                statePath,
+                scriptPath,
+            },
+        });
+        appendNodeTags(stateNode, statePath, stateNode.name, scriptPath, 'state');
+        addEdge({ from: scriptNode.id, to: stateNode.id, type: 'contains', sourceKind: 'script', area });
+        return stateNode;
+    };
+
+    const makeComponentKey = (prefabPath, nodePath, componentName) => [prefabPath, nodePath || '', componentName || ''].join('::');
 
     addNode({
         id: featureId,
@@ -196,6 +321,7 @@ function buildGraph(raw, config, projectProfile, root) {
             summary: config.summary || '',
         },
     });
+    appendNodeTags(nodeMap.get(featureId), config.featureKey, config.featureName, config.summary || '');
 
     for (const prefab of raw.prefabs || []) {
         const prefabNode = addNode({
@@ -207,6 +333,7 @@ function buildGraph(raw, config, projectProfile, root) {
             stack: inferStacks('frontend', projectProfile),
             meta: { category: 'prefab' },
         });
+        appendNodeTags(prefabNode, prefab.prefabPath, prefabNode.name, 'prefab');
         addEdge({ from: featureId, to: prefabNode.id, type: 'contains', sourceKind: 'prefab', area: 'frontend' });
 
         for (const component of prefab.customComponents || []) {
@@ -215,9 +342,9 @@ function buildGraph(raw, config, projectProfile, root) {
                 type: 'component',
                 name: `${component.componentName}@${component.nodePath}`,
                 file: component.scriptPath || prefab.prefabPath,
-                area: component.scriptPath ? inferArea(component.scriptPath, config, projectProfile, root) : 'frontend',
+                area: component.scriptPath ? inferNodeArea(component.scriptPath) : 'frontend',
                 stack: component.scriptPath
-                    ? inferStacks(inferArea(component.scriptPath, config, projectProfile, root), projectProfile)
+                    ? inferStacks(inferNodeArea(component.scriptPath), projectProfile)
                     : inferStacks('frontend', projectProfile),
                 meta: {
                     prefabPath: prefab.prefabPath,
@@ -225,6 +352,8 @@ function buildGraph(raw, config, projectProfile, root) {
                     rawType: component.rawType,
                 },
             });
+            appendNodeTags(componentNode, component.componentName, component.nodePath, component.rawType || '', component.scriptPath || '');
+            componentNodeMap.set(makeComponentKey(prefab.prefabPath, component.nodePath, component.componentName), componentNode.id);
             addEdge({ from: prefabNode.id, to: componentNode.id, type: 'contains', sourceKind: 'prefab', area: componentNode.area });
             if (component.scriptPath) {
                 const scriptNode = ensureScriptNode(component.scriptPath);
@@ -236,16 +365,21 @@ function buildGraph(raw, config, projectProfile, root) {
             if (!eventInfo.targetScriptPath || !eventInfo.handler) {
                 continue;
             }
-            const targetId = makeNodeId('method', eventInfo.targetScriptPath, eventInfo.handler);
-            ensureScriptNode(eventInfo.targetScriptPath);
+            const sourceComponentId =
+                componentNodeMap.get(makeComponentKey(prefab.prefabPath, eventInfo.sourceNodePath, eventInfo.sourceComponent)) || prefabNode.id;
+            const sourceArea = nodeMap.get(sourceComponentId)?.area || 'frontend';
+            const targetMethodNode = ensureMethodNode(eventInfo.targetScriptPath, eventInfo.handler, { area: sourceArea });
+            appendNodeTags(nodeMap.get(sourceComponentId), eventInfo.sourceKind, eventInfo.handler, eventInfo.sourceNodePath, eventInfo.targetComponentName || '');
+            appendNodeTags(targetMethodNode, eventInfo.sourceKind, eventInfo.handler, eventInfo.targetComponentName || '');
             addEdge({
-                from: prefabNode.id,
-                to: targetId,
+                from: sourceComponentId,
+                to: targetMethodNode.id,
                 type: 'binds',
                 sourceKind: 'prefab',
-                area: 'frontend',
+                area: sourceArea,
                 meta: {
                     sourceNodePath: eventInfo.sourceNodePath,
+                    sourceComponent: eventInfo.sourceComponent || '',
                     sourceEventKind: eventInfo.sourceKind,
                     handler: eventInfo.handler,
                 },
@@ -273,36 +407,28 @@ function buildGraph(raw, config, projectProfile, root) {
         }
 
         for (const method of script.methods || []) {
-            const methodArea = inferArea(script.scriptPath, config, projectProfile, root);
-            const currentMethodId = makeNodeId('method', script.scriptPath, method.name);
-            addNode({
-                id: currentMethodId,
-                type: 'method',
-                name: `${path.basename(script.scriptPath, path.extname(script.scriptPath))}.${method.name}`,
-                file: script.scriptPath,
-                line: method.line,
+            const methodArea = inferNodeArea(script.scriptPath);
+            const currentMethodNode = ensureMethodNode(script.scriptPath, method.name, {
                 area: methodArea,
-                stack: inferStacks(methodArea, projectProfile),
-                meta: {
-                    methodName: method.name,
-                    scriptPath: script.scriptPath,
-                    summary: method.summary || '',
-                },
+                line: method.line,
+                summary: method.summary || '',
             });
+            const currentMethodId = currentMethodNode.id;
             addEdge({ from: scriptNode.id, to: currentMethodId, type: 'contains', sourceKind: 'script', area: methodArea });
 
             for (const localMethod of method.localCalls || []) {
-                addEdge({ from: currentMethodId, to: makeNodeId('method', script.scriptPath, localMethod), type: 'calls', sourceKind: 'script', area: methodArea });
+                const targetMethodNode = ensureMethodNode(script.scriptPath, localMethod, { area: methodArea });
+                addEdge({ from: currentMethodId, to: targetMethodNode.id, type: 'calls', sourceKind: 'script', area: methodArea });
             }
 
             for (const fieldCall of method.fieldCalls || []) {
                 if (!fieldCall.sourcePath) {
                     continue;
                 }
-                ensureScriptNode(fieldCall.sourcePath);
+                const targetMethodNode = ensureMethodNode(fieldCall.sourcePath, fieldCall.method);
                 addEdge({
                     from: currentMethodId,
-                    to: makeNodeId('method', fieldCall.sourcePath, fieldCall.method),
+                    to: targetMethodNode.id,
                     type: 'field_calls',
                     sourceKind: 'script',
                     area: methodArea,
@@ -317,10 +443,10 @@ function buildGraph(raw, config, projectProfile, root) {
                 if (!importedCall.sourcePath) {
                     continue;
                 }
-                ensureScriptNode(importedCall.sourcePath);
+                const targetMethodNode = ensureMethodNode(importedCall.sourcePath, importedCall.method);
                 addEdge({
                     from: currentMethodId,
-                    to: makeNodeId('method', importedCall.sourcePath, importedCall.method),
+                    to: targetMethodNode.id,
                     type: 'calls',
                     sourceKind: importedCall.isApi ? 'network' : 'script',
                     area: methodArea,
@@ -343,6 +469,7 @@ function buildGraph(raw, config, projectProfile, root) {
                     stack: inferStacks(methodArea, projectProfile),
                     meta: { bus: subscription.bus },
                 });
+                appendNodeTags(nodeMap.get(eventId), subscription.event, subscription.bus, subscription.mode);
                 addEdge({
                     from: currentMethodId,
                     to: eventId,
@@ -369,6 +496,7 @@ function buildGraph(raw, config, projectProfile, root) {
                     stack: inferStacks(methodArea, projectProfile),
                     meta: { bus: dispatch.bus },
                 });
+                appendNodeTags(nodeMap.get(eventId), dispatch.event, dispatch.bus, dispatch.mode);
                 addEdge({
                     from: currentMethodId,
                     to: eventId,
@@ -396,6 +524,7 @@ function buildGraph(raw, config, projectProfile, root) {
                         callbackKind: request.callbackKind,
                     },
                 });
+                appendNodeTags(nodeMap.get(requestId), request.target || request.callee, request.callee, 'request');
                 addEdge({
                     from: currentMethodId,
                     to: requestId,
@@ -410,9 +539,10 @@ function buildGraph(raw, config, projectProfile, root) {
                 });
 
                 for (const callbackLocalCall of request.callbackLocalCalls || []) {
+                    const callbackMethodNode = ensureMethodNode(script.scriptPath, callbackLocalCall, { area: methodArea });
                     addEdge({
                         from: currentMethodId,
-                        to: makeNodeId('method', script.scriptPath, callbackLocalCall),
+                        to: callbackMethodNode.id,
                         type: 'callback_calls',
                         sourceKind: 'network',
                         area: methodArea,
@@ -424,9 +554,10 @@ function buildGraph(raw, config, projectProfile, root) {
                     if (!callbackFieldCall.sourcePath) {
                         continue;
                     }
+                    const callbackMethodNode = ensureMethodNode(callbackFieldCall.sourcePath, callbackFieldCall.method);
                     addEdge({
                         from: currentMethodId,
-                        to: makeNodeId('method', callbackFieldCall.sourcePath, callbackFieldCall.method),
+                        to: callbackMethodNode.id,
                         type: 'callback_calls',
                         sourceKind: 'network',
                         area: methodArea,
@@ -436,6 +567,75 @@ function buildGraph(raw, config, projectProfile, root) {
                         },
                     });
                 }
+
+                for (const callbackImportedCall of request.callbackImportedCalls || []) {
+                    if (!callbackImportedCall.sourcePath) {
+                        continue;
+                    }
+                    const callbackMethodNode = ensureMethodNode(callbackImportedCall.sourcePath, callbackImportedCall.method);
+                    addEdge({
+                        from: currentMethodId,
+                        to: callbackMethodNode.id,
+                        type: 'callback_calls',
+                        sourceKind: callbackImportedCall.isApi ? 'network' : 'script',
+                        area: methodArea,
+                        meta: {
+                            request: request.target || request.callee,
+                            identifier: callbackImportedCall.identifier,
+                            isApi: Boolean(callbackImportedCall.isApi),
+                        },
+                    });
+                }
+
+                for (const callbackDispatch of request.callbackEventDispatches || []) {
+                    const eventId = makeNodeId('event', callbackDispatch.bus, callbackDispatch.event);
+                    addNode({
+                        id: eventId,
+                        type: 'event',
+                        name: callbackDispatch.event,
+                        file: script.scriptPath,
+                        line: method.line,
+                        area: methodArea,
+                        stack: inferStacks(methodArea, projectProfile),
+                        meta: { bus: callbackDispatch.bus },
+                    });
+                    addEdge({
+                        from: currentMethodId,
+                        to: eventId,
+                        type: 'emits',
+                        sourceKind: 'network',
+                        area: methodArea,
+                        meta: {
+                            request: request.target || request.callee,
+                            mode: callbackDispatch.mode,
+                            phase: 'callback',
+                        },
+                    });
+                }
+            }
+
+            for (const statePath of method.stateReads || []) {
+                const stateNode = ensureStateNode(script.scriptPath, statePath);
+                addEdge({
+                    from: currentMethodId,
+                    to: stateNode.id,
+                    type: 'reads',
+                    sourceKind: 'state',
+                    area: methodArea,
+                    meta: { statePath },
+                });
+            }
+
+            for (const statePath of method.stateWrites || []) {
+                const stateNode = ensureStateNode(script.scriptPath, statePath);
+                addEdge({
+                    from: currentMethodId,
+                    to: stateNode.id,
+                    type: 'writes',
+                    sourceKind: 'state',
+                    area: methodArea,
+                    meta: { statePath },
+                });
             }
         }
     }
@@ -457,6 +657,8 @@ function buildLookup(graph) {
     const methods = {};
     const methodAliases = {};
     const requests = {};
+    const states = {};
+    const nodesByType = {};
 
     const pushEdge = (bucket, nodeId, edge) => {
         if (!bucket[nodeId]) {
@@ -471,6 +673,11 @@ function buildLookup(graph) {
     }
 
     for (const node of graph.nodes) {
+        if (!nodesByType[node.type]) {
+            nodesByType[node.type] = [];
+        }
+        nodesByType[node.type].push(node.id);
+
         if (node.type === 'method') {
             const label = node.name;
             methods[label] = {
@@ -505,6 +712,17 @@ function buildLookup(graph) {
                 callers: (incoming[node.id] || []).filter(edge => edge.type === 'requests').map(edge => nodesById[edge.from]?.name || edge.from),
             };
         }
+
+        if (node.type === 'state') {
+            const stateKey = node.meta?.statePath || node.name;
+            states[stateKey] = {
+                id: node.id,
+                file: node.file,
+                area: node.area,
+                readers: (incoming[node.id] || []).filter(edge => edge.type === 'reads').map(edge => nodesById[edge.from]?.name || edge.from),
+                writers: (incoming[node.id] || []).filter(edge => edge.type === 'writes').map(edge => nodesById[edge.from]?.name || edge.from),
+            };
+        }
     }
 
     return {
@@ -520,6 +738,8 @@ function buildLookup(graph) {
         methodAliases,
         events,
         requests,
+        states,
+        nodesByType,
     };
 }
 

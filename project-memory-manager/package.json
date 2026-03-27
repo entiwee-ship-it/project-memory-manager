@@ -1,0 +1,9 @@
+{
+  "name": "project-memory-manager-skill-runtime",
+  "private": true,
+  "type": "commonjs",
+  "description": "Runtime helpers for the project-memory-manager Codex skill.",
+  "dependencies": {
+    "typescript": "^5.9.3"
+  }
+}

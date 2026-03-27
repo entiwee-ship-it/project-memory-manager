@@ -15,6 +15,7 @@
 - `response`
 - `dto`
 - `model`
+- `state`
 - `table`
 - `config`
 - `job`
@@ -44,3 +45,6 @@
 - request -> callers
 - upstream 遍历
 - downstream 遍历
+- component -> binds(handler / sourceEventKind)
+- state -> readers / writers
+- tag / 语义标签检索

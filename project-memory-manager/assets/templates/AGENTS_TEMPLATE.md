@@ -20,6 +20,8 @@
 
 ## 规则摘要
 - 默认先读 docs
-- 只有倒推链路时才查询 KB
+- `FAQ.md` / `LOCATE.md` / `CHANGE_GUIDE.md` 优先于大范围搜索
+- 倒推调用链、事件绑定、request、state 流转时先查询 KB
+- 只有 docs 与 KB 都不足时，才允许全仓库 `grep` / `rg`
 - 结构变化后刷新 KB
 - 长期认知变化后更新 docs
