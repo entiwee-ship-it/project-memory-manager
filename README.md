@@ -10,6 +10,28 @@ project-memory-manager
 
 它用来把一个普通代码仓库接管成可持续开发的 AI 工作空间。
 
+## 安装与升级
+
+公开安装这个技能，推荐使用 `skills` CLI：
+
+```powershell
+npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
+```
+
+安装完成后，建议运行技能自带校验：
+
+```powershell
+python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
+```
+
+后续升级可使用：
+
+```powershell
+npx skills check
+npx skills update
+python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
+```
+
 ## 这个技能解决什么问题
 
 这个技能解决的是“AI 进入复杂项目后如何稳定接管、定位、开发、沉淀”的问题。
