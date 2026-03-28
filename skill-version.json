@@ -1,7 +1,7 @@
 {
   "name": "project-memory-manager",
-  "version": "0.10.0",
-  "releaseDate": "2026-03-28",
+  "version": "0.11.0",
+  "releaseDate": "2026-03-29",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
   "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
@@ -15,6 +15,7 @@
     "pinus-backend-kb",
     "cocos-static-call-kb",
     "cocos-prefab-binding-kb",
+    "cocos-prefab-profile-audit",
     "cocos-authoring-plan",
     "cocos-authoring-apply",
     "frontend-http-request-kb",

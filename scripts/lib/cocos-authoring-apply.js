@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { normalize, readJson } = require('./common');
+const { createAuthoringError, findAssetCandidates } = require('./cocos-authoring');
 
 function detectEol(text) {
     return text.includes('\r\n') ? '\r\n' : '\n';
@@ -189,7 +190,9 @@ function pushObject(doc, object) {
 function ensureComponent(doc, nodePath, descriptor) {
     const nodeId = doc.nodeIdByPath.get(nodePath);
     if (nodeId == null) {
-        throw new Error(`prefab 中未找到节点: ${nodePath}`);
+        throw createAuthoringError(`prefab 中未找到节点: ${nodePath}`, {
+            code: 'node_not_found',
+        });
     }
 
     const existing = doc.componentByNodeAndName.get(`${nodeId}::${descriptor.componentName}`);
@@ -250,7 +253,9 @@ function ensureButtonComponent(doc, nodePath) {
 function ensureClickEvent(doc, buttonComponent, targetNodePath, componentUuid, handlerName) {
     const targetNodeId = doc.nodeIdByPath.get(targetNodePath);
     if (targetNodeId == null) {
-        throw new Error(`prefab 中未找到事件目标节点: ${targetNodePath}`);
+        throw createAuthoringError(`prefab 中未找到事件目标节点: ${targetNodePath}`, {
+            code: 'target_node_not_found',
+        });
     }
     if (!Array.isArray(buttonComponent.object.clickEvents)) {
         buttonComponent.object.clickEvents = [];
@@ -382,7 +387,10 @@ function insertMethodStub(scriptPath, componentName, handlerName) {
     const classPattern = new RegExp(`class\\s+${componentName}\\b[^{]*\\{`, 'm');
     const classMatch = classPattern.exec(source);
     if (!classMatch) {
-        throw new Error(`无法在脚本中定位 class ${componentName}: ${scriptPath}`);
+        throw createAuthoringError(`无法在脚本中定位 class ${componentName}: ${scriptPath}`, {
+            code: 'class_not_found',
+            scriptPath,
+        });
     }
 
     const classOpenIndex = source.indexOf('{', classMatch.index);
@@ -401,7 +409,10 @@ function insertMethodStub(scriptPath, componentName, handlerName) {
         }
     }
     if (classCloseIndex === -1) {
-        throw new Error(`无法确定 class ${componentName} 的结束位置: ${scriptPath}`);
+        throw createAuthoringError(`无法确定 class ${componentName} 的结束位置: ${scriptPath}`, {
+            code: 'class_close_not_found',
+            scriptPath,
+        });
     }
 
     const eol = detectEol(source);
@@ -416,7 +427,10 @@ function applyClickEventChange({ artifacts, plan, sourceNodePath, targetNodePath
     const assetUuidToPath = buildAssetUuidPathMap(artifacts.graph);
     const scriptRecord = scriptMetaCatalog.byComponentName.get(componentName);
     if (!scriptRecord?.uuid || !scriptRecord.scriptPath) {
-        throw new Error(`无法解析目标组件脚本 UUID: ${componentName}`);
+        throw createAuthoringError(`无法解析目标组件脚本 UUID: ${componentName}`, {
+            code: 'component_uuid_not_found',
+            componentName,
+        });
     }
 
     const doc = loadPrefabDocument(plan.prefab.prefabPath, scriptMetaCatalog);
@@ -479,7 +493,11 @@ function resolveTargetComponent(doc, componentName, query = '') {
         return { kind: 'same-prefab', component: matches[0] };
     }
     if (matches.length > 1) {
-        throw new Error(`目标组件不唯一，请使用 Component@NodePath 形式指定: ${targetName}`);
+        throw createAuthoringError(`目标组件不唯一，请使用 Component@NodePath 形式指定: ${targetName}`, {
+            code: 'ambiguous_component_target',
+            componentName: targetName,
+            suggestions: matches.slice(0, 8).map(item => `${item.componentName}@${item.nodePath}`),
+        });
     }
     return null;
 }
@@ -490,7 +508,10 @@ function applyFieldBindingChange({ artifacts, plan, componentNodePath, component
     const assetUuidToPath = buildAssetUuidPathMap(artifacts.graph);
     const scriptRecord = scriptMetaCatalog.byComponentName.get(componentName);
     if (!scriptRecord?.uuid || !scriptRecord.scriptPath) {
-        throw new Error(`无法解析 owner 组件脚本 UUID: ${componentName}`);
+        throw createAuthoringError(`无法解析 owner 组件脚本 UUID: ${componentName}`, {
+            code: 'owner_component_uuid_not_found',
+            componentName,
+        });
     }
 
     const doc = loadPrefabDocument(plan.prefab.prefabPath, scriptMetaCatalog);
@@ -511,7 +532,9 @@ function applyFieldBindingChange({ artifacts, plan, componentNodePath, component
     if (bindingKind === 'node') {
         const targetNodeId = doc.nodeIdByPath.get(targetNode);
         if (targetNodeId == null) {
-            throw new Error(`prefab 中未找到 target node: ${targetNode}`);
+            throw createAuthoringError(`prefab 中未找到 target node: ${targetNode}`, {
+                code: 'target_node_not_found',
+            });
         }
         setFieldNodeReference(ownerComponent, fieldName, targetNodeId);
         changes.push({ file: normalize(plan.prefab.prefabPath), kind: 'prefab', action: 'bind-field' });
@@ -519,7 +542,10 @@ function applyFieldBindingChange({ artifacts, plan, componentNodePath, component
         const assetNode = assetCatalog.byName.get(targetAsset) || assetCatalog.byPath.get(targetAsset);
         const assetUuid = assetNode?.meta?.uuid || '';
         if (!assetUuid) {
-            throw new Error(`未找到 target asset: ${targetAsset}`);
+            throw createAuthoringError(`未找到 target asset: ${targetAsset}`, {
+                code: 'asset_not_found',
+                suggestions: findAssetCandidates(artifacts.graph, targetAsset),
+            });
         }
         setFieldAssetReference(ownerComponent, fieldName, assetUuid);
         changes.push({ file: normalize(plan.prefab.prefabPath), kind: 'prefab', action: 'bind-field' });
@@ -531,16 +557,25 @@ function applyFieldBindingChange({ artifacts, plan, componentNodePath, component
         } else {
             const nestedTargets = findNestedPrefabTargets(doc, scriptMetaCatalog, targetComponent);
             if (nestedTargets.length !== 1) {
-                throw new Error(nestedTargets.length > 1
-                    ? `nested prefab 中的目标组件不唯一: ${targetComponent}`
-                    : `未找到 target component: ${targetComponent}`);
+                throw createAuthoringError(
+                    nestedTargets.length > 1
+                        ? `nested prefab 中的目标组件不唯一: ${targetComponent}`
+                        : `未找到 target component: ${targetComponent}`,
+                    {
+                        code: nestedTargets.length > 1 ? 'ambiguous_nested_component_target' : 'target_component_not_found',
+                        suggestions: nestedTargets.slice(0, 8).map(item => `${item.nestedComponent.componentName}@${item.parentNodePath}`),
+                    }
+                );
             }
             const nestedTarget = nestedTargets[0];
             ensureTargetOverride(doc, ownerComponent, fieldName, nestedTarget.parentNodeId, nestedTarget.nestedComponent.fileId);
             changes.push({ file: normalize(plan.prefab.prefabPath), kind: 'prefab', action: 'bind-field-override' });
         }
     } else {
-        throw new Error(`当前字段类型不支持自动绑定: ${bindingKind}`);
+        throw createAuthoringError(`当前字段类型不支持自动绑定: ${bindingKind}`, {
+            code: 'binding_kind_unsupported',
+            bindingKind,
+        });
     }
 
     if (changes.some(item => item.kind === 'prefab')) {

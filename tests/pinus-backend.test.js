@@ -389,18 +389,41 @@ function runCocosAuthoringAssertions() {
     assert.ok(learnedProfile.features['cocos-prefab-sample']);
     assert.ok(learnedProfile.features['cocos-prefab-sample'].eventPatterns.some(item => item.targetComponentName === 'SampleView'));
     assert.ok(learnedProfile.features['cocos-prefab-sample'].assetPatterns.some(item => item.assetKind === 'SpriteFrame'));
+    assert.ok(learnedProfile.features['cocos-prefab-sample'].prefabProfiles.some(item => Array.isArray(item.missingBindings) && item.missingBindings.some(binding => binding.fieldName === 'rewardSprite')));
+    assert.ok(learnedProfile.features['cocos-prefab-sample'].prefabProfiles.some(item => Array.isArray(item.specialComponents) && item.specialComponents.some(component => component.componentKind === 'spine')));
 
     const profile = parseTraversal(
         runWithCapturedOutput(cocosAuthoring, ['--feature', 'cocos-prefab-sample', '--prefab', 'SamplePanel', '--intent', 'profile', '--json'], nestedCwd)
     );
     assert.equal(profile.kind, 'cocos-authoring-profile');
     assert.equal(profile.intent, 'profile');
+    assert.equal(profile.summary.objectCount, 21);
+    assert.equal(profile.summary.specialComponentCount, 1);
     assert.ok(Array.isArray(profile.customComponents) && profile.customComponents.some(item => item.componentName === 'SampleView'));
     const sampleViewProfile = profile.customComponents.find(item => item.componentName === 'SampleView');
+    assert.equal(sampleViewProfile.componentIndex, 8);
     assert.ok(sampleViewProfile.bindableFields.some(item => item.fieldName === 'actionNode' && item.bindingKind === 'node'));
     assert.ok(sampleViewProfile.bindableFields.some(item => item.fieldName === 'slotPrefab' && item.bindingKind === 'asset'));
     assert.ok(sampleViewProfile.bindableFields.some(item => item.fieldName === 'slotView' && item.bindingKind === 'component'));
+    assert.ok(sampleViewProfile.existingBindings.some(item => item.field === 'actionNode' && item.targetNodeIndex === 2));
+    assert.ok(Array.isArray(profile.bindingAudit) && profile.bindingAudit.some(item => item.fieldName === 'rewardSprite' && item.status === 'missing'));
+    assert.ok(Array.isArray(profile.specialComponents) && profile.specialComponents.some(item => item.componentKind === 'spine' && item.componentIndex === 18));
+    const eggsTitleNode = profile.nodes.find(item => item.path === 'RootPanel/EggsTitle');
+    assert.equal(eggsTitleNode.nodeIndex, 17);
+    assert.ok(eggsTitleNode.components.some(item => item.componentKind === 'spine' && item.componentIndex === 18));
     assert.ok(Array.isArray(profile.learnedPatterns.eventPatterns) && profile.learnedPatterns.eventPatterns.length > 0);
+
+    const filteredProfile = parseTraversal(
+        runWithCapturedOutput(
+            cocosAuthoring,
+            ['--feature', 'cocos-prefab-sample', '--prefab', 'SamplePanel', '--intent', 'profile', '--node', 'EggsTitle', '--component', 'sp.Skeleton', '--json'],
+            nestedCwd
+        )
+    );
+    assert.equal(filteredProfile.filters.applied, true);
+    assert.equal(filteredProfile.matches.nodes, 1);
+    assert.ok(Array.isArray(filteredProfile.specialComponents) && filteredProfile.specialComponents.length === 1);
+    assert.equal(filteredProfile.specialComponents[0].componentKind, 'spine');
 
     const clickPlan = parseTraversal(
         runWithCapturedOutput(
@@ -445,6 +468,9 @@ function runCocosAuthoringAssertions() {
     assert.equal(fieldPlan.field.fieldName, 'rewardSprite');
     assert.equal(fieldPlan.field.bindingKind, 'asset');
     assert.ok(fieldPlan.changes.some(item => item.kind === 'bind-field' && item.bindingKind === 'asset'));
+    assert.ok(Array.isArray(fieldPlan.learnedConventions?.fieldBindingPatterns));
+    assert.ok(Array.isArray(fieldPlan.learnedConventions?.assetPatterns) && fieldPlan.learnedConventions.assetPatterns.some(item => item.assetKind === 'SpriteFrame'));
+    assert.ok(fieldPlan.changes.some(item => item.kind === 'bind-field' && String(item.learnedFromProject || '').includes('SpriteFrame')));
 
     const aliasProfile = parseTraversal(
         runWithCapturedOutput(planCocosBinding, ['--feature', 'cocos-prefab-sample', '--prefab', 'SamplePanel', '--json'], nestedCwd)
@@ -532,6 +558,46 @@ function runCocosAuthoringAssertions() {
     assert.ok(nestedFieldApply.applyResult.changes.some(item => item.action === 'bind-field-override'));
     const finalPrefab = readJson(path.join(tempRoot, 'assets', 'ui', 'prefabs', 'SamplePanel.prefab'));
     assert.ok(JSON.stringify(finalPrefab).includes('slotHelper'));
+
+    const unsupportedField = parseTraversal(
+        runWithCapturedOutput(
+            cocosAuthoring,
+            [
+                '--feature', 'cocos-prefab-sample',
+                '--prefab', 'SamplePanel',
+                '--intent', 'field-binding',
+                '--component-node', 'RootPanel',
+                '--component', 'SampleView',
+                '--field', 'missingField',
+                '--target-node', 'RootPanel/StartButton',
+                '--json',
+            ],
+            nestedCwd
+        )
+    );
+    assert.equal(unsupportedField.status, 'unsupported');
+    assert.equal(unsupportedField.error.code, 'field_not_found');
+    assert.ok(Array.isArray(unsupportedField.suggestions) && unsupportedField.suggestions.includes('actionNode'));
+
+    const unsupportedAsset = parseTraversal(
+        runWithCapturedOutput(
+            cocosAuthoring,
+            [
+                '--feature', 'cocos-prefab-sample',
+                '--prefab', 'SamplePanel',
+                '--intent', 'field-binding',
+                '--component-node', 'RootPanel',
+                '--component', 'SampleView',
+                '--field', 'rewardSprite',
+                '--target-asset', 'missing-sprite',
+                '--json',
+            ],
+            nestedCwd
+        )
+    );
+    assert.equal(unsupportedAsset.status, 'unsupported');
+    assert.equal(unsupportedAsset.error.code, 'asset_not_found');
+    assert.ok(Array.isArray(unsupportedAsset.suggestions) && unsupportedAsset.suggestions.some(item => item.name === 'start-button'));
 }
 
 function runProjectGlobalAssertions() {

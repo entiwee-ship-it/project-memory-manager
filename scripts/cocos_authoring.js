@@ -5,6 +5,7 @@ const { resolveProjectRoot, readJson } = require('./lib/common');
 const { normalizeFeatureRecord } = require('./lib/feature-kb');
 const {
     buildAuthoringProfile,
+    createAuthoringError,
     isBuiltWithCurrentSkill,
     loadFeatureArtifacts,
     loadFeatureAuthoringProfile,
@@ -22,6 +23,7 @@ function parseArgs(argv) {
         feature: '',
         prefab: '',
         intent: '',
+        nodeQuery: '',
         sourceNode: '',
         targetNode: '',
         targetComponent: '',
@@ -50,6 +52,10 @@ function parseArgs(argv) {
         }
         if (token === '--intent') {
             args.intent = argv[++index] || '';
+            continue;
+        }
+        if (token === '--node') {
+            args.nodeQuery = argv[++index] || '';
             continue;
         }
         if (token === '--source-node') {
@@ -94,7 +100,7 @@ function parseArgs(argv) {
     }
 
     if (!args.feature) {
-        throw new Error('用法: node cocos_authoring.js --feature <key> --prefab <prefab> --intent <profile|click-event|field-binding> ... [--apply] [--json]');
+        throw new Error('用法: node cocos_authoring.js --feature <key> --prefab <prefab> --intent <profile|click-event|field-binding> ... [--node <node>] [--component <component>] [--field <field>] [--apply] [--json]');
     }
     if (!args.intent) {
         throw new Error('--intent 必填，支持 profile / click-event / field-binding');
@@ -109,11 +115,19 @@ function parseArgs(argv) {
 function getFeatureRecord(root, featureKey) {
     const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
     const registry = readJson(registryPath);
+    const featureKeys = (registry.features || [])
+        .map(item => normalizeFeatureRecord(item))
+        .map(item => item.featureKey)
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right));
     const featureRecord = (registry.features || [])
         .map(item => normalizeFeatureRecord(item))
         .find(item => item.featureKey === featureKey);
     if (!featureRecord) {
-        throw new Error(`注册表中未找到功能: ${featureKey}`);
+        throw createAuthoringError(`注册表中未找到功能: ${featureKey}`, {
+            code: 'feature_not_found',
+            suggestions: featureKeys.slice(0, 8),
+        });
     }
     return featureRecord;
 }
@@ -161,10 +175,12 @@ function ensureFeatureFresh(root, featureKey, autoActions = []) {
     }
 
     if (!featureRecord.configPath) {
-        throw new Error(
-            `功能 KB 缺失或过期，但 registry 中没有 configPath: ${featureKey}\n`
-            + `请先手动执行 ${buildFeatureRebuildCommand(featureRecord) || 'node scripts/build_chain_kb.js --root <project-root> --config <config-path>'}`
-        );
+        throw createAuthoringError(`功能 KB 缺失或过期，但 registry 中没有 configPath: ${featureKey}`, {
+            code: 'feature_kb_refresh_unavailable',
+            nextActions: [
+                buildFeatureRebuildCommand(featureRecord) || 'node scripts/build_chain_kb.js --root <project-root> --config <config-path>',
+            ],
+        });
     }
 
     runQuietly(buildChainKb, ['--root', root, '--config', path.resolve(root, featureRecord.configPath)]);
@@ -211,18 +227,43 @@ function printProfile(result) {
     console.log(`feature: ${result.feature.featureKey} (${result.feature.featureName})`);
     console.log(`prefab: ${result.prefab.prefabName}`);
     printAutoActions(result.autoActions || []);
+    if (result.filters?.applied) {
+        console.log(`filters: node=${result.filters.node || '-'}, component=${result.filters.component || '-'}, field=${result.filters.field || '-'}`);
+        console.log(`matches: nodes=${result.matches?.nodes || 0}, components=${result.matches?.components || 0}, customComponents=${result.matches?.customComponents || 0}, bindingAudit=${result.matches?.bindingAudit || 0}`);
+    }
+    if (result.summary) {
+        console.log(`summary: objects=${result.summary.objectCount}, nodes=${result.summary.nodeCount}, components=${result.summary.componentCount}, special=${result.summary.specialComponentCount}, missingBindings=${result.summary.bindingAudit?.missing || 0}`);
+    }
     console.log('- nodes:');
     (result.nodes || []).forEach(node => {
-        const suffix = (node.components || []).length > 0 ? ` [${node.components.join(', ')}]` : '';
-        console.log(`  - ${node.path}${suffix}`);
+        const suffix = (node.components || []).length > 0
+            ? ` [${node.components.map(component => `${component.componentName}#${component.componentIndex}`).join(', ')}]`
+            : '';
+        console.log(`  - ${node.path} (#${node.nodeIndex})${suffix}`);
     });
+    if ((result.specialComponents || []).length > 0) {
+        console.log('- specialComponents:');
+        (result.specialComponents || []).forEach(component => {
+            console.log(`  - ${component.componentName}@${component.nodePath} (#${component.componentIndex}, ${component.componentKind})`);
+        });
+    }
     console.log('- customComponents:');
     (result.customComponents || []).forEach(component => {
-        console.log(`  - ${component.componentName}@${component.nodePath}`);
+        console.log(`  - ${component.componentName}@${component.nodePath} (#${component.componentIndex ?? '-'})`);
         (component.bindableFields || []).forEach(field => {
             console.log(`    field: ${field.fieldName} (${field.bindingKind}:${field.rawType})`);
         });
     });
+    if ((result.bindingAudit || []).length > 0) {
+        console.log('- bindingAudit:');
+        (result.bindingAudit || []).forEach(item => {
+            const target = item.currentBinding?.targetComponentName
+                || item.currentBinding?.targetNodePath
+                || item.currentBinding?.assetPath
+                || '';
+            console.log(`  - [${item.status}] ${item.componentName}.${item.fieldName}@${item.nodePath}${target ? ` -> ${target}` : ''}`);
+        });
+    }
     console.log('- learnedPatterns:');
     console.log(`  - eventPatterns: ${(result.learnedPatterns?.eventPatterns || []).length}`);
     console.log(`  - componentPlacementPatterns: ${(result.learnedPatterns?.componentPlacementPatterns || []).length}`);
@@ -256,6 +297,33 @@ function printPlan(result) {
             console.log(`  - ${change.action}: ${change.file}`);
         });
     }
+    if (result.suggestions?.length) {
+        console.log('- suggestions:');
+        result.suggestions.forEach(item => {
+            if (typeof item === 'string') {
+                console.log(`  - ${item}`);
+                return;
+            }
+            console.log(`  - ${item.name || item.assetPath || JSON.stringify(item)}`);
+        });
+    }
+    if (result.nextActions?.length) {
+        console.log('- nextActions:');
+        result.nextActions.forEach(item => console.log(`  - ${item}`));
+    }
+    if (result.learnedConventions?.fieldBindingPatterns?.length || result.learnedConventions?.assetPatterns?.length) {
+        console.log('- learnedConventions:');
+        (result.learnedConventions.fieldBindingPatterns || []).forEach(item => {
+            const detail = [
+                item.bindingKind || '',
+                item.sampleTargetComponentName || item.sampleTargetNodePath || item.sampleAssetPath || '',
+            ].filter(Boolean).join(' -> ');
+            console.log(`  - field: ${detail || item.bindingKind}`);
+        });
+        (result.learnedConventions.assetPatterns || []).forEach(item => {
+            console.log(`  - asset: ${item.assetKind} -> ${item.directory} (confidence ${item.confidence})`);
+        });
+    }
     console.log('- steps:');
     (result.changes || []).forEach((change, index) => {
         const target = [
@@ -270,7 +338,44 @@ function printPlan(result) {
         console.log(`  ${index + 1}. [${change.status}] ${change.kind}${target ? `: ${target}` : ''}`);
         console.log(`     改动位置: ${change.editTarget} via ${change.applyVia}`);
         console.log(`     原因: ${change.why}`);
+        if (change.learnedFromProject) {
+            console.log(`     项目习惯: ${change.learnedFromProject}`);
+        }
     });
+}
+
+function toUnsupportedResult(args, error, autoActions = []) {
+    const suggestions = Array.isArray(error?.suggestions) ? error.suggestions : [];
+    const nextActions = Array.isArray(error?.nextActions) ? error.nextActions : [];
+    return {
+        kind: 'cocos-authoring-plan',
+        intent: args.intent,
+        feature: {
+            featureKey: args.feature,
+            featureName: '',
+        },
+        prefab: {
+            prefabPath: '',
+            prefabName: args.prefab || '',
+        },
+        status: 'unsupported',
+        autoActions,
+        error: {
+            message: error instanceof Error ? error.message : String(error),
+            code: error?.code || 'unsupported',
+        },
+        suggestions,
+        nextActions,
+        changes: [
+            {
+                kind: 'unsupported',
+                status: 'unsupported',
+                editTarget: 'manual',
+                applyVia: 'manual-followup',
+                why: error instanceof Error ? error.message : String(error),
+            },
+        ],
+    };
 }
 
 function runIntent(args, artifacts, featureProfile) {
@@ -280,7 +385,12 @@ function runIntent(args, artifacts, featureProfile) {
     };
 
     if (args.intent === 'profile') {
-        return summarizeProfile(buildAuthoringProfile(artifacts, commonOptions), featureProfile);
+        return summarizeProfile(buildAuthoringProfile(artifacts, {
+            ...commonOptions,
+            nodeQuery: args.nodeQuery,
+            componentQuery: args.component,
+            fieldQuery: args.field,
+        }), featureProfile);
     }
     if (args.intent === 'click-event') {
         if (!args.sourceNode || !args.targetComponent || !args.handler) {
@@ -341,39 +451,50 @@ function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
     const autoActions = [];
+    try {
+        ensureFeatureFresh(root, args.feature, autoActions);
+        ensureAuthoringProfileFresh(root, args.feature, autoActions);
 
-    ensureFeatureFresh(root, args.feature, autoActions);
-    ensureAuthoringProfileFresh(root, args.feature, autoActions);
+        let artifacts = loadFeatureArtifacts(root, args.feature);
+        let featureProfile = loadFeatureAuthoringProfile(root, args.feature);
+        let result = runIntent(args, artifacts, featureProfile);
+        result.autoActions = autoActions;
 
-    let artifacts = loadFeatureArtifacts(root, args.feature);
-    let featureProfile = loadFeatureAuthoringProfile(root, args.feature);
-    let result = runIntent(args, artifacts, featureProfile);
-    result.autoActions = autoActions;
-
-    if (args.apply) {
-        const applyResult = applyIntent(args, root, artifacts, result);
-        if (applyResult.changed) {
-            ensureFeatureFresh(root, args.feature, []);
-            runQuietly(buildChainKb, ['--root', root, '--config', path.resolve(root, getFeatureRecord(root, args.feature).configPath)]);
-            runQuietly(buildCocosAuthoringProfile, ['--root', root, '--feature', args.feature]);
-            artifacts = loadFeatureArtifacts(root, args.feature);
-            featureProfile = loadFeatureAuthoringProfile(root, args.feature);
-            result = runIntent(args, artifacts, featureProfile);
-            result.autoActions = autoActions;
+        if (args.apply) {
+            const applyResult = applyIntent(args, root, artifacts, result);
+            if (applyResult.changed) {
+                ensureFeatureFresh(root, args.feature, []);
+                runQuietly(buildChainKb, ['--root', root, '--config', path.resolve(root, getFeatureRecord(root, args.feature).configPath)]);
+                runQuietly(buildCocosAuthoringProfile, ['--root', root, '--feature', args.feature]);
+                artifacts = loadFeatureArtifacts(root, args.feature);
+                featureProfile = loadFeatureAuthoringProfile(root, args.feature);
+                result = runIntent(args, artifacts, featureProfile);
+                result.autoActions = autoActions;
+            }
+            result.applyResult = applyResult;
         }
-        result.applyResult = applyResult;
-    }
 
-    if (args.json) {
-        console.log(JSON.stringify(result, null, 2));
-        return;
-    }
+        if (args.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+        }
 
-    if (result.kind === 'cocos-authoring-profile') {
-        printProfile(result);
-        return;
+        if (result.kind === 'cocos-authoring-profile') {
+            printProfile(result);
+            return;
+        }
+        printPlan(result);
+    } catch (error) {
+        if (!error?.isAuthoringError) {
+            throw error;
+        }
+        const unsupported = toUnsupportedResult(args, error, autoActions);
+        if (args.json) {
+            console.log(JSON.stringify(unsupported, null, 2));
+            return;
+        }
+        printPlan(unsupported);
     }
-    printPlan(result);
 }
 
 module.exports = {

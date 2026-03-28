@@ -14,6 +14,9 @@
       },
       {
         "__id__": 3
+      },
+      {
+        "__id__": 17
       }
     ],
     "_components": [
@@ -146,5 +149,34 @@
   },
   {
     "fileId": "sample-view-comp"
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "EggsTitle",
+    "_children": [],
+    "_components": [
+      {
+        "__id__": 18
+      }
+    ],
+    "_prefab": {
+      "__id__": 19
+    },
+    "_active": true
+  },
+  {
+    "__type__": "sp.Skeleton",
+    "node": {
+      "__id__": 17
+    },
+    "__prefab": {
+      "__id__": 20
+    }
+  },
+  {
+    "__type__": "cc.PrefabInfo"
+  },
+  {
+    "fileId": "eggs-title-skeleton"
   }
 ]

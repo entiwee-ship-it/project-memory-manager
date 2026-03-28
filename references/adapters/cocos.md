@@ -108,6 +108,30 @@
 
 - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
 
+如果你要直接回答“Prefab 里这个节点 / 组件的具体索引是多少”“脚本字段有没有绑上”“Spine 组件到底挂在哪”，优先用 profile 的过滤参数，而不是写临时 Python：
+
+- 节点定位：
+  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --node <node-name> --json`
+- 组件定位：
+  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --component <component-name> --json`
+- 字段绑定审计：
+  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --component <component-name> --field <field-name> --json`
+
+现在 `profile` 结果里会直接包含：
+
+- `nodes[*].nodeIndex`
+- `nodes[*].components[*].componentIndex`
+- `components[*].componentKind`
+- `specialComponents`
+- `bindingAudit`
+- `summary.bindingAudit.missing`
+
+其中：
+
+- `componentKind = spine` 会把 `sp.Skeleton` 这类组件显式标出来
+- `bindingAudit.status = missing` 表示脚本字段已存在，但 prefab 里当前还没有绑定
+- `bindingAudit.status = override-bound` 表示它不是普通 serialized field，而是 nested prefab override
+
 ## 推荐理解顺序
 
 - 先看 `component-attachment`，确认脚本实际挂在哪个节点
@@ -121,4 +145,4 @@
 - `HttpClient.getInstance().request(config)` 这类“config 变量来自更早赋值”的场景，还不会反推出内层 `url/method`
 - 还没有实现前后端自动联查；前端 `request` 节点与后端 `endpoint/route` 节点仍需分别查询
 - 目前仍然是静态分析，不会真的打开 Cocos 编辑器去回放场景操作
-- 对没有出现在 prefab 里的“潜在可绑定字段”，知识库不会凭空猜；它只报告当前实际序列化出来的绑定
+- 对没有出现在 prefab 里的“潜在可绑定字段”，现在会通过 `bindingAudit` 报告它们是 `missing`，但不会自动假设目标节点或资源
