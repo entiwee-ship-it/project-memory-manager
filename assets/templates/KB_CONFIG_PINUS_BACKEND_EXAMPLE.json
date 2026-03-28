@@ -8,11 +8,11 @@
   "moduleRoots": [],
   "dbRoots": [],
   "scanTargets": {
-    "handlers": ["E:/path/to/game-server/app/servers/*/handler/*.ts"],
-    "remotes": ["E:/path/to/game-server/app/servers/*/remote/*.ts"],
-    "modules": ["E:/path/to/game-server/app/modules/**/*.ts"],
-    "routes": ["E:/path/to/game-server/app/http/routes/**/*.ts"],
-    "schemas": ["E:/path/to/game-server/app/db/schema/**/*.ts"]
+    "handlers": ["app/servers/*/handler/*.ts"],
+    "remotes": ["app/servers/*/remote/*.ts"],
+    "modules": ["app/modules/**/*.ts"],
+    "routes": ["app/http/routes/**/*.ts"],
+    "schemas": ["app/db/schema/**/*.ts"]
   },
   "outputs": {
     "scan": "project-memory/kb/features/backend-core/scan.raw.json",

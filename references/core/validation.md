@@ -8,7 +8,7 @@
 
 ```bash
 node scripts/show_skill_version.js --text
-python scripts/validate_skill_runtime.py <skill-path> --mode auto
+python scripts/validate_skill_runtime.py . --mode auto
 ```
 
 ## 技能升级后的推荐动作
@@ -16,9 +16,10 @@ python scripts/validate_skill_runtime.py <skill-path> --mode auto
 ```bash
 npx skills check
 npx skills update
-node "<skill-path>/scripts/show_skill_version.js" --text
-python "<skill-path>/scripts/validate_skill_runtime.py" "<skill-path>" --mode auto
-node "<skill-path>/scripts/rebuild_kbs.js" --root <project-root>
+cd "<installed-skill-path>"
+node scripts/show_skill_version.js --text
+python scripts/validate_skill_runtime.py . --mode auto
+node scripts/rebuild_kbs.js --root <project-root>
 ```
 
 ## 模式

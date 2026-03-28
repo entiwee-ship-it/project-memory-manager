@@ -16,7 +16,9 @@
 - `project-memory/docs/project/PROJECT_Overview.md`
 
 ## KB 快速入口
+- 先运行：`node <skill-path>/scripts/query_project_kb.js --root <repo-root>`
 - 先运行：`node <skill-path>/scripts/query_kb.js --feature <feature-key>`
+- 查消息：`node <skill-path>/scripts/query_project_kb.js --root <repo-root> --message <message> --downstream`
 - 查上下游：`node <skill-path>/scripts/query_kb.js --feature <feature-key> --downstream <query>`
 - 查具体方法：`node <skill-path>/scripts/query_kb.js --feature <feature-key> --method <name> --downstream`
 - 当只知道语义词时：`node <skill-path>/scripts/query_kb.js --feature <feature-key> --type method --name <keyword>`
@@ -28,7 +30,8 @@
 ## 规则摘要
 - 默认先读 docs
 - `FAQ.md` / `LOCATE.md` / `CHANGE_GUIDE.md` 优先于大范围搜索
-- 倒推调用链、事件绑定、request、state 流转时先运行 `query_kb.js`
+- 倒推调用链、事件绑定、request、state 流转时先运行 `query_project_kb.js`
+- 当范围缩小到 feature 后再运行 `query_kb.js`
 - 只有 docs 与 KB 都不足时，才允许全仓库 `grep` / `rg`
 - 结构变化后刷新 KB
 - 长期认知变化后更新 docs

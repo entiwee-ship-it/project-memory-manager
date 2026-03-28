@@ -5,6 +5,7 @@ const path = require('path');
 const { resolveProjectRoot, readJson } = require('./lib/common');
 const { normalizeFeatureRecord } = require('./lib/feature-kb');
 const { run: buildChainKb } = require('./build_chain_kb');
+const { run: buildProjectKb } = require('./build_project_kb');
 const { run: refreshMemoryIndexes } = require('./refresh_memory_indexes');
 
 function parseArgs(argv) {
@@ -93,7 +94,17 @@ function resolveTargets(root, featureKey) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
-    const targets = resolveTargets(root, args.feature);
+    if (!args.feature || args.feature === 'project-global') {
+        buildProjectKb(['--root', root]);
+        if (args.feature === 'project-global') {
+            refreshMemoryIndexes(['--root', root]);
+            console.log('KB 重建完成: project-global');
+            return;
+        }
+    }
+
+    const targets = resolveTargets(root, args.feature)
+        .filter(target => target.featureKey !== 'project-global' && path.basename(target.configPath, path.extname(target.configPath)) !== 'project-global');
 
     if (targets.length <= 0) {
         throw new Error(args.feature
@@ -109,7 +120,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     refreshMemoryIndexes(['--root', root]);
-    console.log(`KB 重建完成: ${rebuilt.length} 个 feature`);
+    console.log(`KB 重建完成: project-global + ${rebuilt.length} 个 feature`);
 }
 
 module.exports = {

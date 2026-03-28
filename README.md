@@ -21,8 +21,9 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 安装完成后，建议运行技能自带校验：
 
 ```powershell
-node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\show_skill_version.js" --text
-python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
+cd "<installed-skill-path>"
+node scripts/show_skill_version.js --text
+python scripts/validate_skill_runtime.py . --mode auto
 ```
 
 后续升级可使用：
@@ -30,14 +31,16 @@ python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\vali
 ```powershell
 npx skills check
 npx skills update
-node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\show_skill_version.js" --text
-python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
+cd "<installed-skill-path>"
+node scripts/show_skill_version.js --text
+python scripts/validate_skill_runtime.py . --mode auto
 ```
 
 技能升级完成后，建议立刻在目标项目重建现有 KB：
 
 ```powershell
-node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\rebuild_kbs.js" --root "<project-root>"
+cd "<installed-skill-path>"
+node scripts/rebuild_kbs.js --root "<project-root>"
 ```
 
 升级这个技能本身时，请遵循这条规则：
@@ -106,6 +109,11 @@ project-memory/
 - `project-memory/kb/`：feature 级可查询链路知识库
 - `project-memory/state/`：项目画像、active work、feature registry
 
+新版本里，`project-memory/kb/` 不再只有 feature 视角，还会包含：
+
+- `project-memory/kb/project-global/`：全盘扫描后的全局图
+- `project-memory/state/project-protocols.json`：从项目代码里学习出的消息、dispatcher、状态模式
+
 ## 这个技能如何工作
 
 这个技能遵循 KB-first 的定位协议：
@@ -113,8 +121,9 @@ project-memory/
 1. 先读 `AGENTS.md`
 2. 再读 active work
 3. 再读相关 `docs`
-4. 入口、事件绑定、调用链、状态流转优先查 `KB`
-5. 只有 docs 和 KB 都不足时，才做大范围仓库搜索
+4. 入口、事件绑定、调用链、状态流转优先查 `project-global KB`
+5. 需要局部收窄时再查 feature KB
+6. 只有 docs 和 KB 都不足时，才做大范围仓库搜索
 
 也就是说：
 
@@ -122,11 +131,12 @@ project-memory/
 - `KB` 负责定位
 - `grep/rg` 只负责兜底
 
-推荐把 KB 的默认入口记成一条命令：
+推荐把 KB 的默认入口记成两条命令：
 
+- `node scripts/query_project_kb.js --root <project-root>`
 - `node scripts/query_kb.js --feature <feature-key>`
 
-当你还不知道该读哪个 KB 文件时，不要先手翻 `chain.graph.json` 或 `chain.lookup.json`，先跑上面的命令看 feature 摘要。
+当你还不知道该读哪个 KB 文件时，不要先手翻 `chain.graph.json` 或 `chain.lookup.json`，先跑上面的命令看 project / feature 摘要。
 
 这也是这个技能存在的核心原因：避免 AI 一上来就退回到全仓库搜索。
 
@@ -134,6 +144,9 @@ project-memory/
 
 这版技能已经支持：
 
+- project-global 全盘扫描
+- 项目级协议学习（message / dispatcher / state pattern）
+- project 级查询入口
 - 方法上下游查询
 - 组件与 handler 绑定查询
 - 事件 subscribers / emitters 查询
@@ -172,13 +185,15 @@ project-memory/
 
 推荐读取顺序是：
 
-1. `scripts/query_kb.js`
-2. `build.report.json`
-3. `docs`
-4. `rg/grep`
+1. `scripts/query_project_kb.js`
+2. `scripts/query_kb.js`
+3. `build.report.json`
+4. `docs`
+5. `rg/grep`
 
 各文件的推荐用途：
 
+- `scripts/query_project_kb.js`：全局查询入口，先看 project summary、message、state、跨区域链路
 - `scripts/query_kb.js`：统一查询入口，先看 feature 摘要、再做上下游和节点查询
 - `build.report.json`：给人看的构建汇总与使用说明
 - `chain.lookup.json`：查询脚本使用的索引，通常不要手读

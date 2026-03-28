@@ -501,7 +501,7 @@ def portable_validate(skill_path: Path) -> int:
     print(f"- install-context: {detect_install_context(skill_path)}")
     if detect_install_context(skill_path) == "installed-copy":
         print("- upgrade-policy: do not edit the installed copy directly; fix the source repo, update the skill, then rebuild KBs")
-        print(f"- post-update-rebuild: node \"{skill_path / 'scripts' / 'rebuild_kbs.js'}\" --root <project-root>")
+        print(f"- post-update-rebuild: {version_info.get('rebuildCommand') or 'node scripts/rebuild_kbs.js --root <project-root>'}")
     return 0
 
 
@@ -568,7 +568,7 @@ def strict_validate_with_yaml(skill_path: Path) -> int:
     print(f"- install-context: {detect_install_context(skill_path)}")
     if detect_install_context(skill_path) == "installed-copy":
         print("- upgrade-policy: do not edit the installed copy directly; fix the source repo, update the skill, then rebuild KBs")
-        print(f"- post-update-rebuild: node \"{skill_path / 'scripts' / 'rebuild_kbs.js'}\" --root <project-root>")
+        print(f"- post-update-rebuild: {version_info.get('rebuildCommand') or 'node scripts/rebuild_kbs.js --root <project-root>'}")
     return 0
 
 

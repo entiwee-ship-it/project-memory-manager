@@ -543,7 +543,7 @@ function buildFeatureRecord(config, configPath) {
         areas: Array.isArray(config.areas) ? config.areas : [],
         configPath,
         docsDir: config.docs?.featureDir || '',
-        kbDir: `project-memory/kb/features/${config.featureKey}`,
+        kbDir: config.kbDir || `project-memory/kb/features/${config.featureKey}`,
         outputs: config.outputs || {},
         type: config.type || '',
     });
@@ -1300,6 +1300,7 @@ function buildLookup(graph) {
     const outgoing = {};
     const incoming = {};
     const events = {};
+    const messages = {};
     const methods = {};
     const methodAliases = {};
     const requests = {};
@@ -1351,6 +1352,17 @@ function buildLookup(graph) {
                 bus: node.meta?.bus || '',
                 subscribers: (incoming[node.id] || []).filter(edge => edge.type === 'subscribes').map(edge => nodesById[edge.from]?.name || edge.from),
                 emitters: (incoming[node.id] || []).filter(edge => edge.type === 'emits').map(edge => nodesById[edge.from]?.name || edge.from),
+            };
+        }
+
+        if (node.type === 'message') {
+            messages[node.name] = {
+                id: node.id,
+                protocol: node.meta?.protocol || '',
+                confidence: node.meta?.confidence ?? null,
+                dispatchers: (incoming[node.id] || []).filter(edge => edge.type === 'binds').map(edge => nodesById[edge.from]?.name || edge.from),
+                emitters: (incoming[node.id] || []).filter(edge => edge.type === 'emits').map(edge => nodesById[edge.from]?.name || edge.from),
+                handlers: (outgoing[node.id] || []).filter(edge => edge.type === 'binds').map(edge => nodesById[edge.to]?.name || edge.to),
             };
         }
 
@@ -1418,6 +1430,7 @@ function buildLookup(graph) {
         methods,
         methodAliases,
         events,
+        messages,
         requests,
         routes,
         endpoints,
@@ -1482,11 +1495,16 @@ function run(argv = process.argv.slice(2)) {
     writeJsonWithCompat(root, 'graph', graph, outputs);
     writeJsonWithCompat(root, 'lookup', lookup, outputs);
     writeJsonWithCompat(root, 'report', report, outputs);
-    upsertFeatureRegistry(root, buildFeatureRecord(config, repoRelative(configPath, root)));
+    if (config.registerFeature !== false) {
+        upsertFeatureRegistry(root, buildFeatureRecord(config, repoRelative(configPath, root)));
+    }
     console.log(`链路知识库已构建: ${config.featureKey}`);
 }
 
 module.exports = {
+    buildFeatureRecord,
+    buildGraph,
+    buildLookup,
     run,
 };
 

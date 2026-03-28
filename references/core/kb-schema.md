@@ -11,6 +11,7 @@
 - `endpoint`
 - `service`
 - `event`
+- `message`
 - `request`
 - `response`
 - `dto`
@@ -50,6 +51,7 @@
 - state -> readers / writers
 - tag / 语义标签检索
 - `--feature <key>` 的 feature-summary 摘要输出
+- `--root <repo-root>` 的 project-summary 摘要输出
 - 推荐单入口 `query_kb.js`，`query_chain_kb.js` 作为兼容入口保留
 
 ## 配置与注册表规范
@@ -65,6 +67,14 @@
 - `featureName`
 - `kbDir`
 - `outputs`
+
+### project-global 产物
+
+- `project-memory/kb/project-global/scan.raw.json`
+- `project-memory/kb/project-global/chain.graph.json`
+- `project-memory/kb/project-global/chain.lookup.json`
+- `project-memory/kb/project-global/build.report.json`
+- `project-memory/state/project-protocols.json`
 
 ### 输出文件命名规范
 
@@ -90,6 +100,9 @@
 - `scan.raw.json`
   - purpose: 原始抽取结果
   - useWhen: 通常不要手读；只有怀疑 extractor 漏抓时才打开
+- `project-protocols.json`
+  - purpose: 项目级协议学习结果，包含 message / dispatcher / state pattern
+  - useWhen: 排查项目自定义消息路径、状态机和 dispatcher 约定时优先看
 
 ### feature-summary / build-report 自描述要求
 
@@ -106,6 +119,12 @@
   - `defaultWorkflow`
   - `queryExamples`
   - `artifacts`
+- `query_project_kb.js --root <repo-root>` 返回的 `project-summary` 必须包含：
+  - `project`
+  - `counts`
+  - `builtWithSkill`
+  - `protocolsSummary`
+  - `examples`
 
 ### 升级兼容
 

@@ -1,0 +1,20 @@
+{
+  "areas": {
+    "frontend": [
+      "client"
+    ],
+    "backend": [
+      "game-server"
+    ]
+  },
+  "stacks": {
+    "frontend": [
+      "cocos",
+      "typescript"
+    ],
+    "backend": [
+      "node",
+      "pinus"
+    ]
+  }
+}

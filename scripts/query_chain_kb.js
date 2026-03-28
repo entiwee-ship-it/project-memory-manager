@@ -9,6 +9,7 @@ function parseArgs(argv) {
     const args = {
         feature: '',
         event: '',
+        message: '',
         method: '',
         request: '',
         state: '',
@@ -39,6 +40,10 @@ function parseArgs(argv) {
         }
         if (token === '--event') {
             args.event = argv[++index];
+            continue;
+        }
+        if (token === '--message') {
+            args.message = argv[++index];
             continue;
         }
         if (token === '--method') {
@@ -115,7 +120,7 @@ function parseArgs(argv) {
     }
 
     if (!args.feature) {
-        throw new Error('用法: node query_kb.js --feature <key> [--event|--method|--request|--state|--type|--from --direction <upstream|downstream>|--upstream [query]|--downstream [query]] ... [--json]');
+        throw new Error('用法: node query_kb.js --feature <key> [--event|--message|--method|--request|--state|--type|--from --direction <upstream|downstream>|--upstream [query]|--downstream [query]] ... [--json]');
     }
 
     if (args.from && args.direction && !['upstream', 'downstream'].includes(args.direction)) {
@@ -129,6 +134,7 @@ function collectTypedSelectors(args) {
     return [
         ['method', args.method],
         ['event', args.event],
+        ['message', args.message],
         ['request', args.request],
         ['state', args.state],
     ].filter(([, value]) => Boolean(value));
@@ -269,6 +275,9 @@ function resolveNodeId(graph, lookup, query) {
     if (lookup.events[query]?.id) {
         return lookup.events[query].id;
     }
+    if (lookup.messages?.[query]?.id) {
+        return lookup.messages[query].id;
+    }
     if (lookup.requests[query]?.id) {
         return lookup.requests[query].id;
     }
@@ -360,6 +369,10 @@ function summarizeNode(node, lookup) {
         summary.routeKind = node.meta?.kind || '';
         summary.routeProtocol = node.meta?.protocol || '';
         summary.route = node.meta?.route || node.name;
+    }
+    if (node.type === 'message') {
+        summary.messageProtocol = node.meta?.protocol || '';
+        summary.messageConfidence = node.meta?.confidence ?? null;
     }
     if (node.type === 'request') {
         summary.callee = node.meta?.callee || '';
@@ -456,6 +469,10 @@ function printSummary(result, asJson) {
         console.log(`- kind: ${result.routeKind || '(none)'}`);
         console.log(`- protocol: ${result.routeProtocol || '(none)'}`);
     }
+    if (result.type === 'message') {
+        console.log(`- protocol: ${result.messageProtocol || '(none)'}`);
+        console.log(`- confidence: ${result.messageConfidence ?? '(none)'}`);
+    }
     if (result.type === 'request') {
         console.log(`- callee: ${result.callee || '(none)'}`);
         console.log(`- protocol: ${result.requestProtocol || '(none)'}`);
@@ -520,6 +537,9 @@ function printSearchResults(results, asJson) {
         }
         if (result.type === 'route') {
             console.log(`  route: ${result.route || '(none)'} [${result.routeKind || 'unknown'}|${result.routeProtocol || 'unknown'}]`);
+        }
+        if (result.type === 'message') {
+            console.log(`  message: [${result.messageProtocol || 'unknown'}] confidence=${result.messageConfidence ?? '(none)'}`);
         }
         if (result.type === 'request') {
             console.log(`  request: ${result.requestHttpMethod || '(none)'} [${result.requestProtocol || 'unknown'}|${result.requestTransport || 'unknown'}] via ${result.callee || '(none)'}`);
@@ -706,6 +726,13 @@ function resolveTypedStart(graph, lookup, selectorType, query) {
         }
         return event;
     }
+    if (selectorType === 'message') {
+        const message = lookup.messages?.[query];
+        if (!message) {
+            throw new Error(`未找到消息: ${query}`);
+        }
+        return message;
+    }
     if (selectorType === 'request') {
         const request = lookup.requests[query];
         if (!request) {
@@ -818,6 +845,27 @@ function run(argv = process.argv.slice(2)) {
                 subscribers: event.subscribers || [],
                 emitters: event.emitters || [],
                 node: summarizeNode(lookup.nodesById[event.id], lookup),
+            },
+            args.json
+        );
+        return;
+    }
+    if (args.message) {
+        const message = lookup.messages?.[args.message];
+        if (!message) {
+            throw new Error(`未找到消息: ${args.message}`);
+        }
+        printDetailedResult(
+            {
+                type: 'message',
+                name: args.message,
+                protocol: message.protocol || '',
+                confidence: message.confidence ?? null,
+                kbVersionStatus,
+                dispatchers: message.dispatchers || [],
+                emitters: message.emitters || [],
+                handlers: message.handlers || [],
+                node: summarizeNode(lookup.nodesById[message.id], lookup),
             },
             args.json
         );

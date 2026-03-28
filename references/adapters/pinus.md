@@ -27,4 +27,5 @@
 
 - 目标仓库根已有 `project-memory/` 时，可在任意子目录运行 `node <skill-path>/scripts/build_chain_kb.js --config <config>`
 - 像 `qyserver` 这类多入口后端，优先写 `scanTargets.handlers/remotes/modules/routes/schemas`
-- 当脚本不在目标仓库内执行时，使用绝对路径 `scanTargets`，并让 `extractorAdapter` 显式为 `pinus`
+- 当配置文件就在目标仓库内时，优先使用相对 `scanTargets`
+- 只有当脚本不在目标仓库内执行时，才使用外部仓库路径作为 `scanTargets`，并让 `extractorAdapter` 显式为 `pinus`
