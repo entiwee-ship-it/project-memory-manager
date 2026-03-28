@@ -7,6 +7,8 @@ const repoRoot = path.resolve(__dirname, '..');
 const fixtureRoot = path.join(__dirname, 'fixtures', 'pinus-sample');
 const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: queryChainKb } = require('../scripts/query_chain_kb');
+const { loadSkillVersion, run: showSkillVersion } = require('../scripts/show_skill_version');
+const { validateSkillVersion } = require('../scripts/validate_skill_package');
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -48,6 +50,25 @@ function namesFromTraversal(output) {
     return parsed.traversal.map(item => item.node?.name).filter(Boolean);
 }
 
+function parseTraversal(output) {
+    return JSON.parse(output);
+}
+
+function runVersionAssertions() {
+    const versionInfo = loadSkillVersion(repoRoot);
+    assert.equal(versionInfo.name, 'project-memory-manager');
+    assert.equal(versionInfo.version, '0.2.0');
+    assert.ok(Array.isArray(versionInfo.capabilities) && versionInfo.capabilities.length > 0);
+
+    const textOutput = runWithCapturedOutput(showSkillVersion, ['--text', repoRoot], repoRoot);
+    assert.ok(textOutput.includes('project-memory-manager@0.2.0'));
+    assert.ok(textOutput.includes('capabilities:'));
+
+    const missingVersionCheck = validateSkillVersion(fixtureRoot, 'project-memory-manager');
+    assert.equal(missingVersionCheck.valid, false);
+    assert.ok(missingVersionCheck.message.includes('旧版安装副本'));
+}
+
 function runFixtureAssertions() {
     const tempRoot = copyFixtureToTemp();
     const { graph } = buildFixture(tempRoot);
@@ -58,6 +79,8 @@ function runFixtureAssertions() {
     assert.ok(graph.nodes.some(node => node.type === 'table' && node.name === 'tbUserAccount'));
     assert.ok(graph.nodes.some(node => node.type === 'table' && node.name === 'goldenEggLotteryRecordTable'));
     assert.ok(graph.nodes.some(node => node.type === 'table' && node.name === 'goldenEggUserInfoTable'));
+    assert.ok(graph.nodes.some(node => node.type === 'event' && node.name === 'tableSynced'));
+    assert.ok(graph.nodes.some(node => node.type === 'state' && node.meta?.statePath === 'syncState'));
 
     const nestedCwd = path.join(tempRoot, 'app', 'http', 'routes', 'activity');
     const endpointTraversal = namesFromTraversal(
@@ -66,8 +89,18 @@ function runFixtureAssertions() {
     assert.ok(endpointTraversal.includes('goldenEgg.http_get_activity_goldenegg_getgoldeneggreward'));
     assert.ok(endpointTraversal.includes('goldenEgg.getGoldenEggReward'));
 
+    const explicitAliasTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--downstream', 'GET /activity/goldenEgg/getGoldenEggReward', '--depth', '3', '--json'], nestedCwd)
+    );
+    assert.equal(explicitAliasTraversal.inputQuery, 'GET /activity/goldenEgg/getGoldenEggReward');
+    assert.equal(explicitAliasTraversal.resolvedStart?.name, 'GET /activity/goldenEgg/getGoldenEggReward');
+    assert.deepEqual(
+        explicitAliasTraversal.traversal.map(item => item.node?.name).filter(Boolean),
+        endpointTraversal
+    );
+
     const routeTraversal = namesFromTraversal(
-        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--from', 'reqSyncTable', '--direction', 'downstream', '--depth', '2', '--json'], nestedCwd)
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--downstream', 'reqSyncTable', '--depth', '2', '--json'], nestedCwd)
     );
     assert.ok(routeTraversal.includes('TableMsg.reqSyncTable'));
 
@@ -78,6 +111,35 @@ function runFixtureAssertions() {
     assert.ok(methodTraversal.includes('goldenEggLotteryRecordTable'));
     assert.ok(methodTraversal.includes('goldenEggUserInfoTable'));
     assert.ok(methodTraversal.includes('Rpc.updateUserAsset'));
+
+    const typedMethodTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--method', 'getGoldenEggReward', '--downstream', '--depth', '3', '--json'], nestedCwd)
+    );
+    assert.equal(typedMethodTraversal.inputQuery, 'getGoldenEggReward');
+    assert.equal(typedMethodTraversal.resolvedStart?.name, 'goldenEgg.getGoldenEggReward');
+    assert.ok(typedMethodTraversal.traversal.some(item => item.node?.name === 'tbUserAccount'));
+
+    const typedMethodUpstream = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--method', 'getGoldenEggReward', '--upstream', '--depth', '2', '--json'], nestedCwd)
+    );
+    assert.ok(typedMethodUpstream.includes('GET /activity/goldenEgg/getGoldenEggReward'));
+
+    const typedRequestUpstream = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--request', 'pkplayer.Rpc.updateUserAsset', '--upstream', '--depth', '2', '--json'], nestedCwd)
+    );
+    assert.ok(typedRequestUpstream.includes('goldenEgg.getGoldenEggReward'));
+
+    const typedEventUpstream = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--event', 'tableSynced', '--upstream', '--depth', '2', '--json'], nestedCwd)
+    );
+    assert.ok(typedEventUpstream.includes('TableMsg.reqSyncTable'));
+    assert.ok(typedEventUpstream.includes('TableMsg.init'));
+
+    const typedStateUpstream = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--state', 'syncState', '--upstream', '--depth', '2', '--json'], nestedCwd)
+    );
+    assert.ok(typedStateUpstream.includes('TableMsg.reqSyncTable'));
+    assert.ok(typedStateUpstream.includes('TableMsg.handleTableSynced'));
 
     const registry = readJson(path.join(tempRoot, 'project-memory', 'state', 'feature-registry.json'));
     const featureIndex = readJson(path.join(tempRoot, 'project-memory', 'kb', 'indexes', 'features.json'));
@@ -162,6 +224,7 @@ function runQyserverAssertions() {
 }
 
 try {
+    runVersionAssertions();
     runFixtureAssertions();
     runQyserverAssertions();
     console.log('pinus-backend validation passed');

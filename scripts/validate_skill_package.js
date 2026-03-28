@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 
 const MAX_SKILL_NAME_LENGTH = 64;
+const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const RELEASE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function parseArgs(argv) {
     const defaultSkillPath = path.resolve(__dirname, '..');
@@ -14,6 +16,10 @@ function parseArgs(argv) {
 
 function readText(filePath) {
     return fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+}
+
+function readJson(filePath) {
+    return JSON.parse(readText(filePath));
 }
 
 function fail(message) {
@@ -147,11 +153,67 @@ function validateOpenAiYaml(skillPath, expectedSkillName) {
     return ok('agents/openai.yaml 校验通过');
 }
 
+function validateSkillVersion(skillPath, expectedSkillName) {
+    const versionPath = path.join(skillPath, 'skill-version.json');
+    if (!fs.existsSync(versionPath)) {
+        return fail('未找到 skill-version.json；这通常表示旧版安装副本');
+    }
+
+    let versionInfo = null;
+    try {
+        versionInfo = readJson(versionPath);
+    } catch (error) {
+        return fail(error instanceof Error ? `skill-version.json 解析失败: ${error.message}` : 'skill-version.json 解析失败');
+    }
+
+    if (!versionInfo || typeof versionInfo !== 'object' || Array.isArray(versionInfo)) {
+        return fail('skill-version.json 必须是 JSON 对象');
+    }
+
+    const name = String(versionInfo.name || '').trim();
+    const version = String(versionInfo.version || '').trim();
+    const releaseDate = String(versionInfo.releaseDate || '').trim();
+    const repo = String(versionInfo.repo || '').trim();
+    const capabilities = Array.isArray(versionInfo.capabilities) ? versionInfo.capabilities : null;
+
+    if (!name) {
+        return fail("skill-version.json 缺少 'name'");
+    }
+    if (expectedSkillName && name !== expectedSkillName) {
+        return fail(`skill-version.json 的 name 必须与 SKILL.md 一致: ${expectedSkillName}`);
+    }
+    if (!VERSION_PATTERN.test(version)) {
+        return fail(`skill-version.json 的 version 无效: ${version || '(empty)'}`);
+    }
+    if (!RELEASE_DATE_PATTERN.test(releaseDate)) {
+        return fail(`skill-version.json 的 releaseDate 无效: ${releaseDate || '(empty)'}`);
+    }
+    if (!/^https?:\/\/.+/.test(repo)) {
+        return fail(`skill-version.json 的 repo 无效: ${repo || '(empty)'}`);
+    }
+    if (!capabilities || capabilities.length <= 0 || capabilities.some(item => typeof item !== 'string' || !item.trim())) {
+        return fail("skill-version.json 的 capabilities 必须是非空字符串数组");
+    }
+
+    return {
+        valid: true,
+        message: `skill-version.json 校验通过 (${name}@${version})`,
+        data: {
+            name,
+            version,
+            releaseDate,
+            repo,
+            capabilities,
+        },
+    };
+}
+
 function validateRequiredStructure(skillPath) {
     const requiredPaths = [
         'scripts',
         'references',
         'assets',
+        'skill-version.json',
         path.join('agents', 'openai.yaml'),
     ];
 
@@ -183,6 +245,13 @@ function run(argv = process.argv.slice(2)) {
         process.exit(1);
     }
 
+    const versionResult = validateSkillVersion(args.skillPath, frontmatter.name);
+    checks.push({ name: 'skill-version', ...versionResult });
+    if (!versionResult.valid) {
+        console.error(versionResult.message);
+        process.exit(1);
+    }
+
     const structureResult = validateRequiredStructure(args.skillPath);
     checks.push({ name: 'structure', ...structureResult });
     if (!structureResult.valid) {
@@ -192,9 +261,18 @@ function run(argv = process.argv.slice(2)) {
 
     console.log(`便携技能校验通过: ${args.skillPath}`);
     checks.forEach(check => console.log(`- ${check.name}: ${check.message}`));
+    if (versionResult.data) {
+        console.log(`- version: ${versionResult.data.name}@${versionResult.data.version}`);
+        console.log(`- repo: ${versionResult.data.repo}`);
+        console.log(`- capabilities: ${versionResult.data.capabilities.join(', ')}`);
+    }
 }
 
 module.exports = {
+    validateSkillMd,
+    validateOpenAiYaml,
+    validateSkillVersion,
+    validateRequiredStructure,
     run,
 };
 

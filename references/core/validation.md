@@ -7,6 +7,7 @@
 ## 默认命令
 
 ```bash
+node scripts/show_skill_version.js --text
 python scripts/validate_skill_runtime.py <skill-path> --mode auto
 ```
 
@@ -33,6 +34,7 @@ python scripts/validate_skill_runtime.py <skill-path> --mode auto
 ## 说明
 
 - 便携校验能力比完整 YAML 解析窄，但足以覆盖当前技能的 `SKILL.md` 与 `agents/openai.yaml` 结构。
+- `skill-version.json` 是公开安装版技能的版本指纹；缺失它通常说明当前安装副本仍是旧版。
 - `auto` 模式的默认策略是：能补环境就补环境，补不了才做最后兜底。
 - 本地 venv 默认放在运行时目录下的 `validation-tools-venv`，临时安装缓存放在 `validation-temp/` 会话目录。
 - 若要启用 TypeScript AST 抽取，可在技能目录执行 `npm install` 安装 `package.json` 中的 `typescript`，或将 `PMM_TYPESCRIPT_PATH` 指向 `typescript` 包目录。

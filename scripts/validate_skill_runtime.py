@@ -11,6 +11,7 @@ project-memory-manager 技能校验器。
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -312,11 +313,59 @@ def parse_openai_yaml_portable(content: str) -> dict:
     return {"interface": interface_data}
 
 
+def validate_skill_version(skill_path: Path, expected_skill_name: str = "") -> tuple[bool, str, dict[str, object] | None]:
+    import re
+
+    version_file = skill_path / "skill-version.json"
+    if not version_file.exists():
+        return False, "未找到 skill-version.json；这通常表示旧版安装副本", None
+
+    try:
+        version_info = json.loads(version_file.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as error:
+        return False, f"skill-version.json 解析失败: {error}", None
+
+    if not isinstance(version_info, dict):
+        return False, "skill-version.json 必须是 JSON 对象", None
+
+    name = str(version_info.get("name", "")).strip()
+    version = str(version_info.get("version", "")).strip()
+    release_date = str(version_info.get("releaseDate", "")).strip()
+    repo = str(version_info.get("repo", "")).strip()
+    capabilities = version_info.get("capabilities")
+
+    if not name:
+        return False, "skill-version.json 缺少 'name'", None
+    if expected_skill_name and name != expected_skill_name:
+        return False, f"skill-version.json 的 name 必须与 SKILL.md 一致: {expected_skill_name}", None
+    if not re.match(r"^\d+\.\d+\.\d+$", version):
+        return False, f"skill-version.json 的 version 无效: {version or '(empty)'}", None
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", release_date):
+        return False, f"skill-version.json 的 releaseDate 无效: {release_date or '(empty)'}", None
+    if not re.match(r"^https?://.+", repo):
+        return False, f"skill-version.json 的 repo 无效: {repo or '(empty)'}", None
+    if not isinstance(capabilities, list) or not capabilities or any(not isinstance(item, str) or not item.strip() for item in capabilities):
+        return False, "skill-version.json 的 capabilities 必须是非空字符串数组", None
+
+    return (
+        True,
+        f"skill-version.json 校验通过 ({name}@{version})",
+        {
+            "name": name,
+            "version": version,
+            "releaseDate": release_date,
+            "repo": repo,
+            "capabilities": capabilities,
+        },
+    )
+
+
 def validate_required_structure(skill_path: Path) -> tuple[bool, str]:
     required_paths = [
         skill_path / "scripts",
         skill_path / "references",
         skill_path / "assets",
+        skill_path / "skill-version.json",
         skill_path / "agents" / "openai.yaml",
     ]
     for required_path in required_paths:
@@ -397,6 +446,11 @@ def portable_validate(skill_path: Path) -> int:
         print("agents/openai.yaml 缺少 interface.short_description", file=sys.stderr)
         return 1
 
+    version_valid, version_message, version_info = validate_skill_version(skill_path, skill_name)
+    if not version_valid:
+        print(version_message, file=sys.stderr)
+        return 1
+
     structure_valid, structure_message = validate_required_structure(skill_path)
     if not structure_valid:
         print(structure_message, file=sys.stderr)
@@ -405,7 +459,11 @@ def portable_validate(skill_path: Path) -> int:
     print(f"便携技能校验通过: {skill_path}")
     print("- skill-md: SKILL.md 校验通过")
     print("- openai-yaml: agents/openai.yaml 校验通过")
+    print(f"- skill-version: {version_message}")
     print(f"- structure: {structure_message}")
+    print(f"- version: {version_info['name']}@{version_info['version']}")
+    print(f"- repo: {version_info['repo']}")
+    print(f"- capabilities: {', '.join(version_info['capabilities'])}")
     return 0
 
 
@@ -450,12 +508,21 @@ def strict_validate_with_yaml(skill_path: Path) -> int:
         print(f"agents/openai.yaml 的 default_prompt 必须包含 ${skill_name}", file=sys.stderr)
         return 1
 
+    version_valid, version_message, version_info = validate_skill_version(skill_path, skill_name)
+    if not version_valid:
+        print(version_message, file=sys.stderr)
+        return 1
+
     structure_valid, structure_message = validate_required_structure(skill_path)
     if not structure_valid:
         print(structure_message, file=sys.stderr)
         return 1
 
     print(f"严格技能校验通过: {skill_path}")
+    print(f"- skill-version: {version_message}")
+    print(f"- version: {version_info['name']}@{version_info['version']}")
+    print(f"- repo: {version_info['repo']}")
+    print(f"- capabilities: {', '.join(version_info['capabilities'])}")
     return 0
 
 

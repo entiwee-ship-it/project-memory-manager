@@ -12,6 +12,8 @@ function parseArgs(argv) {
         state: '',
         upstream: '',
         downstream: '',
+        upstreamFlag: false,
+        downstreamFlag: false,
         from: '',
         direction: '',
         type: '',
@@ -27,6 +29,8 @@ function parseArgs(argv) {
 
     for (let index = 0; index < argv.length; index++) {
         const token = argv[index];
+        const nextToken = argv[index + 1];
+        const hasExplicitValue = Boolean(nextToken && !String(nextToken).startsWith('--'));
         if (token === '--feature') {
             args.feature = argv[++index];
             continue;
@@ -48,11 +52,19 @@ function parseArgs(argv) {
             continue;
         }
         if (token === '--upstream') {
-            args.upstream = argv[++index];
+            if (hasExplicitValue) {
+                args.upstream = argv[++index];
+            } else {
+                args.upstreamFlag = true;
+            }
             continue;
         }
         if (token === '--downstream') {
-            args.downstream = argv[++index];
+            if (hasExplicitValue) {
+                args.downstream = argv[++index];
+            } else {
+                args.downstreamFlag = true;
+            }
             continue;
         }
         if (token === '--from') {
@@ -101,7 +113,7 @@ function parseArgs(argv) {
     }
 
     if (!args.feature) {
-        throw new Error('用法: node query_chain_kb.js --feature <key> [--event|--method|--request|--state|--type|--from|--upstream|--downstream] ... [--json]');
+        throw new Error('用法: node query_chain_kb.js --feature <key> [--event|--method|--request|--state|--type|--from --direction <upstream|downstream>|--upstream [query]|--downstream [query]] ... [--json]');
     }
 
     if (args.from && args.direction && !['upstream', 'downstream'].includes(args.direction)) {
@@ -109,6 +121,15 @@ function parseArgs(argv) {
     }
 
     return args;
+}
+
+function collectTypedSelectors(args) {
+    return [
+        ['method', args.method],
+        ['event', args.event],
+        ['request', args.request],
+        ['state', args.state],
+    ].filter(([, value]) => Boolean(value));
 }
 
 function loadFeatureLookup(root, featureKey) {
@@ -485,10 +506,113 @@ function printTraversal(result, asJson) {
         });
 }
 
+function resolveTypedStart(graph, lookup, selectorType, query) {
+    if (selectorType === 'method') {
+        const method = resolveMethod(lookup, query);
+        if (!method) {
+            throw new Error(`未找到方法: ${query}`);
+        }
+        return method;
+    }
+    if (selectorType === 'event') {
+        const event = lookup.events[query];
+        if (!event) {
+            throw new Error(`未找到事件: ${query}`);
+        }
+        return event;
+    }
+    if (selectorType === 'request') {
+        const request = lookup.requests[query];
+        if (!request) {
+            throw new Error(`未找到 request: ${query}`);
+        }
+        return request;
+    }
+    if (selectorType === 'state') {
+        const state = resolveState(lookup, query);
+        if (!state) {
+            throw new Error(`未找到 state: ${query}`);
+        }
+        return state;
+    }
+
+    const resolved = resolveNodeId(graph, lookup, query);
+    if (!resolved) {
+        throw new Error(`未找到节点: ${query}`);
+    }
+    return typeof resolved === 'string' ? { id: resolved } : resolved;
+}
+
+function resolveTraversalSpec(args, graph, lookup) {
+    if (args.upstream) {
+        return { direction: 'upstream', inputQuery: args.upstream, selectorType: 'node' };
+    }
+    if (args.downstream) {
+        return { direction: 'downstream', inputQuery: args.downstream, selectorType: 'node' };
+    }
+
+    const typedSelectors = collectTypedSelectors(args);
+    if (args.upstreamFlag || args.downstreamFlag) {
+        if (typedSelectors.length > 1) {
+            throw new Error('链路遍历模式下只支持一个 typed selector');
+        }
+        if (typedSelectors.length === 1) {
+            const [selectorType, inputQuery] = typedSelectors[0];
+            return {
+                direction: args.upstreamFlag ? 'upstream' : 'downstream',
+                inputQuery,
+                selectorType,
+            };
+        }
+        if (args.from) {
+            return {
+                direction: args.upstreamFlag ? 'upstream' : 'downstream',
+                inputQuery: args.from,
+                selectorType: 'node',
+            };
+        }
+        throw new Error('未提供链路遍历起点。请传入 --upstream <query> / --downstream <query>，或结合 --method/--event/--request/--state 使用。');
+    }
+
+    if (args.from && args.direction) {
+        return {
+            direction: args.direction,
+            inputQuery: args.from,
+            selectorType: 'node',
+        };
+    }
+
+    return null;
+}
+
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
     const { graph, lookup } = loadFeatureLookup(root, args.feature);
+
+    const traversalSpec = resolveTraversalSpec(args, graph, lookup);
+    if (traversalSpec) {
+        const resolved = resolveTypedStart(graph, lookup, traversalSpec.selectorType, traversalSpec.inputQuery);
+        if (resolved?.ambiguous) {
+            printTraversal(resolved, args.json);
+            return;
+        }
+
+        const startId = typeof resolved === 'string' ? resolved : resolved.id;
+        const startNode = lookup.nodesById[startId];
+        printTraversal(
+            {
+                inputQuery: traversalSpec.inputQuery,
+                resolvedStart: startNode ? summarizeNode(startNode, lookup) : null,
+                node: startNode,
+                direction: traversalSpec.direction,
+                depth: args.depth,
+                traversal: traverse(lookup, startId, traversalSpec.direction, args.depth),
+            },
+            args.json
+        );
+        return;
+    }
 
     if (args.event) {
         const event = lookup.events[args.event];
@@ -557,37 +681,6 @@ function run(argv = process.argv.slice(2)) {
     if (args.type || args.name || args.tag || args.file || args.hasHandler) {
         const results = searchNodes(graph, lookup, args);
         printSearchResults(results, args.json);
-        return;
-    }
-
-    const direction = args.upstream
-        ? 'upstream'
-        : args.downstream
-          ? 'downstream'
-          : args.from && args.direction
-            ? args.direction
-            : '';
-    const startQuery = args.upstream || args.downstream || args.from;
-
-    if (direction && startQuery) {
-        const resolved = resolveNodeId(graph, lookup, startQuery);
-        if (!resolved) {
-            throw new Error(`未找到节点: ${startQuery}`);
-        }
-        if (typeof resolved === 'object' && resolved.ambiguous) {
-            printTraversal(resolved, args.json);
-            return;
-        }
-
-        printTraversal(
-            {
-                node: lookup.nodesById[resolved],
-                direction,
-                depth: args.depth,
-                traversal: traverse(lookup, resolved, direction, args.depth),
-            },
-            args.json
-        );
         return;
     }
 

@@ -21,6 +21,7 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 安装完成后，建议运行技能自带校验：
 
 ```powershell
+node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\show_skill_version.js" --text
 python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
 ```
 
@@ -29,6 +30,7 @@ python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\vali
 ```powershell
 npx skills check
 npx skills update
+node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\show_skill_version.js" --text
 python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
 ```
 

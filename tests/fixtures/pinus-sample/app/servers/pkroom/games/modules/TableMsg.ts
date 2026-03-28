@@ -1,7 +1,9 @@
 type MsgHandler = (tb: any, pl: any, msg: any) => Promise<any> | any;
+declare const eventBus: any;
 
 export class TableMsg {
     private handlers: Map<string, MsgHandler>;
+    private syncState: any;
 
     static inst = new TableMsg();
 
@@ -23,10 +25,22 @@ export class TableMsg {
 
     init() {
         this.regHandler('reqSyncTable', this.reqSyncTable);
+        eventBus.on('tableSynced', this.handleTableSynced, this);
     }
 
     async reqSyncTable(tb: any, pl: any, msg: any) {
+        this.syncState = msg;
         tb.NotifyAll('syncTable', { ok: true, msg });
+        if (this.syncState) {
+            eventBus.emit('tableSynced');
+        }
         return { tb, pl, msg };
+    }
+
+    async handleTableSynced() {
+        if (!this.syncState) {
+            return null;
+        }
+        return this.syncState;
     }
 }
