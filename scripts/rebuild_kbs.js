@@ -6,6 +6,7 @@ const { resolveProjectRoot, readJson } = require('./lib/common');
 const { normalizeFeatureRecord } = require('./lib/feature-kb');
 const { run: buildChainKb } = require('./build_chain_kb');
 const { run: buildProjectKb } = require('./build_project_kb');
+const { run: buildCocosAuthoringProfile } = require('./build_cocos_authoring_profile');
 const { run: refreshMemoryIndexes } = require('./refresh_memory_indexes');
 
 function parseArgs(argv) {
@@ -97,8 +98,9 @@ function run(argv = process.argv.slice(2)) {
     if (!args.feature || args.feature === 'project-global') {
         buildProjectKb(['--root', root]);
         if (args.feature === 'project-global') {
+            buildCocosAuthoringProfile(['--root', root]);
             refreshMemoryIndexes(['--root', root]);
-            console.log('KB 重建完成: project-global');
+            console.log('KB 重建完成: project-global + cocos-authoring-profile');
             return;
         }
     }
@@ -119,8 +121,9 @@ function run(argv = process.argv.slice(2)) {
         rebuilt.push(target.configPath);
     }
 
+    buildCocosAuthoringProfile(['--root', root, ...(args.feature ? ['--feature', args.feature] : [])]);
     refreshMemoryIndexes(['--root', root]);
-    console.log(`KB 重建完成: project-global + ${rebuilt.length} 个 feature`);
+    console.log(`KB 重建完成: project-global + ${rebuilt.length} 个 feature + cocos-authoring-profile`);
 }
 
 module.exports = {

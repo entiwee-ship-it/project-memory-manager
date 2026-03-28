@@ -484,13 +484,131 @@ function normalizeTypeName(typeText) {
         .replace(/\bundefined\b/g, ' ')
         .replace(/\breadonly\b/g, ' ')
         .trim();
-
-    const match = cleaned.match(/[A-Za-z_$][\w$]*/);
-    return match ? match[0] : '';
+    const token = cleaned.split(/\s+/).find(Boolean) || '';
+    if (!token) {
+        return '';
+    }
+    const normalizedToken = token.replace(/[()?:=!]+/g, '');
+    const segments = normalizedToken.split('.').filter(Boolean);
+    return segments.length > 0 ? segments[segments.length - 1] : '';
 }
 
-function extractFieldTypes(source, imports) {
+function getDecorators(node, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !node) {
+        return [];
+    }
+    if (typeof ts.canHaveDecorators === 'function' && typeof ts.getDecorators === 'function') {
+        return ts.getDecorators(node) || [];
+    }
+    return node.decorators || [];
+}
+
+function inferFieldTypeFromDecorators(member, sourceFile, ts = TYPESCRIPT_RUNTIME) {
+    if (!ts || !member) {
+        return '';
+    }
+
+    for (const decorator of getDecorators(member, ts)) {
+        const expression = decorator.expression || null;
+        if (!expression || !ts.isCallExpression(expression)) {
+            continue;
+        }
+
+        const decoratorName = getPropertyNameText(expression.expression, ts);
+        if (decoratorName !== 'property' && decoratorName !== 'type') {
+            continue;
+        }
+
+        const firstArg = expression.arguments?.[0];
+        if (!firstArg) {
+            continue;
+        }
+
+        if (ts.isIdentifier(firstArg)) {
+            return firstArg.text;
+        }
+        if (isPropertyAccessLike(firstArg, ts)) {
+            return normalizeTypeName(firstArg.getText(sourceFile));
+        }
+        if (ts.isObjectLiteralExpression(firstArg)) {
+            for (const property of firstArg.properties || []) {
+                if (!ts.isPropertyAssignment(property)) {
+                    continue;
+                }
+                const propertyName = getPropertyNameText(property.name, ts);
+                if (propertyName !== 'type') {
+                    continue;
+                }
+                if (ts.isIdentifier(property.initializer)) {
+                    return property.initializer.text;
+                }
+                if (isPropertyAccessLike(property.initializer, ts)) {
+                    return normalizeTypeName(property.initializer.getText(sourceFile));
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+function extractFieldTypesFromAst(source, scriptFile, imports) {
+    const ts = TYPESCRIPT_RUNTIME;
+    if (!ts) {
+        return new Map();
+    }
+
+    const scriptKind = scriptFile.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const sourceFile = ts.createSourceFile(scriptFile, source, ts.ScriptTarget.Latest, true, scriptKind);
     const fieldTypes = new Map();
+    const importMap = new Map();
+
+    for (const importInfo of imports) {
+        for (const identifier of importInfo.identifiers) {
+            importMap.set(identifier, importInfo);
+        }
+    }
+
+    const visit = node => {
+        if (ts.isClassLike(node)) {
+            for (const member of node.members || []) {
+                if (!ts.isPropertyDeclaration(member) || !member.name) {
+                    continue;
+                }
+                const fieldName = getPropertyNameText(member.name, ts);
+                if (!fieldName || String(fieldName).startsWith('_')) {
+                    continue;
+                }
+
+                const explicitType = member.type ? member.type.getText(sourceFile) : '';
+                const decoratorType = inferFieldTypeFromDecorators(member, sourceFile, ts);
+                const rawType = explicitType || decoratorType;
+                if (!rawType) {
+                    continue;
+                }
+
+                const baseType = normalizeTypeName(rawType);
+                const importInfo = importMap.get(baseType) || null;
+                fieldTypes.set(fieldName, {
+                    fieldName,
+                    rawType,
+                    baseType,
+                    sourcePath: importInfo?.resolvedPath || null,
+                    sourceSpecifier: importInfo?.specifier || (rawType.startsWith('cc.') || decoratorType ? 'cc' : ''),
+                    declaredVia: explicitType ? 'type-annotation' : 'decorator',
+                });
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    };
+
+    visit(sourceFile);
+    return fieldTypes;
+}
+
+function extractFieldTypes(source, scriptFile, imports) {
+    const fieldTypes = extractFieldTypesFromAst(source, scriptFile, imports);
     const importMap = new Map();
 
     for (const importInfo of imports) {
@@ -508,13 +626,16 @@ function extractFieldTypes(source, imports) {
         const baseType = normalizeTypeName(rawType);
         const importInfo = importMap.get(baseType) || null;
 
-        fieldTypes.set(fieldName, {
-            fieldName,
-            rawType,
-            baseType,
-            sourcePath: importInfo?.resolvedPath || null,
-            sourceSpecifier: importInfo?.specifier || '',
-        });
+        if (!fieldTypes.has(fieldName)) {
+            fieldTypes.set(fieldName, {
+                fieldName,
+                rawType,
+                baseType,
+                sourcePath: importInfo?.resolvedPath || null,
+                sourceSpecifier: importInfo?.specifier || (rawType.startsWith('cc.') ? 'cc' : ''),
+                declaredVia: 'regex',
+            });
+        }
     }
 
     return fieldTypes;
@@ -2777,7 +2898,7 @@ function extractScriptInsights(methodRoots, context) {
             const source = fs.readFileSync(scriptFile, 'utf8');
             const astContext = extractMethodDefinitionsFromAst(source, scriptFile);
             const imports = extractImports(source, scriptFile, context);
-            const fieldTypes = extractFieldTypes(source, imports);
+            const fieldTypes = extractFieldTypes(source, scriptFile, imports);
             const handlerMaps = extractHandlerMaps(source);
             const exports = extractExports(source);
             const methods = [];

@@ -75,6 +75,7 @@ node scripts/rebuild_kbs.js --root "<project-root>"
 - 识别项目拓扑和技术栈区域
 - 构建或刷新 feature 级知识库
 - 查询方法、事件、request、state 的上下游链路
+- 为 Cocos prefab / 点击事件 / 字段绑定生成开发规划与自动应用
 - 为全栈仓库建立统一的 AI 工作协议
 
 适用技术方向包括：

@@ -650,6 +650,7 @@ function buildRecommendedCommands(featureKey, lookup = {}) {
 
     if (Array.isArray(lookup.nodesByType?.binding) && lookup.nodesByType.binding.length > 0) {
         commands.push(`node scripts/query_kb.js --feature ${featureKey} --type binding --name <field|handler>`);
+        commands.push(`node scripts/cocos_authoring.js --feature ${featureKey} --prefab <prefab-name> --intent profile`);
     }
     if (Array.isArray(lookup.nodesByType?.['ui-node']) && lookup.nodesByType['ui-node'].length > 0) {
         commands.push(`node scripts/query_kb.js --feature ${featureKey} --type ui-node --name <node-path>`);

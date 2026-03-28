@@ -434,6 +434,7 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
     if ((raw.prefabs || []).length > 0) {
         queryExamples.push(`node scripts/query_kb.js --feature ${config.featureKey} --type binding --name <field|handler>`);
         queryExamples.push(`node scripts/query_kb.js --feature ${config.featureKey} --type ui-node --name <node-path>`);
+        queryExamples.push(`node scripts/cocos_authoring.js --feature ${config.featureKey} --prefab <prefab-name> --intent profile`);
     }
 
     return {

@@ -80,6 +80,33 @@
 - `node scripts/query_kb.js --feature <feature-key> --type ui-node --name <node-path>`
 - `node scripts/query_kb.js --feature <feature-key> --type asset --name <asset-name>`
 - `node scripts/query_chain_kb.js --feature <feature-key> --downstream <binding-node-name>`
+- `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
+
+## 创作辅助层
+
+现在新增了 `scripts/cocos_authoring.js`，它不是只解释现状，而是给“新增功能时该怎么绑定”出规划，必要时还能直接应用修改。
+
+第一版支持两类规划：
+
+- 新增点击事件
+  - 示例：
+    - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent click-event --source-node <source-node> --target-component <target-component> --handler <method>`
+- 新增字段绑定
+  - 示例：
+    - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-node <node-path>`
+    - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-asset <asset-name>`
+
+它当前会输出：
+
+- 目标脚本组件是否已经挂到正确节点
+- handler 方法是否已经存在，是否需要先改脚本
+- 事件应该写入哪个 `clickEvents`
+- 字段应该写回哪个 serialized field
+- 当前 prefab 里已有的 click 绑定约定，作为项目级学习样本
+
+如果你只是想先看某个 prefab 里“有哪些节点、哪些脚本、哪些可绑定字段、已有事件习惯”，可以直接运行：
+
+- `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
 
 ## 推荐理解顺序
 
