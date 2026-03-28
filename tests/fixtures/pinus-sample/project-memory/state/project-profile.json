@@ -1,0 +1,10 @@
+{
+  "areas": {
+    "backend": ["app", "app/http/routes", "app/modules", "app/servers"],
+    "data": ["app/db/schema"]
+  },
+  "stacks": {
+    "backend": ["node", "pinus"],
+    "data": ["mysql", "drizzle"]
+  }
+}

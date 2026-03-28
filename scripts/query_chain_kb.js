@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { readJson } = require('./lib/common');
+const { readJson, resolveProjectRoot } = require('./lib/common');
 
 function parseArgs(argv) {
     const args = {
@@ -19,6 +19,7 @@ function parseArgs(argv) {
         tag: '',
         file: '',
         hasHandler: '',
+        root: '',
         depth: 2,
         limit: 20,
         json: false,
@@ -80,6 +81,10 @@ function parseArgs(argv) {
         }
         if (token === '--has-handler') {
             args.hasHandler = argv[++index];
+            continue;
+        }
+        if (token === '--root') {
+            args.root = argv[++index];
             continue;
         }
         if (token === '--depth') {
@@ -166,6 +171,11 @@ function findMatchingNodes(graph, query) {
             matchContains(node.file, query) ||
             matchContains(node.meta?.methodName, query) ||
             matchContains(node.meta?.statePath, query) ||
+            matchContains(node.meta?.route, query) ||
+            matchContains(node.meta?.path, query) ||
+            matchContains(node.meta?.importPath, query) ||
+            matchContains(node.meta?.kind, query) ||
+            matchContains(node.meta?.protocol, query) ||
             (node.meta?.tags || []).some(tag => matchContains(tag, query))
         );
     });
@@ -175,6 +185,15 @@ function findMatchingNodes(graph, query) {
 function resolveNodeId(graph, lookup, query) {
     if (lookup.nodesById[query]) {
         return query;
+    }
+    const exactNodeMatches = graph.nodes.filter(node => node.name === query || node.id === query || node.meta?.statePath === query);
+    if (exactNodeMatches.length === 1) {
+        return exactNodeMatches[0].id;
+    }
+    if (exactNodeMatches.length > 1) {
+        return {
+            ambiguous: exactNodeMatches.map(node => `${node.type}:${node.name}`),
+        };
     }
     const method = resolveMethod(lookup, query);
     if (method?.id) {
@@ -188,6 +207,15 @@ function resolveNodeId(graph, lookup, query) {
     }
     if (lookup.requests[query]?.id) {
         return lookup.requests[query].id;
+    }
+    if (lookup.routes?.[query]?.id) {
+        return lookup.routes[query].id;
+    }
+    if (lookup.endpoints?.[query]?.id) {
+        return lookup.endpoints[query].id;
+    }
+    if (lookup.tables?.[query]?.id) {
+        return lookup.tables[query].id;
     }
     if (lookup.states?.[query]?.id) {
         return lookup.states[query].id;
@@ -246,7 +274,7 @@ function summarizeNode(node, lookup) {
     const outgoing = lookup.adjacency.outgoing[node.id] || [];
     const incoming = lookup.adjacency.incoming[node.id] || [];
     const binds = outgoing.filter(edge => edge.type === 'binds');
-    return {
+    const summary = {
         id: node.id,
         type: node.type,
         name: node.name,
@@ -259,6 +287,21 @@ function summarizeNode(node, lookup) {
         incomingCount: incoming.length,
         bindings: summarizeEdges(binds, lookup),
     };
+
+    if (node.type === 'endpoint') {
+        summary.httpMethod = node.meta?.method || '';
+        summary.httpPath = node.meta?.path || '';
+    }
+    if (node.type === 'route') {
+        summary.routeKind = node.meta?.kind || '';
+        summary.routeProtocol = node.meta?.protocol || '';
+        summary.route = node.meta?.route || node.name;
+    }
+    if (node.type === 'table') {
+        summary.importPath = node.meta?.importPath || '';
+    }
+
+    return summary;
 }
 
 function searchNodes(graph, lookup, args) {
@@ -273,6 +316,9 @@ function searchNodes(graph, lookup, args) {
                 matchContains(node.name, args.name) ||
                 matchContains(node.meta?.methodName, args.name) ||
                 matchContains(node.meta?.statePath, args.name) ||
+                matchContains(node.meta?.route, args.name) ||
+                matchContains(node.meta?.path, args.name) ||
+                matchContains(node.meta?.importPath, args.name) ||
                 (node.meta?.tags || []).some(tag => matchContains(tag, args.name))
             );
         });
@@ -327,6 +373,18 @@ function printSummary(result, asJson) {
     console.log(`- area: ${result.area || 'unknown'}`);
     console.log(`- outgoing: ${result.outgoingCount}`);
     console.log(`- incoming: ${result.incomingCount}`);
+    if (result.type === 'endpoint') {
+        console.log(`- httpMethod: ${result.httpMethod || '(none)'}`);
+        console.log(`- httpPath: ${result.httpPath || '(none)'}`);
+    }
+    if (result.type === 'route') {
+        console.log(`- route: ${result.route || '(none)'}`);
+        console.log(`- kind: ${result.routeKind || '(none)'}`);
+        console.log(`- protocol: ${result.routeProtocol || '(none)'}`);
+    }
+    if (result.type === 'table') {
+        console.log(`- importPath: ${result.importPath || '(none)'}`);
+    }
     if ((result.bindings || []).length > 0) {
         console.log('- bindings:');
         result.bindings.forEach(item => {
@@ -377,6 +435,15 @@ function printSearchResults(results, asJson) {
     results.forEach(result => {
         console.log(`- ${result.name} [${result.type}] (${result.area || 'unknown'})`);
         console.log(`  file: ${result.file || '(none)'}`);
+        if (result.type === 'endpoint') {
+            console.log(`  http: ${result.httpMethod || '(none)'} ${result.httpPath || '(none)'}`);
+        }
+        if (result.type === 'route') {
+            console.log(`  route: ${result.route || '(none)'} [${result.routeKind || 'unknown'}|${result.routeProtocol || 'unknown'}]`);
+        }
+        if (result.type === 'table') {
+            console.log(`  importPath: ${result.importPath || '(none)'}`);
+        }
         if ((result.bindings || []).length > 0) {
             result.bindings.forEach(item => {
                 console.log(`  binds ${item.meta?.sourceEventKind || item.type} -> ${item.to}`);
@@ -420,7 +487,8 @@ function printTraversal(result, asJson) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const { graph, lookup } = loadFeatureLookup(process.cwd(), args.feature);
+    const root = resolveProjectRoot(args.root || process.cwd());
+    const { graph, lookup } = loadFeatureLookup(root, args.feature);
 
     if (args.event) {
         const event = lookup.events[args.event];

@@ -2,7 +2,21 @@
 
 const fs = require('fs');
 const path = require('path');
-const { readJson, timestamp, writeJson } = require('./lib/common');
+const { readJson, resolveProjectRoot, timestamp, writeJson } = require('./lib/common');
+
+function parseArgs(argv) {
+    const args = {
+        root: '',
+    };
+
+    for (let index = 0; index < argv.length; index++) {
+        if (argv[index] === '--root') {
+            args.root = argv[++index] || '';
+        }
+    }
+
+    return args;
+}
 
 function firstHeading(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -10,8 +24,9 @@ function firstHeading(filePath) {
     return match ? match[1].trim() : path.basename(filePath, path.extname(filePath));
 }
 
-function run() {
-    const root = process.cwd();
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
+    const root = resolveProjectRoot(args.root || process.cwd());
     const workDir = path.join(root, 'project-memory', 'docs', 'work', 'active');
     const configDir = path.join(root, 'project-memory', 'kb', 'configs');
     const domainDirs = [
@@ -78,7 +93,7 @@ function run() {
         games: domains,
     });
 
-    console.log('记忆索引已刷新');
+    console.log(`记忆索引已刷新: ${root}`);
 }
 
 module.exports = {

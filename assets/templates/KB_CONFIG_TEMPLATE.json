@@ -8,6 +8,16 @@
   "componentRoots": [],
   "assetRoots": [],
   "methodRoots": [],
+  "serverRoots": [],
+  "moduleRoots": [],
+  "dbRoots": [],
+  "scanTargets": {
+    "handlers": [],
+    "remotes": [],
+    "modules": [],
+    "routes": [],
+    "schemas": []
+  },
   "prefabs": [],
   "outputs": {
     "scan": "project-memory/kb/features/<feature-key>/scan.raw.json",

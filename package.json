@@ -3,6 +3,9 @@
   "private": true,
   "type": "commonjs",
   "description": "Runtime helpers for the project-memory-manager Codex skill.",
+  "scripts": {
+    "test": "node tests/pinus-backend.test.js"
+  },
   "dependencies": {
     "typescript": "^5.9.3"
   }

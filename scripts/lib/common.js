@@ -9,6 +9,15 @@ function ensureDir(dirPath) {
     fs.mkdirSync(dirPath, { recursive: true });
 }
 
+function pathExists(targetPath) {
+    try {
+        fs.accessSync(targetPath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, ''));
 }
@@ -21,6 +30,10 @@ function writeJson(filePath, value) {
 function writeText(filePath, value) {
     ensureDir(path.dirname(filePath));
     fs.writeFileSync(filePath, value, 'utf8');
+}
+
+function hasOwn(object, key) {
+    return Object.prototype.hasOwnProperty.call(object, key);
 }
 
 function listFilesRecursive(rootPath, matcher = () => true, acc = [], options = {}) {
@@ -67,6 +80,34 @@ function listFilesRecursive(rootPath, matcher = () => true, acc = [], options = 
 
 function repoRelative(filePath, root = process.cwd()) {
     return normalize(path.relative(root, path.resolve(filePath)));
+}
+
+function findProjectRoot(startDir = process.cwd()) {
+    let current = path.resolve(startDir);
+
+    while (true) {
+        if (pathExists(path.join(current, 'project-memory'))) {
+            return current;
+        }
+
+        const parent = path.dirname(current);
+        if (parent === current) {
+            return null;
+        }
+        current = parent;
+    }
+}
+
+function resolveProjectRoot(startDir = process.cwd()) {
+    const envRoot = String(process.env.PMM_PROJECT_ROOT || '').trim();
+    if (envRoot) {
+        const resolvedEnvRoot = path.resolve(envRoot);
+        if (pathExists(path.join(resolvedEnvRoot, 'project-memory'))) {
+            return resolvedEnvRoot;
+        }
+    }
+
+    return findProjectRoot(startDir) || path.resolve(startDir);
 }
 
 function slugify(input) {
@@ -134,13 +175,17 @@ function timestamp() {
 
 module.exports = {
     ensureDir,
+    findProjectRoot,
+    hasOwn,
     inferArea,
     inferStacks,
     listFilesRecursive,
     loadProjectProfile,
     normalize,
+    pathExists,
     readJson,
     repoRelative,
+    resolveProjectRoot,
     slugify,
     timestamp,
     writeJson,

@@ -43,6 +43,7 @@
 - event -> subscribers / emitters
 - method -> outgoing / incoming edges
 - request -> callers
+- endpoint / route / table 的 `--type` / `--name` / `--from --direction` 查询
 - upstream 遍历
 - downstream 遍历
 - component -> binds(handler / sourceEventKind)

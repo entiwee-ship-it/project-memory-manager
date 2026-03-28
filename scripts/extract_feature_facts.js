@@ -6,6 +6,9 @@ const { createExtractContext } = require('./adapters/extract');
 
 const DEFAULT_METHOD_SKIP = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'constructor']);
 const STATE_MUTATION_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'set', 'delete', 'clear']);
+const HTTP_ROUTE_METHODS = new Set(['get', 'post', 'put', 'delete']);
+const DRIZZLE_READ_METHODS = new Set(['from', 'join', 'innerJoin', 'leftJoin', 'rightJoin']);
+const DRIZZLE_WRITE_METHODS = new Set(['insert', 'update', 'delete']);
 
 function loadTypeScriptRuntime() {
     const candidates = [
@@ -66,7 +69,7 @@ function parseArgs(argv) {
     }
 
     if (!args.output || (args.prefabs.length <= 0 && args.methodRoots.length <= 0)) {
-        throw new Error('用法: node extract_feature_facts.js [--adapter <auto|cocos|generic>] [--component-root <dir>] [--asset-root <dir>] [--method-root <dir>] --output <file> [<prefab...>]');
+        throw new Error('用法: node extract_feature_facts.js [--adapter <auto|cocos|pinus|generic>] [--component-root <dir>] [--asset-root <dir>] [--method-root <dir>] --output <file> [<prefab...>]');
     }
     if (args.assetRoots.length <= 0) {
         args.assetRoots = [...args.componentRoots];
@@ -387,6 +390,39 @@ function extractImports(source, scriptFile, context) {
     return imports;
 }
 
+function buildImportIdentifierMap(imports = []) {
+    const importMap = new Map();
+    for (const importInfo of imports) {
+        for (const identifier of importInfo.identifiers || []) {
+            importMap.set(identifier, importInfo);
+        }
+    }
+    return importMap;
+}
+
+function isDbSchemaImport(importInfo) {
+    const resolvedPath = normalize(importInfo?.resolvedPath || '');
+    const specifier = String(importInfo?.specifier || '');
+    return /(?:^|\/)app\/db\/schema\//.test(resolvedPath) || /(?:^|\/)db\/schema\//.test(specifier);
+}
+
+function buildDbTableImportMap(imports = []) {
+    const tableMap = new Map();
+    for (const importInfo of imports) {
+        if (!isDbSchemaImport(importInfo)) {
+            continue;
+        }
+        for (const identifier of importInfo.identifiers || []) {
+            tableMap.set(identifier, {
+                tableName: identifier,
+                importPath: importInfo.specifier || importInfo.resolvedPath || '',
+                resolvedPath: importInfo.resolvedPath || '',
+            });
+        }
+    }
+    return tableMap;
+}
+
 function normalizeTypeName(typeText) {
     if (!typeText) {
         return '';
@@ -629,6 +665,113 @@ function splitTopLevelArgs(content) {
     return args;
 }
 
+function extractCallableParamNames(callableText) {
+    const normalizedCallable = String(callableText || '').trim();
+    if (!normalizedCallable) {
+        return [];
+    }
+
+    const arrowIndex = normalizedCallable.indexOf('=>');
+    if (arrowIndex !== -1) {
+        let paramsText = normalizedCallable.slice(0, arrowIndex).trim().replace(/^async\s+/, '');
+        if (paramsText.startsWith('(')) {
+            const closingIndex = paramsText.lastIndexOf(')');
+            return extractParamNames(closingIndex !== -1 ? paramsText.slice(1, closingIndex) : paramsText.slice(1));
+        }
+        return extractParamNames(paramsText);
+    }
+
+    const openParenIndex = normalizedCallable.indexOf('(');
+    if (openParenIndex !== -1) {
+        const paramsContent = extractWrappedContent(normalizedCallable, openParenIndex, '(', ')');
+        return extractParamNames(paramsContent);
+    }
+
+    return [];
+}
+
+function buildHttpRouteBasePath(scriptFile) {
+    const normalizedPath = normalize(scriptFile);
+    const marker = '/app/http/routes/';
+    const markerIndex = normalizedPath.indexOf(marker);
+    if (markerIndex === -1) {
+        return '';
+    }
+
+    const relativePath = normalizedPath.slice(markerIndex + marker.length).replace(/\.[^.]+$/, '');
+    const segments = relativePath.split('/').filter(Boolean);
+    if (segments[segments.length - 1] === 'index') {
+        segments.pop();
+    }
+    return segments.length ? `/${segments.join('/')}` : '';
+}
+
+function joinHttpRoutePath(basePath, subPath) {
+    const normalizedBase = String(basePath || '').trim();
+    const normalizedSubPath = String(normalizeInlineExpression(subPath) || '').trim();
+
+    if (!normalizedBase && !normalizedSubPath) {
+        return '/';
+    }
+    if (!normalizedSubPath || normalizedSubPath === '/') {
+        return normalizedBase || '/';
+    }
+
+    const left = normalizedBase.replace(/\/+$/, '');
+    const right = normalizedSubPath.replace(/^\/+/, '');
+    const combined = `${left}/${right}`.replace(/\/{2,}/g, '/');
+    return combined.startsWith('/') ? combined : `/${combined}`;
+}
+
+function toSyntheticMethodName(prefix, routeLabel) {
+    const normalized = String(routeLabel || '')
+        .replace(/[^A-Za-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase();
+    return `${prefix}_${normalized || 'root'}`;
+}
+
+function inferPinusMessageRouteEntries(scriptFile, methodName) {
+    const normalizedPath = normalize(scriptFile);
+    const pinusMatch = normalizedPath.match(/(?:^|\/)app\/servers\/([^/]+)\/(handler|remote)\/([^/]+)\.[^.]+$/);
+    if (!pinusMatch) {
+        return [];
+    }
+
+    const [, serverType, layer, serviceName] = pinusMatch;
+    const kind = layer === 'handler' ? 'pinus-handler' : 'pinus-remote';
+    const protocol = layer === 'handler' ? 'pinus' : 'pinus-rpc';
+
+    return uniqueSorted([
+        `${serverType}.${serviceName}.${methodName}`,
+        `app.rpc.${serverType}.${serviceName}.${methodName}`,
+        `${layer}.${serverType}.${serviceName}.${methodName}`,
+    ]).map(route => ({
+        kind,
+        protocol,
+        route,
+        handler: methodName,
+        role: 'handler',
+    }));
+}
+
+function extractTableMessageBindings(source) {
+    const bindings = [];
+    const bindingPattern = /\bthis\.regHandler\(\s*['"]([^'"]+)['"]\s*,\s*this\.([A-Za-z_$][\w$]*)\s*\)/g;
+    let match = null;
+
+    while ((match = bindingPattern.exec(source))) {
+        bindings.push({
+            route: match[1],
+            handler: match[2],
+            kind: 'table-msg',
+            protocol: 'table-msg',
+        });
+    }
+
+    return dedupeBy(bindings, item => `${item.route}::${item.handler}`);
+}
+
 function extractParamNames(paramsText) {
     return splitTopLevelArgs(paramsText)
         .map(param => {
@@ -693,6 +836,109 @@ function extractMethodDefinitions(source) {
         });
 
         headerPattern.lastIndex = cursor + 1;
+    }
+
+    return definitions;
+}
+
+function extractFunctionDefinitions(source) {
+    const definitions = [];
+    const functionPattern = /^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/gm;
+    let match = null;
+
+    while ((match = functionPattern.exec(source))) {
+        const functionName = match[1];
+        if (!functionName || DEFAULT_METHOD_SKIP.has(functionName)) {
+            continue;
+        }
+
+        const openParenIndex = functionPattern.lastIndex - 1;
+        const paramRange = extractWrappedRange(source, openParenIndex, '(', ')');
+        if (!paramRange) {
+            continue;
+        }
+
+        let cursor = paramRange.closeIndex + 1;
+        while (cursor < source.length && /\s/.test(source[cursor])) {
+            cursor++;
+        }
+
+        let returnType = '';
+        if (source[cursor] === ':') {
+            cursor++;
+            const returnStart = cursor;
+            while (cursor < source.length && source[cursor] !== '{') {
+                cursor++;
+            }
+            returnType = source.slice(returnStart, cursor).trim();
+        }
+
+        while (cursor < source.length && /\s/.test(source[cursor])) {
+            cursor++;
+        }
+        if (source[cursor] !== '{') {
+            continue;
+        }
+
+        definitions.push({
+            name: functionName,
+            access: 'public',
+            static: false,
+            async: /\basync\s+function\b/.test(match[0]),
+            params: paramRange.content.trim(),
+            returnType,
+            startIndex: match.index,
+            openBraceIndex: cursor,
+        });
+
+        functionPattern.lastIndex = cursor + 1;
+    }
+
+    return definitions;
+}
+
+function extractVariableCallableDefinitions(source) {
+    const definitions = [];
+    const variablePattern = /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(async\s+)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/gm;
+    let match = null;
+
+    while ((match = variablePattern.exec(source))) {
+        const name = match[1];
+        if (!name || DEFAULT_METHOD_SKIP.has(name)) {
+            continue;
+        }
+
+        const assignmentIndex = source.indexOf('=', match.index);
+        if (assignmentIndex === -1) {
+            continue;
+        }
+
+        const initializerText = source.slice(assignmentIndex + 1).trimStart();
+        const arrowIndex = initializerText.indexOf('=>');
+        const braceIndex = initializerText.indexOf('{');
+        if (arrowIndex === -1 && braceIndex === -1) {
+            continue;
+        }
+
+        const paramNames = extractCallableParamNames(initializerText);
+        const bodyText = extractInlineCallbackBody(initializerText);
+        if (!bodyText) {
+            continue;
+        }
+
+        definitions.push({
+            name,
+            access: 'public',
+            static: false,
+            async: /\basync\b/.test(match[0]),
+            params: paramNames.join(', '),
+            returnType: '',
+            startIndex: match.index,
+            openBraceIndex: braceIndex === -1 ? -1 : assignmentIndex + 1 + initializerText.indexOf('{'),
+            bodyText,
+            directBodyText: bodyText,
+            paramNames,
+        });
     }
 
     return definitions;
@@ -785,6 +1031,48 @@ function extractMethodDefinitionsFromAst(source, scriptFile) {
             }
         }
 
+        if (ts.isFunctionDeclaration(node) && node.name && node.body) {
+            const name = node.name.text;
+            pushDefinition(name, node, {
+                access: 'public',
+                static: false,
+                async: hasModifier(node, 'AsyncKeyword', ts),
+                paramsNode: node.parameters || [],
+                returnType: node.type ? node.type.getText(sourceFile) : '',
+                paramNames: extractAstParamNames(node.parameters || [], ts),
+                openBraceIndex: node.body ? node.body.pos - 1 : -1,
+                bodyText: extractMethodBodyTextFromAst(node.body, sourceFile, ts),
+                directBodyText: extractDirectBodyTextFromAst(node, sourceFile, ts),
+                astKind: 'function',
+            });
+        }
+
+        if (ts.isVariableStatement(node)) {
+            for (const declaration of node.declarationList?.declarations || []) {
+                if (!ts.isIdentifier(declaration.name) || !declaration.initializer) {
+                    continue;
+                }
+                if (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer)) {
+                    continue;
+                }
+
+                const initializer = declaration.initializer;
+                pushDefinition(declaration.name.text, declaration, {
+                    access: 'public',
+                    static: false,
+                    async: hasModifier(initializer, 'AsyncKeyword', ts),
+                    paramsNode: initializer.parameters || [],
+                    returnType: initializer.type ? initializer.type.getText(sourceFile) : '',
+                    paramNames: extractAstParamNames(initializer.parameters || [], ts),
+                    openBraceIndex: ts.isBlock(initializer.body) ? initializer.body.pos - 1 : -1,
+                    bodyText: extractMethodBodyTextFromAst(initializer.body, sourceFile, ts),
+                    directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
+                    astKind: ts.isArrowFunction(initializer) ? 'arrow-variable' : 'function-variable',
+                    astNode: initializer,
+                });
+            }
+        }
+
         ts.forEachChild(node, visit);
     };
 
@@ -856,6 +1144,36 @@ function createEmptyCallInfo() {
         callbackInvocations: [],
         stateReads: [],
         stateWrites: [],
+        httpEndpoints: [],
+        messageRoutes: [],
+        notifyRoutes: [],
+        dbReads: [],
+        dbWrites: [],
+    };
+}
+
+function matchPinusRpcPath(expressionPath) {
+    return String(expressionPath || '').match(/^(?:app|global\.App)\.rpc\.([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)$/);
+}
+
+function buildPinusRpcRequest(routeInfo, callbackDetails = {}) {
+    if (!routeInfo) {
+        return null;
+    }
+
+    const route = `${routeInfo.serverType}.${routeInfo.serviceName}.${routeInfo.methodName}`;
+    return {
+        callee: 'pinus.rpc',
+        target: route,
+        route,
+        protocol: 'pinus-rpc',
+        callbackKind: callbackDetails.callbackKind || 'none',
+        callbackRef: callbackDetails.callbackRef || '',
+        callbackLocalCalls: callbackDetails.callbackLocalCalls || [],
+        callbackImportedCalls: callbackDetails.callbackImportedCalls || [],
+        callbackFieldCalls: callbackDetails.callbackFieldCalls || [],
+        callbackEventDispatches: callbackDetails.callbackEventDispatches || [],
+        callbackInvocations: callbackDetails.callbackInvocations || [],
     };
 }
 
@@ -941,6 +1259,15 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                 callbackInvocations.push(expression.text);
             }
 
+            if (
+                ts.isIdentifier(expression) &&
+                knownMethodNames.includes(expression.text) &&
+                !paramSet.has(expression.text) &&
+                !importMap.has(expression.text)
+            ) {
+                pushLocalCall(expression.text, node);
+            }
+
             if (isPropertyAccessLike(expression, ts)) {
                 const thisPath = readThisAccessPathFromAst(expression, ts);
                 if (thisPath) {
@@ -974,6 +1301,55 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                         });
                     }
                 }
+
+                const qualifiedParts = String(calleePath || '').split('.').filter(Boolean);
+                const candidateMethod = qualifiedParts[qualifiedParts.length - 1] || '';
+                const rootIdentifier = qualifiedParts[0] || '';
+                if (
+                    qualifiedParts.length > 1 &&
+                    knownMethodNames.includes(candidateMethod) &&
+                    !importMap.has(rootIdentifier) &&
+                    !paramSet.has(rootIdentifier) &&
+                    !String(calleePath || '').includes('.rpc.')
+                ) {
+                    pushLocalCall(candidateMethod, node);
+                }
+            }
+
+            const pinusRpcMatch = matchPinusRpcPath(normalizedPath);
+            if (pinusRpcMatch) {
+                const callbackArg = (node.arguments || []).find(arg => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) || null;
+                const lastArg = node.arguments?.[node.arguments.length - 1] || null;
+                const lastArgText = lastArg ? lastArg.getText(sourceFile).trim() : '';
+                const callbackMethodRef = stripThisPrefix(readThisAccessPathFromAst(lastArg, ts) || '');
+                const callbackCallInfo = callbackArg
+                    ? analyzeInlineCallableFromAst(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__pinus_rpc_callback__', knownMethodNames)
+                    : createEmptyCallInfo();
+
+                networkRequests.push(buildPinusRpcRequest(
+                    {
+                        serverType: pinusRpcMatch[1],
+                        serviceName: pinusRpcMatch[2],
+                        methodName: pinusRpcMatch[3],
+                    },
+                    {
+                        callbackKind: callbackArg
+                            ? 'inline'
+                            : callbackMethodRef
+                              ? 'methodRef'
+                                : 'none',
+                        callbackRef: callbackArg ? '' : callbackMethodRef,
+                        callbackLocalCalls: callbackArg
+                            ? callbackCallInfo.localCalls
+                            : callbackMethodRef
+                              ? [callbackMethodRef]
+                              : [],
+                        callbackImportedCalls: callbackCallInfo.importedCalls,
+                        callbackFieldCalls: callbackCallInfo.fieldCalls,
+                        callbackEventDispatches: callbackCallInfo.eventDispatches,
+                        callbackInvocations: callbackCallInfo.callbackInvocations,
+                    }
+                ));
             }
 
             if (['eventBus.on', 'eventBus.once', 'oops.message.on', 'oops.message.once', 'director.on', 'director.once'].includes(normalizedPath)) {
@@ -1101,6 +1477,11 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
         callbackInvocations: uniqueSorted(callbackInvocations),
         stateReads: [],
         stateWrites: [],
+        httpEndpoints: [],
+        messageRoutes: [],
+        notifyRoutes: [],
+        dbReads: [],
+        dbWrites: [],
     };
 }
 
@@ -1207,7 +1588,214 @@ function createInlineActionSummary(callInfo) {
         callbackInvocations: callInfo.callbackInvocations,
         stateReads: callInfo.stateReads,
         stateWrites: callInfo.stateWrites,
+        notifyRoutes: callInfo.notifyRoutes,
+        dbReads: callInfo.dbReads,
+        dbWrites: callInfo.dbWrites,
     };
+}
+
+function extractNotifyRoutes(methodBody) {
+    const routes = [];
+    const pushRoute = (kind, routeValue, callee, protocol = 'socket') => {
+        const route = normalizeInlineExpression(routeValue);
+        if (!route) {
+            return;
+        }
+        routes.push({
+            kind,
+            route,
+            protocol,
+            callee: String(callee || '').trim(),
+        });
+    };
+
+    let match = null;
+    const notifyPattern = /\b([A-Za-z_$][\w$.]*|this(?:\.[A-Za-z_$][\w$]*)*)\.notify\(\s*([^,\n]+?)(?=\s*,)/g;
+    while ((match = notifyPattern.exec(methodBody))) {
+        if (String(match[1] || '').includes('.rpc.')) {
+            continue;
+        }
+        pushRoute('player-notify', match[2], `${match[1]}.notify`);
+    }
+
+    const notifyAllPattern = /\b([A-Za-z_$][\w$.]*|this(?:\.[A-Za-z_$][\w$]*)*)\.NotifyAll\(\s*([^,\n]+?)(?=\s*,)/g;
+    while ((match = notifyAllPattern.exec(methodBody))) {
+        pushRoute('room-notify-all', match[2], `${match[1]}.NotifyAll`);
+    }
+
+    const pushPattern = /\b([A-Za-z_$][\w$.]*channelService)\.pushMessageByUids\(\s*([^,\n]+?)(?=\s*,)/g;
+    while ((match = pushPattern.exec(methodBody))) {
+        pushRoute('channel-push', match[2], `${match[1]}.pushMessageByUids`);
+    }
+
+    return dedupeBy(routes, item => `${item.kind}::${item.route}::${item.callee}`);
+}
+
+function extractDbAccesses(methodBody, imports = []) {
+    const tableImports = buildDbTableImportMap(imports);
+    const reads = [];
+    const writes = [];
+
+    const pushAccess = (bucket, operation, tableName) => {
+        const tableInfo = tableImports.get(tableName);
+        if (!tableInfo) {
+            return;
+        }
+        bucket.push({
+            tableName,
+            importPath: tableInfo.importPath,
+            resolvedPath: tableInfo.resolvedPath,
+            operation,
+        });
+    };
+
+    let match = null;
+    const readPattern = /\.(from|join|innerJoin|leftJoin|rightJoin)\(\s*([A-Za-z_$][\w$]*)/g;
+    while ((match = readPattern.exec(methodBody))) {
+        if (!DRIZZLE_READ_METHODS.has(match[1])) {
+            continue;
+        }
+        pushAccess(reads, match[1], match[2]);
+    }
+
+    const writePattern = /\.(insert|update|delete)\(\s*([A-Za-z_$][\w$]*)/g;
+    while ((match = writePattern.exec(methodBody))) {
+        if (!DRIZZLE_WRITE_METHODS.has(match[1])) {
+            continue;
+        }
+        pushAccess(writes, match[1], match[2]);
+    }
+
+    return {
+        reads: dedupeBy(reads, item => `${item.tableName}::${item.importPath}::${item.operation}`),
+        writes: dedupeBy(writes, item => `${item.tableName}::${item.importPath}::${item.operation}`),
+    };
+}
+
+function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames = []) {
+    const routeBasePath = buildHttpRouteBasePath(scriptFile);
+    if (!routeBasePath && !normalize(scriptFile).includes('/app/http/routes/')) {
+        return [];
+    }
+
+    const syntheticMethods = [];
+    const routePattern = /\b([A-Za-z_$][\w$]*)\.(get|post|put|delete)\s*\(/g;
+    let match = null;
+
+    while ((match = routePattern.exec(source))) {
+        const httpMethod = String(match[2] || '').toLowerCase();
+        if (!HTTP_ROUTE_METHODS.has(httpMethod)) {
+            continue;
+        }
+
+        const openParenIndex = routePattern.lastIndex - 1;
+        const argsRange = extractWrappedRange(source, openParenIndex, '(', ')');
+        if (!argsRange) {
+            continue;
+        }
+
+        const args = splitTopLevelArgs(argsRange.content);
+        const pathArg = args[0] || '';
+        const callbackArg = [...args].reverse().find(arg => /=>|function\b/.test(arg)) || '';
+        const callbackBody = callbackArg ? extractInlineCallbackBody(callbackArg) : '';
+        if (!pathArg || !callbackBody) {
+            routePattern.lastIndex = argsRange.closeIndex + 1;
+            continue;
+        }
+
+        const fullPath = joinHttpRoutePath(routeBasePath, pathArg);
+        const paramNames = extractCallableParamNames(callbackArg);
+        const callInfo = normalizeFinalCallInfo(
+            extractMethodCalls(callbackBody, '__http_endpoint__', imports, fieldTypes, handlerMaps, paramNames, knownMethodNames, callbackBody),
+            knownMethodNames
+        );
+        const line = source.slice(0, match.index).split(/\r?\n/).length;
+        const endpointMethod = httpMethod.toUpperCase();
+        const syntheticMethodName = toSyntheticMethodName(`http_${httpMethod}`, fullPath);
+
+        syntheticMethods.push({
+            name: syntheticMethodName,
+            access: 'public',
+            static: false,
+            async: /\basync\b/.test(callbackArg),
+            params: paramNames.join(', '),
+            returnType: '',
+            paramNames,
+            line,
+            summary: `HTTP ${endpointMethod} ${fullPath}`,
+            localCalls: callInfo.localCalls,
+            localCallSites: callInfo.localCallSites,
+            importedCalls: callInfo.importedCalls,
+            apiCalls: callInfo.apiCalls,
+            fieldCalls: callInfo.fieldCalls,
+            eventSubscriptions: callInfo.eventSubscriptions,
+            eventDispatches: callInfo.eventDispatches,
+            networkRequests: callInfo.networkRequests,
+            callbackInvocations: callInfo.callbackInvocations,
+            stateReads: callInfo.stateReads,
+            stateWrites: callInfo.stateWrites,
+            notifyRoutes: callInfo.notifyRoutes,
+            dbReads: callInfo.dbReads,
+            dbWrites: callInfo.dbWrites,
+            httpEndpoints: [
+                {
+                    method: endpointMethod,
+                    path: fullPath,
+                    handlerName: `${match[1]}.${httpMethod}`,
+                    localCalls: callInfo.localCalls,
+                    importedCalls: callInfo.importedCalls,
+                    fieldCalls: callInfo.fieldCalls,
+                },
+            ],
+            messageRoutes: [],
+            syntheticKind: 'http-endpoint',
+        });
+
+        routePattern.lastIndex = argsRange.closeIndex + 1;
+    }
+
+    return syntheticMethods;
+}
+
+function enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source) {
+    const tableBindings = extractTableMessageBindings(source);
+    const dispatchMethod = methods.find(method => method.name === 'handleMsg') || null;
+
+    for (const method of methods) {
+        method.httpEndpoints = Array.isArray(method.httpEndpoints) ? method.httpEndpoints : [];
+        method.messageRoutes = Array.isArray(method.messageRoutes) ? method.messageRoutes : [];
+        method.notifyRoutes = Array.isArray(method.notifyRoutes) ? method.notifyRoutes : [];
+        method.dbReads = Array.isArray(method.dbReads) ? method.dbReads : [];
+        method.dbWrites = Array.isArray(method.dbWrites) ? method.dbWrites : [];
+
+        method.messageRoutes.push(...inferPinusMessageRouteEntries(scriptFile, method.name));
+
+        for (const binding of tableBindings) {
+            if (binding.handler !== method.name) {
+                continue;
+            }
+            method.messageRoutes.push({
+                ...binding,
+                role: 'handler',
+            });
+        }
+    }
+
+    if (dispatchMethod && tableBindings.length > 0) {
+        dispatchMethod.messageRoutes.push(
+            ...tableBindings.map(binding => ({
+                ...binding,
+                role: 'dispatcher',
+            }))
+        );
+    }
+
+    for (const method of methods) {
+        method.messageRoutes = dedupeBy(
+            method.messageRoutes,
+            item => `${item.kind}::${item.route}::${item.handler || ''}::${item.role || ''}`
+        );
+    }
 }
 
 function extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames = []) {
@@ -1416,6 +2004,48 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         });
     }
 
+    const pinusRpcPattern = /\b(?:this\.app|global\.App)\.rpc\.([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\s*\(/g;
+    while ((match = pinusRpcPattern.exec(methodBody))) {
+        const openParenIndex = pinusRpcPattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const callbackArg = args.find(arg => /=>|function\b/.test(arg)) || '';
+        const callbackBody = callbackArg ? extractInlineCallbackBody(callbackArg) : '';
+        const lastArg = (args[args.length - 1] || '').trim();
+        const callbackMethodRefMatch = lastArg.match(/^this\.([A-Za-z_$][\w$]*)$/);
+        const callbackMethodRef = callbackMethodRefMatch ? callbackMethodRefMatch[1] : '';
+        const callbackCallInfo = callbackBody
+            ? extractMethodCalls(callbackBody, '__pinus_rpc_callback__', imports, fieldTypes, handlerMaps, paramNames, knownMethodNames)
+            : createEmptyCallInfo();
+
+        requests.push(buildPinusRpcRequest(
+            {
+                serverType: match[1],
+                serviceName: match[2],
+                methodName: match[3],
+            },
+            {
+                callbackKind: callbackArg
+                    ? 'inline'
+                    : callbackMethodRef
+                      ? 'methodRef'
+                        : 'none',
+                callbackRef: callbackArg ? '' : callbackMethodRef,
+                callbackLocalCalls: callbackBody
+                    ? callbackCallInfo.localCalls
+                    : callbackMethodRef
+                      ? [callbackMethodRef]
+                      : [],
+                callbackImportedCalls: callbackCallInfo.importedCalls,
+                callbackFieldCalls: callbackCallInfo.fieldCalls,
+                callbackEventDispatches: callbackCallInfo.eventDispatches,
+                callbackInvocations: callbackBody ? extractInvokedIdentifierNames(callbackBody, paramNames) : [],
+            }
+        ));
+
+        pinusRpcPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
     return dedupeBy(
         requests,
         request => `${request.callee}::${request.target}::${request.callbackKind}::${request.callbackRef}::${request.callbackLocalCalls.join(',')}`
@@ -1426,6 +2056,8 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const directBody = directMethodBody || methodBody;
     const localCalls = [];
     const localCallSites = [];
+    const importIdentifiers = new Set(imports.flatMap(importInfo => importInfo.identifiers || []));
+    const paramSet = new Set(paramNames || []);
     const localPattern = /\bthis\.([A-Za-z_$][\w$]*)\s*\(/g;
     let match = null;
     while ((match = localPattern.exec(directBody))) {
@@ -1440,6 +2072,37 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
             if (argRange) {
                 localPattern.lastIndex = argRange.closeIndex + 1;
             }
+        }
+    }
+
+    const directLocalPattern = /\b([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
+    while ((match = directLocalPattern.exec(directBody))) {
+        const expressionPath = match[1];
+        if (!expressionPath || expressionPath.startsWith('this.') || expressionPath.includes('.rpc.')) {
+            continue;
+        }
+        const pathParts = expressionPath.split('.').filter(Boolean);
+        const candidateMethod = pathParts[pathParts.length - 1] || '';
+        const rootIdentifier = pathParts[0] || '';
+        if (!knownMethodNames.includes(candidateMethod)) {
+            continue;
+        }
+        if (importIdentifiers.has(rootIdentifier) || paramSet.has(rootIdentifier)) {
+            continue;
+        }
+        if (pathParts.length === 1 && candidateMethod === methodName) {
+            continue;
+        }
+
+        localCalls.push(candidateMethod);
+        const openParenIndex = directLocalPattern.lastIndex - 1;
+        const argRange = extractWrappedRange(directBody, openParenIndex, '(', ')');
+        localCallSites.push({
+            method: candidateMethod,
+            args: argRange ? splitTopLevelArgs(argRange.content) : [],
+        });
+        if (argRange) {
+            directLocalPattern.lastIndex = argRange.closeIndex + 1;
         }
     }
 
@@ -1499,6 +2162,8 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const networkRequests = extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
     const callbackInvocations = extractInvokedIdentifierNames(directBody, paramNames);
     const stateAccesses = extractStateAccesses(directBody, fieldTypes, knownMethodNames);
+    const notifyRoutes = extractNotifyRoutes(directBody);
+    const dbAccesses = extractDbAccesses(directBody, imports);
 
     return {
         localCalls: uniqueSorted(localCalls),
@@ -1532,6 +2197,11 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         callbackInvocations,
         stateReads: stateAccesses.reads,
         stateWrites: stateAccesses.writes,
+        httpEndpoints: [],
+        messageRoutes: [],
+        notifyRoutes,
+        dbReads: dbAccesses.reads,
+        dbWrites: dbAccesses.writes,
     };
 }
 
@@ -1568,6 +2238,18 @@ function mergeCallInfo(regexInfo, astInfo) {
     const mergedEventDispatches = dedupeBy(
         [...(regexInfo.eventDispatches || []), ...(astInfo.eventDispatches || [])],
         item => `${item.bus}::${item.mode}::${item.event}`
+    );
+    const mergedNotifyRoutes = dedupeBy(
+        [...(regexInfo.notifyRoutes || []), ...(astInfo.notifyRoutes || [])],
+        item => `${item.kind || ''}::${item.route || ''}::${item.callee || ''}`
+    );
+    const mergedDbReads = dedupeBy(
+        [...(regexInfo.dbReads || []), ...(astInfo.dbReads || [])],
+        item => `${item.tableName || ''}::${item.importPath || ''}::${item.operation || ''}`
+    );
+    const mergedDbWrites = dedupeBy(
+        [...(regexInfo.dbWrites || []), ...(astInfo.dbWrites || [])],
+        item => `${item.tableName || ''}::${item.importPath || ''}::${item.operation || ''}`
     );
     const mergedNetworkRequestsMap = new Map();
     for (const item of [...(regexInfo.networkRequests || []), ...(astInfo.networkRequests || [])]) {
@@ -1622,6 +2304,17 @@ function mergeCallInfo(regexInfo, astInfo) {
         callbackInvocations: uniqueSorted([...(regexInfo.callbackInvocations || []), ...(astInfo.callbackInvocations || [])]),
         stateReads: uniqueSorted([...(regexInfo.stateReads || []), ...(astInfo.stateReads || [])]),
         stateWrites: uniqueSorted([...(regexInfo.stateWrites || []), ...(astInfo.stateWrites || [])]),
+        httpEndpoints: dedupeBy(
+            [...(regexInfo.httpEndpoints || []), ...(astInfo.httpEndpoints || [])],
+            item => `${item.method || ''}::${item.path || ''}::${item.handlerName || ''}`
+        ),
+        messageRoutes: dedupeBy(
+            [...(regexInfo.messageRoutes || []), ...(astInfo.messageRoutes || [])],
+            item => `${item.kind || ''}::${item.route || ''}::${item.handler || ''}::${item.role || ''}`
+        ),
+        notifyRoutes: mergedNotifyRoutes,
+        dbReads: mergedDbReads,
+        dbWrites: mergedDbWrites,
     };
 }
 
@@ -1639,6 +2332,26 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
         ),
         stateWrites: uniqueSorted(
             (callInfo.stateWrites || []).filter(item => !knownMethodNames.includes(String(item || '').split('.')[0]))
+        ),
+        httpEndpoints: dedupeBy(
+            [...(callInfo.httpEndpoints || [])],
+            item => `${item.method || ''}::${item.path || ''}::${item.handlerName || ''}`
+        ),
+        messageRoutes: dedupeBy(
+            [...(callInfo.messageRoutes || [])],
+            item => `${item.kind || ''}::${item.route || ''}::${item.handler || ''}::${item.role || ''}`
+        ),
+        notifyRoutes: dedupeBy(
+            [...(callInfo.notifyRoutes || [])],
+            item => `${item.kind || ''}::${item.route || ''}::${item.callee || ''}`
+        ),
+        dbReads: dedupeBy(
+            [...(callInfo.dbReads || [])],
+            item => `${item.tableName || ''}::${item.importPath || ''}::${item.operation || ''}`
+        ),
+        dbWrites: dedupeBy(
+            [...(callInfo.dbWrites || [])],
+            item => `${item.tableName || ''}::${item.importPath || ''}::${item.operation || ''}`
         ),
     };
 
@@ -1753,7 +2466,12 @@ function extractScriptInsights(methodRoots, context) {
             const handlerMaps = extractHandlerMaps(source);
             const exports = extractExports(source);
             const methods = [];
-            const methodDefinitions = astContext?.methods?.length ? astContext.methods : extractMethodDefinitions(source);
+            const regexDefinitions = [
+                ...extractMethodDefinitions(source),
+                ...extractFunctionDefinitions(source),
+                ...extractVariableCallableDefinitions(source),
+            ];
+            const methodDefinitions = astContext?.methods?.length ? astContext.methods : regexDefinitions;
             const knownMethodNames = methodDefinitions.map(item => item.name);
             for (const methodDef of methodDefinitions) {
                 const line = methodDef.line || source.slice(0, methodDef.startIndex).split(/\r?\n/).length;
@@ -1786,8 +2504,19 @@ function extractScriptInsights(methodRoots, context) {
                     callbackInvocations: callInfo.callbackInvocations,
                     stateReads: callInfo.stateReads,
                     stateWrites: callInfo.stateWrites,
+                    httpEndpoints: callInfo.httpEndpoints,
+                    messageRoutes: callInfo.messageRoutes,
+                    notifyRoutes: callInfo.notifyRoutes,
+                    dbReads: callInfo.dbReads,
+                    dbWrites: callInfo.dbWrites,
+                    syntheticKind: methodDef.syntheticKind || '',
                 });
             }
+
+            methods.push(
+                ...extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames)
+            );
+            enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source);
 
             result.push({
                 scriptPath: normalizedScript,

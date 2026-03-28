@@ -1,10 +1,18 @@
 const generic = require('./generic');
 const cocos = require('./cocos');
+const pinus = require('./pinus');
 
 function inferExtractProfile(args = {}) {
     const prefabInputs = Array.isArray(args.prefabs) ? args.prefabs : [];
     if (prefabInputs.some(item => String(item || '').toLowerCase().endsWith('.prefab'))) {
         return 'cocos';
+    }
+    const methodRoots = Array.isArray(args.methodRoots) ? args.methodRoots : [];
+    const componentRoots = Array.isArray(args.componentRoots) ? args.componentRoots : [];
+    const assetRoots = Array.isArray(args.assetRoots) ? args.assetRoots : [];
+    const allRoots = [...methodRoots, ...componentRoots, ...assetRoots].map(item => String(item || '').toLowerCase());
+    if (allRoots.some(item => item.includes('/app/servers/') || item.includes('\\app\\servers\\') || item.includes('/app/http/routes/') || item.includes('\\app\\http\\routes\\'))) {
+        return 'pinus';
     }
     return 'generic';
 }
@@ -16,8 +24,14 @@ function getExtractAdapters(mode = 'auto', args = {}) {
             return [generic];
         case 'cocos':
             return [cocos, generic];
+        case 'pinus':
+            return [pinus, generic];
         default:
-            return selectedMode === 'cocos' ? [cocos, generic] : [generic];
+            return selectedMode === 'cocos'
+                ? [cocos, generic]
+                : selectedMode === 'pinus'
+                  ? [pinus, generic]
+                  : [generic];
     }
 }
 

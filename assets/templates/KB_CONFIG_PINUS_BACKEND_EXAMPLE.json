@@ -1,0 +1,27 @@
+{
+  "featureName": "Backend Core",
+  "featureKey": "backend-core",
+  "summary": "Pinus backend chain KB covering handlers, remotes, HTTP routes, modules, and schemas",
+  "extractorAdapter": "pinus",
+  "areas": ["backend", "data"],
+  "serverRoots": [],
+  "moduleRoots": [],
+  "dbRoots": [],
+  "scanTargets": {
+    "handlers": ["E:/path/to/game-server/app/servers/*/handler/*.ts"],
+    "remotes": ["E:/path/to/game-server/app/servers/*/remote/*.ts"],
+    "modules": ["E:/path/to/game-server/app/modules/**/*.ts"],
+    "routes": ["E:/path/to/game-server/app/http/routes/**/*.ts"],
+    "schemas": ["E:/path/to/game-server/app/db/schema/**/*.ts"]
+  },
+  "outputs": {
+    "scan": "project-memory/kb/features/backend-core/scan.raw.json",
+    "graph": "project-memory/kb/features/backend-core/chain.graph.json",
+    "lookup": "project-memory/kb/features/backend-core/chain.lookup.json",
+    "report": "project-memory/kb/features/backend-core/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/backend-core",
+    "featureIndex": "project-memory/docs/features/backend-core/FEATURE.md"
+  }
+}
