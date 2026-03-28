@@ -1,0 +1,13 @@
+{
+  "areas": {
+    "frontend": [
+      "assets"
+    ]
+  },
+  "stacks": {
+    "frontend": [
+      "cocos",
+      "typescript"
+    ]
+  }
+}

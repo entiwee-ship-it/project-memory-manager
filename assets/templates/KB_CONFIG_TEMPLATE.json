@@ -1,6 +1,15 @@
 {
+  "_comment_required": [
+    "featureKey",
+    "featureName",
+    "outputs.scan",
+    "outputs.graph",
+    "outputs.lookup",
+    "outputs.report"
+  ],
   "featureName": "",
   "featureKey": "",
+  "type": "",
   "summary": "",
   "uiEntry": "",
   "extractorAdapter": "generic",

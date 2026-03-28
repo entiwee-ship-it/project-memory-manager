@@ -49,3 +49,66 @@
 - component -> binds(handler / sourceEventKind)
 - state -> readers / writers
 - tag / 语义标签检索
+- `--feature <key>` 的 feature-summary 摘要输出
+- 推荐单入口 `query_kb.js`，`query_chain_kb.js` 作为兼容入口保留
+
+## 配置与注册表规范
+
+### KB 配置规范
+
+- 必填：`featureKey`、`featureName`、`outputs.scan`、`outputs.graph`、`outputs.lookup`、`outputs.report`
+- 可选：`type`、`summary`、`areas`、`extractorAdapter`、`scanTargets`
+
+### 注册表规范
+
+- `featureKey`
+- `featureName`
+- `kbDir`
+- `outputs`
+
+### 输出文件命名规范
+
+- `chain.graph.json`
+- `chain.lookup.json`
+- `scan.raw.json`
+- `build.report.json`
+
+### 输出文件用途
+
+- `scripts/query_kb.js`
+  - purpose: 统一查询入口
+  - useWhen: 遇到入口、事件、request、state、上下游链路问题时先运行
+- `build.report.json`
+  - purpose: 给人看的构建汇总、默认排查顺序和 KB 文件说明
+  - useWhen: 刚构建完 KB，或不知道该查哪个文件时优先看
+- `chain.lookup.json`
+  - purpose: 查询索引
+  - useWhen: 通常不要手读；只有调试查询或排查索引异常时才打开
+- `chain.graph.json`
+  - purpose: 图节点与边的底层事实
+  - useWhen: 通常不要手读；只有确认边类型、节点 meta 或导出图时才打开
+- `scan.raw.json`
+  - purpose: 原始抽取结果
+  - useWhen: 通常不要手读；只有怀疑 extractor 漏抓时才打开
+
+### feature-summary / build-report 自描述要求
+
+- `query_kb.js --feature <key>` 返回的 `feature-summary` 必须包含：
+  - `purpose`
+  - `useWhen`
+  - `defaultWorkflow`
+  - `artifacts`
+  - `examples`
+- `build.report.json` 必须包含：
+  - `kind`
+  - `purpose`
+  - `useWhen`
+  - `defaultWorkflow`
+  - `queryExamples`
+  - `artifacts`
+
+### 升级兼容
+
+- 允许读取旧字段 `key`、`name`、`outputDir`
+- 允许读取旧注册表字段 `graphPath`、`lookupPath`
+- 允许读取旧文件名 `graph.json`、`lookup.json`、`scan.json`、`report.json`

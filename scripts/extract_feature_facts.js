@@ -310,14 +310,20 @@ function extractLeadingDoc(source, index, allowDecorators = false) {
     return source.slice(start, end + 2);
 }
 
-function resolveImportPath(specifier, scriptFile, context) {
+function resolveImportInfo(specifier, scriptFile, context) {
     for (const adapter of context.adapters) {
         const resolvedPath = adapter.resolveImportPath?.(specifier, scriptFile, context) || null;
         if (resolvedPath) {
-            return normalize(resolvedPath);
+            return {
+                resolvedPath: normalize(resolvedPath),
+                resolvedVia: adapter.name || context.adapterMode || 'generic',
+            };
         }
     }
-    return null;
+    return {
+        resolvedPath: null,
+        resolvedVia: '',
+    };
 }
 
 function parseImportIdentifiers(clause) {
@@ -375,12 +381,13 @@ function extractImports(source, scriptFile, context) {
     while ((match = importPattern.exec(source))) {
         const clause = match[1].trim().replace(/\s+/g, ' ');
         const specifier = match[2].trim();
-        const resolvedPath = resolveImportPath(specifier, scriptFile, context);
+        const { resolvedPath, resolvedVia } = resolveImportInfo(specifier, scriptFile, context);
         imports.push({
             clause,
             specifier,
             identifiers: parseImportIdentifiers(clause),
             resolvedPath,
+            resolvedVia,
             isLocal: Boolean(resolvedPath),
             isApi: Boolean(resolvedPath && /Api\.ts$/.test(resolvedPath)),
             isResponse: Boolean(resolvedPath && /Response\.ts$/.test(resolvedPath)),
@@ -398,6 +405,37 @@ function buildImportIdentifierMap(imports = []) {
         }
     }
     return importMap;
+}
+
+function buildImportedCall(importInfo, identifier, method, extra = {}) {
+    return {
+        identifier,
+        method,
+        sourcePath: importInfo?.resolvedPath || null,
+        sourceSpecifier: importInfo?.specifier || '',
+        isApi: Boolean(importInfo?.isApi),
+        callKind: extra.callKind || 'static-method',
+        memberPath: extra.memberPath || '',
+        resolvedVia: extra.resolvedVia || importInfo?.resolvedVia || '',
+    };
+}
+
+function findImportedCallFromExpressionPath(expressionPath, importMap) {
+    const parts = String(expressionPath || '').split('.').filter(Boolean);
+    if (parts.length < 2) {
+        return null;
+    }
+
+    const identifier = parts[0];
+    const importInfo = importMap.get(identifier);
+    if (!importInfo) {
+        return null;
+    }
+
+    return buildImportedCall(importInfo, identifier, parts[parts.length - 1], {
+        callKind: 'static-method',
+        memberPath: parts.slice(1, -1).join('.'),
+    });
 }
 
 function isDbSchemaImport(importInfo) {
@@ -478,8 +516,8 @@ function normalizeInlineExpression(expression) {
         .replace(/\s+/g, ' ')
         .trim();
 
-    const quotedMatch = normalized.match(/^['"](.+)['"]$/);
-    return quotedMatch ? quotedMatch[1] : normalized;
+    const quotedMatch = normalized.match(/^(['"`])([\s\S]*)\1$/);
+    return quotedMatch ? quotedMatch[2] : normalized;
 }
 
 function extractHandlerMaps(source) {
@@ -1167,6 +1205,7 @@ function buildPinusRpcRequest(routeInfo, callbackDetails = {}) {
         target: route,
         route,
         protocol: 'pinus-rpc',
+        transport: 'pinus-rpc',
         callbackKind: callbackDetails.callbackKind || 'none',
         callbackRef: callbackDetails.callbackRef || '',
         callbackLocalCalls: callbackDetails.callbackLocalCalls || [],
@@ -1289,17 +1328,9 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                     }
                 }
 
-                if (ts.isIdentifier(expression.expression)) {
-                    const importInfo = importMap.get(expression.expression.text);
-                    if (importInfo) {
-                        importedCalls.push({
-                            identifier: expression.expression.text,
-                            method: getPropertyNameText(expression.name, ts),
-                            sourcePath: importInfo.resolvedPath,
-                            sourceSpecifier: importInfo.specifier,
-                            isApi: importInfo.isApi,
-                        });
-                    }
+                const importedCall = findImportedCallFromExpressionPath(calleePath, importMap);
+                if (importedCall) {
+                    importedCalls.push(importedCall);
                 }
 
                 const qualifiedParts = String(calleePath || '').split('.').filter(Boolean);
@@ -1472,7 +1503,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
         ),
         networkRequests: dedupeBy(
             networkRequests,
-            item => `${item.callee}::${item.target}::${item.callbackKind}::${item.callbackRef}::${(item.callbackLocalCalls || []).join(',')}`
+            item => `${item.protocol || ''}::${item.httpMethod || ''}::${item.transport || ''}::${item.callee}::${item.target}::${item.callbackKind}::${item.callbackRef}::${(item.callbackLocalCalls || []).join(',')}`
         ),
         callbackInvocations: uniqueSorted(callbackInvocations),
         stateReads: [],
@@ -1925,6 +1956,86 @@ function summarizeNetworkTarget(callee, args) {
     return normalizeInlineExpression(args[0] || '');
 }
 
+function readObjectLiteralProperty(objectText, propertyName) {
+    const normalized = String(objectText || '').trim();
+    if (!normalized.startsWith('{') || !normalized.endsWith('}')) {
+        return '';
+    }
+
+    const entries = splitTopLevelArgs(normalized.slice(1, -1));
+    for (const entry of entries) {
+        const match = entry.match(/^(?:['"`]?([A-Za-z_$][\w$-]*)['"`]?|([A-Za-z_$][\w$]*))\s*:\s*([\s\S]+)$/);
+        if (!match) {
+            continue;
+        }
+        const key = (match[1] || match[2] || '').trim();
+        if (key === propertyName) {
+            return String(match[3] || '').trim();
+        }
+    }
+
+    return '';
+}
+
+function normalizeHttpMethodValue(rawMethod, fallback = 'GET') {
+    const normalized = normalizeInlineExpression(rawMethod || fallback).trim();
+    if (!normalized) {
+        return String(fallback || 'GET').toUpperCase();
+    }
+    return normalized.toUpperCase();
+}
+
+function buildHttpRequest(callee, target, httpMethod, transport) {
+    return {
+        callee,
+        target: normalizeInlineExpression(target || '') || callee,
+        protocol: 'http',
+        httpMethod: normalizeHttpMethodValue(httpMethod || 'GET'),
+        transport,
+        callbackKind: 'none',
+        callbackRef: '',
+        callbackLocalCalls: [],
+        callbackImportedCalls: [],
+        callbackFieldCalls: [],
+        callbackEventDispatches: [],
+        callbackInvocations: [],
+    };
+}
+
+function buildHttpRequestFromArgs(callee, args = [], transport, explicitMethod = '') {
+    const normalizedCallee = String(callee || '').trim();
+    if (!normalizedCallee) {
+        return null;
+    }
+
+    if (normalizedCallee === 'fetch') {
+        const initArg = args[1] || '';
+        return buildHttpRequest(
+            normalizedCallee,
+            args[0] || normalizedCallee,
+            readObjectLiteralProperty(initArg, 'method') || explicitMethod || 'GET',
+            transport
+        );
+    }
+
+    if (normalizedCallee === 'axios' || /\.request$/.test(normalizedCallee)) {
+        const configArg = args[0] || '';
+        return buildHttpRequest(
+            normalizedCallee,
+            readObjectLiteralProperty(configArg, 'url') || normalizedCallee,
+            readObjectLiteralProperty(configArg, 'method') || explicitMethod || 'GET',
+            transport
+        );
+    }
+
+    return buildHttpRequest(
+        normalizedCallee,
+        args[0] || normalizedCallee,
+        explicitMethod || 'GET',
+        transport
+    );
+}
+
 function isStateFieldPath(fieldPath, fieldTypes, knownMethodNames = []) {
     const rootField = String(fieldPath || '').split('.')[0];
     if (!rootField) {
@@ -2046,9 +2157,63 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         pinusRpcPattern.lastIndex = openParenIndex + content.length + 2;
     }
 
+    const httpClientPattern = /\bHttpClient\.getInstance\(\)\.(get|post|put|delete|request)\s*\(/g;
+    while ((match = httpClientPattern.exec(methodBody))) {
+        const openParenIndex = httpClientPattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const httpMethod = match[1] === 'request' ? '' : match[1];
+        const request = buildHttpRequestFromArgs(`HttpClient.getInstance().${match[1]}`, args, 'http-client', httpMethod);
+        if (request) {
+            requests.push(request);
+        }
+        httpClientPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
+    const fetchPattern = /\bfetch\s*\(/g;
+    while ((match = fetchPattern.exec(methodBody))) {
+        const openParenIndex = fetchPattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const request = buildHttpRequestFromArgs('fetch', args, 'fetch');
+        if (request) {
+            requests.push(request);
+        }
+        fetchPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
+    const axiosMethodPattern = /\baxios\.(get|post|put|delete|request)\s*\(/g;
+    while ((match = axiosMethodPattern.exec(methodBody))) {
+        const openParenIndex = axiosMethodPattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const httpMethod = match[1] === 'request' ? '' : match[1];
+        const request = buildHttpRequestFromArgs(`axios.${match[1]}`, args, 'axios', httpMethod);
+        if (request) {
+            requests.push(request);
+        }
+        axiosMethodPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
+    const axiosCallPattern = /\baxios\s*\(/g;
+    while ((match = axiosCallPattern.exec(methodBody))) {
+        const openParenIndex = axiosCallPattern.lastIndex - 1;
+        const previousChar = methodBody[Math.max(0, match.index - 1)] || '';
+        if (previousChar === '.') {
+            continue;
+        }
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const request = buildHttpRequestFromArgs('axios', args, 'axios');
+        if (request) {
+            requests.push(request);
+        }
+        axiosCallPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
     return dedupeBy(
         requests,
-        request => `${request.callee}::${request.target}::${request.callbackKind}::${request.callbackRef}::${request.callbackLocalCalls.join(',')}`
+        request => `${request.protocol || ''}::${request.httpMethod || ''}::${request.transport || ''}::${request.callee}::${request.target}::${request.callbackKind}::${request.callbackRef}::${request.callbackLocalCalls.join(',')}`
     );
 }
 
@@ -2109,16 +2274,14 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const importedCalls = [];
     for (const importInfo of imports) {
         for (const identifier of importInfo.identifiers) {
-            const callPattern = new RegExp(`\\b${identifier.replace(/\$/g, '\\$')}\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g');
+            const callPattern = new RegExp(`\\b(${identifier.replace(/\$/g, '\\$')}(?:\\.[A-Za-z_$][\\w$]*)*)\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g');
             let callMatch = null;
             while ((callMatch = callPattern.exec(directBody))) {
-                importedCalls.push({
-                    identifier,
-                    method: callMatch[1],
-                    sourcePath: importInfo.resolvedPath,
-                    sourceSpecifier: importInfo.specifier,
-                    isApi: importInfo.isApi,
-                });
+                const qualifier = String(callMatch[1] || '').trim();
+                importedCalls.push(buildImportedCall(importInfo, identifier, callMatch[2], {
+                    callKind: 'static-method',
+                    memberPath: qualifier.startsWith(`${identifier}.`) ? qualifier.slice(identifier.length + 1) : '',
+                }));
             }
         }
     }
@@ -2177,6 +2340,9 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
                 sourcePath: sample?.sourcePath || null,
                 sourceSpecifier: sample?.sourceSpecifier || '',
                 isApi: Boolean(sample?.isApi),
+                callKind: sample?.callKind || 'static-method',
+                memberPath: sample?.memberPath || '',
+                resolvedVia: sample?.resolvedVia || '',
             };
         }),
         apiCalls: uniqueSorted(importedCalls.filter(call => call.isApi).map(call => `${call.identifier}.${call.method}`)),
@@ -2253,7 +2419,7 @@ function mergeCallInfo(regexInfo, astInfo) {
     );
     const mergedNetworkRequestsMap = new Map();
     for (const item of [...(regexInfo.networkRequests || []), ...(astInfo.networkRequests || [])]) {
-        const primaryKey = `${item.callee}::${item.target}`;
+        const primaryKey = `${item.protocol || ''}::${item.httpMethod || ''}::${item.transport || ''}::${item.callee}::${item.target}`;
         const secondaryKey = `${primaryKey}::${item.callbackKind}::${item.callbackRef}::${(item.callbackLocalCalls || []).join(',')}`;
         const existing = mergedNetworkRequestsMap.get(primaryKey) || mergedNetworkRequestsMap.get(secondaryKey) || null;
         if (!existing) {
@@ -2270,6 +2436,9 @@ function mergeCallInfo(regexInfo, astInfo) {
             ((item.callbackLocalCalls || []).length > 0 ? 2 : 0) +
             ((item.callbackRef || '').length > 0 ? 1 : 0);
         const preferred = nextScore >= currentScore ? item : existing;
+        preferred.protocol = preferred.protocol || existing.protocol || item.protocol || '';
+        preferred.httpMethod = preferred.httpMethod || existing.httpMethod || item.httpMethod || '';
+        preferred.transport = preferred.transport || existing.transport || item.transport || '';
         preferred.callbackLocalCalls = unique([...(existing.callbackLocalCalls || []), ...(item.callbackLocalCalls || [])]);
         preferred.callbackImportedCalls = dedupeBy(
             [...(existing.callbackImportedCalls || []), ...(item.callbackImportedCalls || [])],
@@ -2372,7 +2541,7 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
 
     const requestMap = new Map();
     for (const item of callInfo.networkRequests || []) {
-        const key = `${item.callee}::${item.target}`;
+        const key = `${item.protocol || ''}::${item.httpMethod || ''}::${item.transport || ''}::${item.callee}::${item.target}`;
         const existing = requestMap.get(key) || null;
         if (!existing) {
             requestMap.set(key, item);
@@ -2387,6 +2556,9 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
             ((item.callbackLocalCalls || []).length > 0 ? 2 : 0) +
             ((item.callbackRef || '').length > 0 ? 1 : 0);
         const preferred = nextScore >= existingScore ? item : existing;
+        preferred.protocol = preferred.protocol || existing.protocol || item.protocol || '';
+        preferred.httpMethod = preferred.httpMethod || existing.httpMethod || item.httpMethod || '';
+        preferred.transport = preferred.transport || existing.transport || item.transport || '';
         preferred.callbackLocalCalls = unique([...(existing.callbackLocalCalls || []), ...(item.callbackLocalCalls || [])]);
         preferred.callbackImportedCalls = dedupeBy(
             [...(existing.callbackImportedCalls || []), ...(item.callbackImportedCalls || [])],

@@ -1,0 +1,24 @@
+{
+  "featureKey": "cocos-http-sample",
+  "featureName": "Cocos HTTP Sample",
+  "summary": "Fixture for Cocos static API calls and HTTP request extraction",
+  "areas": [
+    "frontend"
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "methodRoots": [
+    "assets"
+  ],
+  "outputs": {
+    "scan": "project-memory/kb/features/cocos-http-sample/scan.raw.json",
+    "graph": "project-memory/kb/features/cocos-http-sample/chain.graph.json",
+    "lookup": "project-memory/kb/features/cocos-http-sample/chain.lookup.json",
+    "report": "project-memory/kb/features/cocos-http-sample/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/cocos-http-sample",
+    "featureIndex": "project-memory/docs/features/cocos-http-sample/FEATURE.md"
+  }
+}

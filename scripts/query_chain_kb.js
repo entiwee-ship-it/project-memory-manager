@@ -2,6 +2,7 @@
 
 const path = require('path');
 const { readJson, resolveProjectRoot } = require('./lib/common');
+const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
 
 function parseArgs(argv) {
     const args = {
@@ -113,7 +114,7 @@ function parseArgs(argv) {
     }
 
     if (!args.feature) {
-        throw new Error('用法: node query_chain_kb.js --feature <key> [--event|--method|--request|--state|--type|--from --direction <upstream|downstream>|--upstream [query]|--downstream [query]] ... [--json]');
+        throw new Error('用法: node query_kb.js --feature <key> [--event|--method|--request|--state|--type|--from --direction <upstream|downstream>|--upstream [query]|--downstream [query]] ... [--json]');
     }
 
     if (args.from && args.direction && !['upstream', 'downstream'].includes(args.direction)) {
@@ -135,17 +136,13 @@ function collectTypedSelectors(args) {
 function loadFeatureLookup(root, featureKey) {
     const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
     const registry = readJson(registryPath);
-    const feature = (registry.features || []).find(item => item.featureKey === featureKey);
+    const normalizedFeatures = (registry.features || []).map(item => normalizeFeatureRecord(item));
+    const feature = normalizedFeatures.find(item => item.featureKey === featureKey);
     if (!feature) {
         throw new Error(`注册表中未找到功能: ${featureKey}`);
     }
 
-    const kbDir = path.resolve(root, feature.kbDir);
-    return {
-        feature,
-        graph: readJson(path.join(kbDir, 'chain.graph.json')),
-        lookup: readJson(path.join(kbDir, 'chain.lookup.json')),
-    };
+    return loadFeatureLookupArtifacts(root, feature);
 }
 
 function normalizeText(value) {
@@ -318,6 +315,12 @@ function summarizeNode(node, lookup) {
         summary.routeProtocol = node.meta?.protocol || '';
         summary.route = node.meta?.route || node.name;
     }
+    if (node.type === 'request') {
+        summary.callee = node.meta?.callee || '';
+        summary.requestProtocol = node.meta?.protocol || '';
+        summary.requestHttpMethod = node.meta?.httpMethod || '';
+        summary.requestTransport = node.meta?.transport || '';
+    }
     if (node.type === 'table') {
         summary.importPath = node.meta?.importPath || '';
     }
@@ -340,6 +343,10 @@ function searchNodes(graph, lookup, args) {
                 matchContains(node.meta?.route, args.name) ||
                 matchContains(node.meta?.path, args.name) ||
                 matchContains(node.meta?.importPath, args.name) ||
+                matchContains(node.meta?.protocol, args.name) ||
+                matchContains(node.meta?.httpMethod, args.name) ||
+                matchContains(node.meta?.transport, args.name) ||
+                matchContains(node.meta?.callee, args.name) ||
                 (node.meta?.tags || []).some(tag => matchContains(tag, args.name))
             );
         });
@@ -403,6 +410,12 @@ function printSummary(result, asJson) {
         console.log(`- kind: ${result.routeKind || '(none)'}`);
         console.log(`- protocol: ${result.routeProtocol || '(none)'}`);
     }
+    if (result.type === 'request') {
+        console.log(`- callee: ${result.callee || '(none)'}`);
+        console.log(`- protocol: ${result.requestProtocol || '(none)'}`);
+        console.log(`- httpMethod: ${result.requestHttpMethod || '(none)'}`);
+        console.log(`- transport: ${result.requestTransport || '(none)'}`);
+    }
     if (result.type === 'table') {
         console.log(`- importPath: ${result.importPath || '(none)'}`);
     }
@@ -462,6 +475,9 @@ function printSearchResults(results, asJson) {
         if (result.type === 'route') {
             console.log(`  route: ${result.route || '(none)'} [${result.routeKind || 'unknown'}|${result.routeProtocol || 'unknown'}]`);
         }
+        if (result.type === 'request') {
+            console.log(`  request: ${result.requestHttpMethod || '(none)'} [${result.requestProtocol || 'unknown'}|${result.requestTransport || 'unknown'}] via ${result.callee || '(none)'}`);
+        }
         if (result.type === 'table') {
             console.log(`  importPath: ${result.importPath || '(none)'}`);
         }
@@ -504,6 +520,120 @@ function printTraversal(result, asJson) {
                   : '';
             console.log(`${indent}- ${item.edge.type} -> ${targetLabel}${metaSuffix}`);
         });
+}
+
+function buildRecommendedCommands(featureKey) {
+    return [
+        `node scripts/query_kb.js --feature ${featureKey}`,
+        `node scripts/query_kb.js --feature ${featureKey} --downstream <query>`,
+        `node scripts/query_kb.js --feature ${featureKey} --method <name> --downstream`,
+        `node scripts/query_kb.js --feature ${featureKey} --type method --name <keyword>`,
+        `node scripts/query_chain_kb.js --feature ${featureKey} --downstream <query>`,
+    ];
+}
+
+function buildArtifactGuide(feature) {
+    const outputs = feature.outputs || {};
+    return [
+        {
+            key: 'entrypoint',
+            file: 'scripts/query_kb.js',
+            purpose: '统一查询入口，优先用于 feature 摘要、链路遍历和节点检索。',
+            useWhen: '遇到入口、关闭窗口链路、事件绑定、request、state 流转时先运行它。',
+            priority: 1,
+        },
+        {
+            key: 'report',
+            file: outputs.report || '',
+            purpose: '构建汇总和使用说明，给人快速理解当前 feature 的范围、推荐查询方式和产物位置。',
+            useWhen: '先想知道这个 feature 有什么、应该怎么查时优先看。',
+            priority: 2,
+        },
+        {
+            key: 'lookup',
+            file: outputs.lookup || '',
+            purpose: '查询索引，供查询脚本读取 method / event / request / state / route 的映射。',
+            useWhen: '通常不要手读；只有调试查询脚本或排查索引异常时才直接打开。',
+            priority: 3,
+        },
+        {
+            key: 'graph',
+            file: outputs.graph || '',
+            purpose: '图节点与边的底层事实数据。',
+            useWhen: '通常不要手读；只有确认具体边类型、节点 meta 或导出图时才打开。',
+            priority: 4,
+        },
+        {
+            key: 'scan',
+            file: outputs.scan || '',
+            purpose: '原始抽取事实，接近 extractor 输出。',
+            useWhen: '通常不要手读；只有怀疑抽取阶段漏抓时才回看它。',
+            priority: 5,
+        },
+    ];
+}
+
+function buildFeatureSummary(feature, graph, lookup) {
+    const nodeCount = Array.isArray(graph.nodes) ? graph.nodes.length : 0;
+    const edgeCount = Array.isArray(graph.edges) ? graph.edges.length : 0;
+    const nodesByType = Object.fromEntries(
+        Object.entries(lookup.nodesByType || {}).map(([type, ids]) => [type, Array.isArray(ids) ? ids.length : 0])
+    );
+    const examples = buildRecommendedCommands(feature.featureKey);
+    const artifacts = buildArtifactGuide(feature);
+
+    return {
+        kind: 'feature-summary',
+        purpose: '功能知识库摘要与默认查询入口。先用它确认当前 feature 的范围、常见节点类型和推荐命令，再决定是否继续看 docs 或源码。',
+        useWhen: '当你还不确定该查哪个 KB 文件，或刚准备开始定位一个 feature 的入口、调用链、request、event、state 时。',
+        feature: {
+            featureKey: feature.featureKey,
+            featureName: feature.featureName,
+            kbDir: feature.kbDir,
+        },
+        counts: {
+            nodes: nodeCount,
+            edges: edgeCount,
+            nodesByType,
+        },
+        defaultWorkflow: [
+            '先运行 feature 摘要，确认这个 KB 里有哪些节点类型和推荐命令。',
+            '再用 --downstream / --upstream 或 --method / --event / --request / --state 精确查询。',
+            '只有 KB 结果不足以回答问题时，再读相关 docs；最后才用 rg/grep 回源码确认。'
+        ],
+        artifacts,
+        examples,
+    };
+}
+
+function printFeatureSummary(summary, asJson) {
+    if (asJson) {
+        console.log(JSON.stringify(summary, null, 2));
+        return;
+    }
+
+    console.log(`${summary.feature.featureName} (${summary.feature.featureKey})`);
+    console.log(`- kbDir: ${summary.feature.kbDir}`);
+    console.log(`- purpose: ${summary.purpose}`);
+    console.log(`- useWhen: ${summary.useWhen}`);
+    console.log(`- nodes: ${summary.counts.nodes}`);
+    console.log(`- edges: ${summary.counts.edges}`);
+    console.log('- nodesByType:');
+    Object.entries(summary.counts.nodesByType)
+        .sort((left, right) => left[0].localeCompare(right[0]))
+        .forEach(([type, count]) => console.log(`  - ${type}: ${count}`));
+    console.log('- defaultWorkflow:');
+    (summary.defaultWorkflow || []).forEach(item => console.log(`  - ${item}`));
+    console.log('- artifacts:');
+    (summary.artifacts || [])
+        .sort((left, right) => (left.priority || 99) - (right.priority || 99))
+        .forEach(item => {
+            console.log(`  - ${item.key}: ${item.file || '(none)'}`);
+            console.log(`    purpose: ${item.purpose}`);
+            console.log(`    useWhen: ${item.useWhen}`);
+        });
+    console.log('- examples:');
+    summary.examples.forEach(example => console.log(`  - ${example}`));
 }
 
 function resolveTypedStart(graph, lookup, selectorType, query) {
@@ -588,7 +718,7 @@ function resolveTraversalSpec(args, graph, lookup) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
-    const { graph, lookup } = loadFeatureLookup(root, args.feature);
+    const { feature, graph, lookup } = loadFeatureLookup(root, args.feature);
 
     const traversalSpec = resolveTraversalSpec(args, graph, lookup);
     if (traversalSpec) {
@@ -655,6 +785,9 @@ function run(argv = process.argv.slice(2)) {
                 name: args.request,
                 callee: request.callee || '',
                 callers: request.callers || [],
+                protocol: request.protocol || '',
+                httpMethod: request.httpMethod || '',
+                transport: request.transport || '',
                 node: summarizeNode(lookup.nodesById[request.id], lookup),
             },
             args.json
@@ -684,7 +817,7 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
 
-    throw new Error('未提供查询条件。');
+    printFeatureSummary(buildFeatureSummary(feature, graph, lookup), args.json);
 }
 
 module.exports = {

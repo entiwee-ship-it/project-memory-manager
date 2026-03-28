@@ -2,6 +2,21 @@ const generic = require('./generic');
 const cocos = require('./cocos');
 const pinus = require('./pinus');
 
+function looksLikeCocosRoot(rootPath = '') {
+    const normalized = String(rootPath || '').toLowerCase();
+    if (!normalized) {
+        return false;
+    }
+    return (
+        normalized.includes('/assets/') ||
+        normalized.includes('\\assets\\') ||
+        normalized.endsWith('/assets') ||
+        normalized.endsWith('\\assets') ||
+        normalized.includes('/oops-plugin-framework/assets') ||
+        normalized.includes('\\oops-plugin-framework\\assets')
+    );
+}
+
 function inferExtractProfile(args = {}) {
     const prefabInputs = Array.isArray(args.prefabs) ? args.prefabs : [];
     if (prefabInputs.some(item => String(item || '').toLowerCase().endsWith('.prefab'))) {
@@ -13,6 +28,9 @@ function inferExtractProfile(args = {}) {
     const allRoots = [...methodRoots, ...componentRoots, ...assetRoots].map(item => String(item || '').toLowerCase());
     if (allRoots.some(item => item.includes('/app/servers/') || item.includes('\\app\\servers\\') || item.includes('/app/http/routes/') || item.includes('\\app\\http\\routes\\'))) {
         return 'pinus';
+    }
+    if ([...methodRoots, ...componentRoots, ...assetRoots].some(looksLikeCocosRoot)) {
+        return 'cocos';
     }
     return 'generic';
 }

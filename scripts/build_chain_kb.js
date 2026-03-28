@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { runExtract } = require('./extract_feature_facts');
 const { hasOwn, inferArea, inferStacks, loadProjectProfile, normalize, pathExists, readJson, repoRelative, resolveProjectRoot, slugify, timestamp, writeJson } = require('./lib/common');
+const { normalizeConfig, normalizeFeatureRecord } = require('./lib/feature-kb');
 
 function parseArgs(argv) {
     const args = { config: '', root: '' };
@@ -266,6 +267,9 @@ function collectEffectiveNetworkRequests(methodInfo, methodMap, stack = new Set(
     const deduped = new Map();
     for (const request of effective) {
         const key = [
+            request.protocol || '',
+            request.httpMethod || '',
+            request.transport || '',
             request.callee,
             request.target,
             request.viaMethod || '',
@@ -350,8 +354,175 @@ function resolveNetworkRequestRoute(request = {}) {
     return '';
 }
 
-function buildFeatureRecord(config, configPath) {
+function formatRequestNodeName(request = {}) {
+    const target = String(request.target || '').trim();
+    const httpMethod = String(request.httpMethod || '').trim().toUpperCase();
+    if (request.protocol === 'http' && httpMethod && target && target !== request.callee) {
+        return `${httpMethod} ${target}`;
+    }
+    return target || String(request.callee || '').trim();
+}
+
+function buildKbArtifactGuide(outputs = {}) {
+    return [
+        {
+            key: 'entrypoint',
+            file: 'scripts/query_kb.js',
+            purpose: '统一知识库查询入口，优先用于 feature 摘要、链路遍历和节点检索。',
+            useWhen: '遇到入口、关闭窗口链路、request、事件绑定、状态流转时先运行。',
+            priority: 1,
+        },
+        {
+            key: 'report',
+            file: outputs.report || '',
+            purpose: '给人看的构建汇总与使用指引。',
+            useWhen: '先想知道这个 feature 有哪些 KB 产物、该从哪里开始查时优先看。',
+            priority: 2,
+        },
+        {
+            key: 'lookup',
+            file: outputs.lookup || '',
+            purpose: '查询索引，供 query_kb.js / query_chain_kb.js 读取。',
+            useWhen: '通常不要手读；只有调试查询脚本或排查索引异常时才打开。',
+            priority: 3,
+        },
+        {
+            key: 'graph',
+            file: outputs.graph || '',
+            purpose: '图节点与边的底层事实数据。',
+            useWhen: '通常不要手读；只有确认边类型、节点 meta 或导出图时才打开。',
+            priority: 4,
+        },
+        {
+            key: 'scan',
+            file: outputs.scan || '',
+            purpose: 'extractor 的原始扫描产物。',
+            useWhen: '通常不要手读；只有怀疑抽取阶段漏抓时才回看。',
+            priority: 5,
+        },
+    ];
+}
+
+function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup) {
+    const nodesByType = Object.fromEntries(
+        Object.entries(lookup.nodesByType || {}).map(([type, ids]) => [type, Array.isArray(ids) ? ids.length : 0])
+    );
+    const outputs = {
+        scan: repoRelative(outputPaths.scan.canonicalPath, root),
+        graph: repoRelative(outputPaths.graph.canonicalPath, root),
+        lookup: repoRelative(outputPaths.lookup.canonicalPath, root),
+        report: repoRelative(outputPaths.report.canonicalPath, root),
+    };
+
     return {
+        kind: 'kb-build-report',
+        generatedAt: timestamp(),
+        featureKey: config.featureKey,
+        featureName: config.featureName,
+        purpose: '功能知识库构建汇总与使用说明。优先用它确认 KB 覆盖范围、推荐查询入口和产物用途。',
+        useWhen: '当你刚构建完 KB，或升级后不确定该查哪个文件、该先跑什么命令时。',
+        configPath: repoRelative(configPath, root),
+        outputs,
+        counts: {
+            nodes: graph.nodes.length,
+            edges: graph.edges.length,
+            scripts: (raw.scripts || []).length,
+            prefabs: (raw.prefabs || []).length,
+            nodesByType,
+        },
+        defaultWorkflow: [
+            '先运行 node scripts/query_kb.js --feature <feature-key> 查看 feature 摘要。',
+            '再用 --downstream / --upstream 或 --method / --event / --request / --state 做精确查询。',
+            '只有 KB 结果不足以回答问题时，再读 docs；最后才用 rg/grep 回源码确认。'
+        ],
+        queryExamples: [
+            `node scripts/query_kb.js --feature ${config.featureKey}`,
+            `node scripts/query_kb.js --feature ${config.featureKey} --downstream <query>`,
+            `node scripts/query_kb.js --feature ${config.featureKey} --method <name> --downstream`,
+            `node scripts/query_kb.js --feature ${config.featureKey} --type method --name <keyword>`,
+        ],
+        artifacts: buildKbArtifactGuide(outputs),
+        legacyCompatibility: {
+            oldOutputNamesSupported: ['graph.json', 'lookup.json', 'scan.json', 'report.json'],
+            note: '旧文件名仍可兼容，但长期规范只推荐 chain.graph.json / chain.lookup.json / scan.raw.json / build.report.json。',
+        },
+    };
+}
+
+function validateNormalizedConfig(config = {}) {
+    const missing = [];
+    if (!String(config.featureKey || '').trim()) {
+        missing.push('featureKey');
+    }
+    if (!String(config.featureName || '').trim()) {
+        missing.push('featureName');
+    }
+    if (!config.outputs || typeof config.outputs !== 'object') {
+        missing.push('outputs');
+        return missing;
+    }
+    for (const key of ['scan', 'graph', 'lookup', 'report']) {
+        if (!String(config.outputs[key] || '').trim()) {
+            missing.push(`outputs.${key}`);
+        }
+    }
+    return missing;
+}
+
+function ensureCanonicalOutputCompat(root, outputs = {}) {
+    const compatPairs = [
+        ['scan', 'scan.raw.json', 'scan.json'],
+        ['graph', 'chain.graph.json', 'graph.json'],
+        ['lookup', 'chain.lookup.json', 'lookup.json'],
+        ['report', 'build.report.json', 'report.json'],
+    ];
+
+    const compatibility = {};
+
+    for (const [key, canonicalName, legacyName] of compatPairs) {
+        const configuredPath = String(outputs[key] || '').trim();
+        const absoluteConfigured = path.resolve(root, configuredPath);
+        const configuredBaseName = path.basename(absoluteConfigured);
+        const canonicalPath = configuredBaseName.toLowerCase() === canonicalName.toLowerCase()
+            ? absoluteConfigured
+            : path.join(path.dirname(absoluteConfigured), canonicalName);
+        const legacyPath = configuredBaseName.toLowerCase() === legacyName.toLowerCase()
+            ? absoluteConfigured
+            : path.join(path.dirname(absoluteConfigured), legacyName);
+
+        compatibility[key] = {
+            configuredPath: absoluteConfigured,
+            canonicalPath,
+            legacyPath,
+            configuredBaseName,
+        };
+    }
+
+    return compatibility;
+}
+
+function writeJsonWithCompat(root, key, value, outputs = {}) {
+    const compatibility = ensureCanonicalOutputCompat(root, outputs)[key];
+    writeJson(compatibility.canonicalPath, value);
+
+    if (compatibility.configuredPath !== compatibility.canonicalPath) {
+        writeJson(compatibility.configuredPath, value);
+    }
+
+    const isLegacyConfigured = compatibility.configuredPath === compatibility.legacyPath;
+    if (isLegacyConfigured && compatibility.legacyPath !== compatibility.canonicalPath) {
+        writeJson(compatibility.legacyPath, value);
+    }
+
+    return {
+        canonicalPath: compatibility.canonicalPath,
+        configuredPath: compatibility.configuredPath,
+        legacyPath: compatibility.legacyPath,
+    };
+}
+
+function buildFeatureRecord(config, configPath) {
+    return normalizeFeatureRecord({
         featureKey: config.featureKey,
         featureName: config.featureName,
         summary: config.summary || '',
@@ -360,7 +531,8 @@ function buildFeatureRecord(config, configPath) {
         docsDir: config.docs?.featureDir || '',
         kbDir: `project-memory/kb/features/${config.featureKey}`,
         outputs: config.outputs || {},
-    };
+        type: config.type || '',
+    });
 }
 
 function upsertFeatureRegistry(root, featureRecord) {
@@ -379,7 +551,7 @@ function upsertFeatureRegistry(root, featureRecord) {
             ...featureRecord,
         };
     } else {
-        features.push(featureRecord);
+        features.push(normalizeFeatureRecord(featureRecord));
     }
 
     features.sort((left, right) => String(left.featureKey || '').localeCompare(String(right.featureKey || '')));
@@ -778,6 +950,9 @@ function buildGraph(raw, config, projectProfile, root) {
                     meta: {
                         identifier: importedCall.identifier,
                         isApi: importedCall.isApi,
+                        callKind: importedCall.callKind || '',
+                        memberPath: importedCall.memberPath || '',
+                        resolvedVia: importedCall.resolvedVia || '',
                     },
                 });
             }
@@ -865,12 +1040,20 @@ function buildGraph(raw, config, projectProfile, root) {
             const methodInfo = methodMap.get(methodKey(script.scriptPath, method.name));
             const effectiveRequests = collectEffectiveNetworkRequests(methodInfo, methodMap);
             for (const request of effectiveRequests) {
-                const requestId = makeNodeId('request', request.callee, request.target || request.callee);
+                const requestName = formatRequestNodeName(request);
+                const requestId = makeNodeId(
+                    'request',
+                    request.protocol || '',
+                    request.httpMethod || '',
+                    request.transport || '',
+                    request.callee,
+                    requestName
+                );
                 const requestRoute = resolveNetworkRequestRoute(request);
                 addNode({
                     id: requestId,
                     type: 'request',
-                    name: request.target || request.callee,
+                    name: requestName,
                     file: script.scriptPath,
                     line: method.line,
                     area: methodArea,
@@ -879,9 +1062,22 @@ function buildGraph(raw, config, projectProfile, root) {
                         callee: request.callee,
                         callbackKind: request.callbackKind,
                         route: requestRoute,
+                        protocol: request.protocol || '',
+                        httpMethod: request.httpMethod || '',
+                        transport: request.transport || '',
                     },
                 });
-                appendNodeTags(nodeMap.get(requestId), request.target || request.callee, request.callee, requestRoute, 'request');
+                appendNodeTags(
+                    nodeMap.get(requestId),
+                    requestName,
+                    request.target || request.callee,
+                    request.callee,
+                    requestRoute,
+                    request.protocol || '',
+                    request.httpMethod || '',
+                    request.transport || '',
+                    'request'
+                );
                 addEdge({
                     from: currentMethodId,
                     to: requestId,
@@ -892,6 +1088,9 @@ function buildGraph(raw, config, projectProfile, root) {
                         callee: request.callee,
                         target: request.target,
                         viaMethod: request.viaMethod || '',
+                        protocol: request.protocol || '',
+                        httpMethod: request.httpMethod || '',
+                        transport: request.transport || '',
                     },
                 });
 
@@ -1145,6 +1344,9 @@ function buildLookup(graph) {
                 id: node.id,
                 callee: node.meta?.callee || '',
                 callers: (incoming[node.id] || []).filter(edge => edge.type === 'requests').map(edge => nodesById[edge.from]?.name || edge.from),
+                protocol: node.meta?.protocol || '',
+                httpMethod: node.meta?.httpMethod || '',
+                transport: node.meta?.transport || '',
             };
         }
 
@@ -1213,15 +1415,23 @@ function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const configPath = path.resolve(args.root || process.cwd(), args.config);
     const root = resolveProjectRoot(args.root || path.dirname(configPath));
-    const config = readJson(configPath);
+    const rawConfig = readJson(configPath);
+    const normalizedConfigResult = normalizeConfig(rawConfig);
+    const config = normalizedConfigResult.config;
+    const missing = validateNormalizedConfig(config);
+    if (missing.length > 0) {
+        throw new Error(`KB 配置缺少必要字段: ${missing.join(', ')}`);
+    }
+    normalizedConfigResult.warnings.forEach(message => console.warn(`[deprecated] ${message}`));
     const profile = loadProjectProfile(root);
     const outputs = config.outputs || {};
     const extractInputs = deriveExtractInputs(config, root);
+    const outputPaths = ensureCanonicalOutputCompat(root, outputs);
 
-    const scanPath = path.resolve(root, outputs.scan);
-    const graphPath = path.resolve(root, outputs.graph);
-    const lookupPath = path.resolve(root, outputs.lookup);
-    const reportPath = path.resolve(root, outputs.report);
+    const scanPath = outputPaths.scan.canonicalPath;
+    const graphPath = outputPaths.graph.canonicalPath;
+    const lookupPath = outputPaths.lookup.canonicalPath;
+    const reportPath = outputPaths.report.canonicalPath;
 
     const extractArgs = [];
     if (config.extractorAdapter) {
@@ -1251,28 +1461,11 @@ function run(argv = process.argv.slice(2)) {
     const raw = readJson(scanPath);
     const graph = buildGraph(raw, config, profile, root);
     const lookup = buildLookup(graph);
-    const report = {
-        generatedAt: timestamp(),
-        featureKey: config.featureKey,
-        featureName: config.featureName,
-        configPath: repoRelative(configPath, root),
-        outputs: {
-            scan: repoRelative(scanPath, root),
-            graph: repoRelative(graphPath, root),
-            lookup: repoRelative(lookupPath, root),
-            report: repoRelative(reportPath, root),
-        },
-        counts: {
-            nodes: graph.nodes.length,
-            edges: graph.edges.length,
-            scripts: (raw.scripts || []).length,
-            prefabs: (raw.prefabs || []).length,
-        },
-    };
+    const report = buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup);
 
-    writeJson(graphPath, graph);
-    writeJson(lookupPath, lookup);
-    writeJson(reportPath, report);
+    writeJsonWithCompat(root, 'graph', graph, outputs);
+    writeJsonWithCompat(root, 'lookup', lookup, outputs);
+    writeJsonWithCompat(root, 'report', report, outputs);
     upsertFeatureRegistry(root, buildFeatureRecord(config, repoRelative(configPath, root)));
     console.log(`链路知识库已构建: ${config.featureKey}`);
 }

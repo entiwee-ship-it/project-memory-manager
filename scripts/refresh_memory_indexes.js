@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { readJson, resolveProjectRoot, timestamp, writeJson } = require('./lib/common');
+const { normalizeConfig, normalizeFeatureRecord, toPosixPath } = require('./lib/feature-kb');
 
 function parseArgs(argv) {
     const args = {
@@ -22,6 +23,46 @@ function firstHeading(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const match = content.match(/^#\s+(.+)$/m);
     return match ? match[1].trim() : path.basename(filePath, path.extname(filePath));
+}
+
+function scanFeatureDirs(featuresRoot) {
+    if (!fs.existsSync(featuresRoot)) {
+        return [];
+    }
+
+    return fs.readdirSync(featuresRoot, { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => {
+            const featureKey = entry.name;
+            const kbDir = toPosixPath(path.join(path.relative(path.dirname(featuresRoot), featuresRoot), featureKey));
+            return normalizeFeatureRecord({
+                featureKey,
+                featureName: featureKey,
+                kbDir,
+            });
+        });
+}
+
+function mergeFeatureRecords(...groups) {
+    const merged = new Map();
+    for (const group of groups) {
+        for (const record of group) {
+            const normalized = normalizeFeatureRecord(record);
+            if (!normalized.featureKey) {
+                continue;
+            }
+            const existing = merged.get(normalized.featureKey) || {};
+            merged.set(normalized.featureKey, {
+                ...existing,
+                ...normalized,
+                outputs: {
+                    ...(existing.outputs || {}),
+                    ...(normalized.outputs || {}),
+                },
+            });
+        }
+    }
+    return Array.from(merged.values()).sort((left, right) => left.featureKey.localeCompare(right.featureKey));
 }
 
 function run(argv = process.argv.slice(2)) {
@@ -45,6 +86,9 @@ function run(argv = process.argv.slice(2)) {
             ? fs.readdirSync(domainDir).filter(name => name.endsWith('.md')).map(name => path.join(domainDir, name))
             : []
     ));
+    const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
+    const existingRegistry = fs.existsSync(registryPath) ? readJson(registryPath) : { features: [] };
+    const existingFeatures = Array.isArray(existingRegistry.features) ? existingRegistry.features : [];
 
     const generatedAt = timestamp();
     const activeWorks = workFiles.map(filePath => ({
@@ -53,19 +97,22 @@ function run(argv = process.argv.slice(2)) {
         status: 'active',
     }));
 
-    const features = configFiles.map(filePath => {
-        const config = readJson(filePath);
-        return {
-            featureKey: config.featureKey,
-            featureName: config.featureName,
-            summary: config.summary || '',
-            areas: Array.isArray(config.areas) ? config.areas : [],
+    const featuresFromConfigs = configFiles.map(filePath => {
+        const normalized = normalizeConfig(readJson(filePath)).config;
+        return normalizeFeatureRecord({
+            featureKey: normalized.featureKey,
+            featureName: normalized.featureName,
+            summary: normalized.summary || '',
+            areas: Array.isArray(normalized.areas) ? normalized.areas : [],
             configPath: path.relative(root, filePath).replace(/\\/g, '/'),
-            docsDir: config.docs?.featureDir || '',
-            kbDir: `project-memory/kb/features/${config.featureKey}`,
-            outputs: config.outputs || {},
-        };
+            docsDir: normalized.docs?.featureDir || '',
+            kbDir: normalized.kbDir,
+            outputs: normalized.outputs || {},
+            type: normalized.type || '',
+        });
     });
+    const featuresFromKbDirs = scanFeatureDirs(path.join(root, 'project-memory', 'kb', 'features'));
+    const features = mergeFeatureRecords(existingFeatures, featuresFromConfigs, featuresFromKbDirs);
 
     const domains = domainFiles.map(filePath => ({
         title: firstHeading(filePath),

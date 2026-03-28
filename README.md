@@ -110,6 +110,12 @@ project-memory/
 - `KB` 负责定位
 - `grep/rg` 只负责兜底
 
+推荐把 KB 的默认入口记成一条命令：
+
+- `node scripts/query_kb.js --feature <feature-key>`
+
+当你还不知道该读哪个 KB 文件时，不要先手翻 `chain.graph.json` 或 `chain.lookup.json`，先跑上面的命令看 feature 摘要。
+
 这也是这个技能存在的核心原因：避免 AI 一上来就退回到全仓库搜索。
 
 ## 当前具备的提取能力
@@ -133,6 +139,52 @@ project-memory/
 - state readers / writers
 
 若运行环境缺少 `typescript`，会自动回退到正则模式。
+
+## 配置与输出约定
+
+当前规范配置主键是：
+
+- `featureKey`
+- `featureName`
+- `outputs.scan`
+- `outputs.graph`
+- `outputs.lookup`
+- `outputs.report`
+
+当前规范输出文件名是：
+
+- `chain.graph.json`
+- `chain.lookup.json`
+- `scan.raw.json`
+- `build.report.json`
+
+推荐读取顺序是：
+
+1. `scripts/query_kb.js`
+2. `build.report.json`
+3. `docs`
+4. `rg/grep`
+
+各文件的推荐用途：
+
+- `scripts/query_kb.js`：统一查询入口，先看 feature 摘要、再做上下游和节点查询
+- `build.report.json`：给人看的构建汇总与使用说明
+- `chain.lookup.json`：查询脚本使用的索引，通常不要手读
+- `chain.graph.json`：图节点与边的底层事实，通常不要手读
+- `scan.raw.json`：原始抽取结果，只在怀疑 extractor 漏抓时回看
+
+当前规范注册表字段是：
+
+- `featureKey`
+- `featureName`
+- `kbDir`
+- `outputs`
+
+升级兼容说明：
+
+- 旧字段 `key`、`name`、`outputDir` 仍可读取，但会打印弃用告警
+- 旧文件名 `graph.json`、`lookup.json`、`scan.json`、`report.json` 仍可兼容
+- 注册表里的旧字段 `key`、`name`、`graphPath`、`lookupPath` 仍可被查询脚本读取
 
 ## 仓库结构
 
