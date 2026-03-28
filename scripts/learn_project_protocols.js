@@ -114,6 +114,105 @@ function makeMethodRef(rawMethodRecord, graphMethodMap) {
     };
 }
 
+function resolveMethodNodeRef(scriptPath, methodName, graphMethodMap) {
+    const key = buildMethodKey(scriptPath, methodName);
+    const methodNode = graphMethodMap.get(key);
+    if (!methodNode) {
+        return {
+            id: '',
+            name: `${path.basename(scriptPath, path.extname(scriptPath))}.${methodName}`,
+            scriptPath: normalize(scriptPath),
+        };
+    }
+    return {
+        id: methodNode.id,
+        name: methodNode.name,
+        scriptPath: normalize(scriptPath),
+    };
+}
+
+function resolveImportedCallRef(importedCall, indexes) {
+    if (!importedCall?.sourcePath || !importedCall?.method) {
+        return importedCall?.identifier && importedCall?.method
+            ? `${importedCall.identifier}.${importedCall.method}`
+            : '';
+    }
+    return resolveMethodNodeRef(importedCall.sourcePath, importedCall.method, indexes.graphMethodMap).name;
+}
+
+function resolveFieldCallRef(fieldCall, indexes) {
+    if (!fieldCall?.sourcePath || !fieldCall?.method) {
+        return fieldCall?.fieldName && fieldCall?.method
+            ? `${fieldCall.fieldName}.${fieldCall.method}`
+            : '';
+    }
+    return resolveMethodNodeRef(fieldCall.sourcePath, fieldCall.method, indexes.graphMethodMap).name;
+}
+
+function extractNextMethodNames(rawMethodRecord, indexes) {
+    const nextMethods = [];
+    for (const callSite of rawMethodRecord.method?.localCallSites || []) {
+        nextMethods.push(resolveMethodNodeRef(rawMethodRecord.scriptPath, callSite.method, indexes.graphMethodMap).name);
+    }
+    for (const call of rawMethodRecord.method?.importedCalls || []) {
+        nextMethods.push(resolveImportedCallRef(call, indexes));
+    }
+    for (const call of rawMethodRecord.method?.fieldCalls || []) {
+        nextMethods.push(resolveFieldCallRef(call, indexes));
+    }
+    return unique(nextMethods).filter(Boolean);
+}
+
+function extractMessageContext(rawMethodRecord, indexes, messagePatterns = []) {
+    const methodRef = makeMethodRef(rawMethodRecord, indexes.graphMethodMap);
+    const handled = [];
+    const emitted = [];
+    for (const pattern of messagePatterns) {
+        if ((pattern.handlers || []).some(item => item.name === methodRef.name)) {
+            handled.push(pattern.name);
+        }
+        if ((pattern.senders || []).some(item => item.name === methodRef.name)) {
+            emitted.push(pattern.name);
+        }
+        if ((pattern.dispatchers || []).some(item => item.name === methodRef.name)) {
+            handled.push(pattern.name);
+        }
+    }
+    return {
+        handledMessages: unique(handled).sort((left, right) => left.localeCompare(right)),
+        emittedMessages: unique(emitted).sort((left, right) => left.localeCompare(right)),
+    };
+}
+
+function buildTimingEventPattern(methodName, subscription, inlineActions, messageContext) {
+    const nextMethods = unique([
+        ...(inlineActions.localCalls || []).map(name => `${methodName.split('.').slice(0, -1).join('.') || methodName.split('.')[0]}.${name}`),
+        ...(inlineActions.importedCalls || []).map(call => `${call.identifier}.${call.method}`),
+        ...(inlineActions.fieldCalls || []).map(call => `${call.fieldName}.${call.method}`),
+    ]).filter(Boolean);
+    const evidenceFiles = unique([subscription.file || '']).filter(Boolean);
+    const confidence = Math.min(
+        0.9,
+        0.45
+        + (nextMethods.length > 0 ? 0.2 : 0)
+        + ((inlineActions.stateWrites || []).length > 0 ? 0.15 : 0)
+        + ((messageContext.handledMessages || []).length > 0 ? 0.1 : 0)
+    );
+    return {
+        kind: 'event-gated',
+        ownerMethod: methodName,
+        event: subscription.event || '',
+        protocol: subscription.bus || '',
+        trigger: subscription.event || '',
+        nextMethods,
+        stateReads: inlineActions.stateReads || [],
+        stateWrites: inlineActions.stateWrites || [],
+        messageContext,
+        confidence: Number(confidence.toFixed(2)),
+        evidenceFiles,
+    };
+}
+
 function ensureMessageBucket(bucketMap, messageName, protocol = '') {
     const key = String(messageName || '').trim();
     if (!key) {
@@ -277,6 +376,99 @@ function learnDispatcherPatterns(messagePatterns = []) {
     })).sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function learnTimingPatterns(raw, indexes, messagePatterns = []) {
+    const patterns = [];
+
+    for (const rawMethodRecord of indexes.rawMethodMap.values()) {
+        const methodRef = makeMethodRef(rawMethodRecord, indexes.graphMethodMap);
+        const method = rawMethodRecord.method || {};
+        const messageContext = extractMessageContext(rawMethodRecord, indexes, messagePatterns);
+
+        for (const signal of method.timingSignals || []) {
+            const nextMethods = unique([
+                ...(signal.callbackLocalCalls || []).map(name => resolveMethodNodeRef(rawMethodRecord.scriptPath, name, indexes.graphMethodMap).name),
+                ...(signal.callbackImportedCalls || []).map(call => resolveImportedCallRef(call, indexes)),
+                ...(signal.callbackFieldCalls || []).map(call => resolveFieldCallRef(call, indexes)),
+            ]).filter(Boolean);
+            const confidence = Math.min(
+                0.92,
+                0.45
+                + (nextMethods.length > 0 ? 0.2 : 0)
+                + ((signal.callbackStateWrites || []).length > 0 ? 0.15 : 0)
+                + (signal.delayMs ? 0.1 : 0)
+                + ((messageContext.handledMessages || []).length > 0 ? 0.05 : 0)
+            );
+            patterns.push({
+                kind: signal.kind || 'timing-signal',
+                ownerMethod: methodRef.name,
+                trigger: signal.delayMs ? `${signal.callee}:${signal.delayMs}` : signal.callee || '',
+                callee: signal.callee || '',
+                delayMs: signal.delayMs || '',
+                event: signal.event || '',
+                callbackKind: signal.callbackKind || 'none',
+                callbackRef: signal.callbackRef || '',
+                nextMethods,
+                stateReads: signal.callbackStateReads || [],
+                stateWrites: signal.callbackStateWrites || [],
+                messageContext,
+                confidence: Number(confidence.toFixed(2)),
+                evidenceFiles: [normalize(rawMethodRecord.scriptPath)],
+            });
+        }
+
+        for (const subscription of method.eventSubscriptions || []) {
+            const inlineActions = subscription.inlineActions || null;
+            if (!inlineActions || !subscription.event) {
+                continue;
+            }
+            if (!/(anim|animation|tween|finish|finished|complete|completed|end|ended|delay|wait|after)/i.test(subscription.event)) {
+                continue;
+            }
+            patterns.push({
+                ...buildTimingEventPattern(methodRef.name, { ...subscription, file: normalize(rawMethodRecord.scriptPath) }, inlineActions, messageContext),
+            });
+        }
+
+        for (const request of method.networkRequests || []) {
+            const nextMethods = unique([
+                ...(request.callbackLocalCalls || []).map(name => resolveMethodNodeRef(rawMethodRecord.scriptPath, name, indexes.graphMethodMap).name),
+                ...(request.callbackImportedCalls || []).map(call => resolveImportedCallRef(call, indexes)),
+                ...(request.callbackFieldCalls || []).map(call => resolveFieldCallRef(call, indexes)),
+            ]).filter(Boolean);
+            if (nextMethods.length <= 0) {
+                continue;
+            }
+            patterns.push({
+                kind: 'request-callback',
+                ownerMethod: methodRef.name,
+                trigger: request.target || request.callee || '',
+                callee: request.callee || '',
+                delayMs: '',
+                event: '',
+                callbackKind: request.callbackKind || 'none',
+                callbackRef: request.callbackRef || '',
+                nextMethods,
+                stateReads: [],
+                stateWrites: [],
+                messageContext,
+                confidence: 0.62,
+                evidenceFiles: [normalize(rawMethodRecord.scriptPath)],
+            });
+        }
+    }
+
+    return dedupeBy(
+        patterns.map(item => ({
+            ...item,
+            nextMethods: unique(item.nextMethods).sort((left, right) => left.localeCompare(right)),
+            stateReads: unique(item.stateReads).sort((left, right) => left.localeCompare(right)),
+            stateWrites: unique(item.stateWrites).sort((left, right) => left.localeCompare(right)),
+            evidenceFiles: unique(item.evidenceFiles).sort((left, right) => left.localeCompare(right)),
+        })),
+        item => `${item.kind}::${item.ownerMethod}::${item.trigger}::${item.callbackRef}::${item.nextMethods.join(',')}::${item.stateWrites.join(',')}`
+    );
+}
+
 function learnStateMachinePatterns(messagePatterns = [], indexes) {
     const stateMap = new Map();
 
@@ -343,6 +535,107 @@ function learnStateMachinePatterns(messagePatterns = [], indexes) {
     }).sort((left, right) => `${left.message}::${left.state}`.localeCompare(`${right.message}::${right.state}`));
 }
 
+function learnPhasePatterns(raw, indexes, messagePatterns = [], timingPatterns = []) {
+    const timingByOwner = new Map();
+    for (const pattern of timingPatterns) {
+        const bucket = timingByOwner.get(pattern.ownerMethod) || [];
+        bucket.push(pattern);
+        timingByOwner.set(pattern.ownerMethod, bucket);
+    }
+
+    const patterns = [];
+    for (const rawMethodRecord of indexes.rawMethodMap.values()) {
+        const methodRef = makeMethodRef(rawMethodRecord, indexes.graphMethodMap);
+        const method = rawMethodRecord.method || {};
+        const messageContext = extractMessageContext(rawMethodRecord, indexes, messagePatterns);
+        const directNextMethods = extractNextMethodNames(rawMethodRecord, indexes);
+        const timing = timingByOwner.get(methodRef.name) || [];
+        const asyncNextMethods = unique(timing.flatMap(item => item.nextMethods || []));
+        const stateReads = unique(method.stateReads || []);
+        const stateWrites = unique(method.stateWrites || []);
+        const nextMethods = unique([...directNextMethods, ...asyncNextMethods]);
+
+        if (
+            nextMethods.length <= 0
+            && stateReads.length <= 0
+            && stateWrites.length <= 0
+            && (messageContext.handledMessages || []).length <= 0
+            && (messageContext.emittedMessages || []).length <= 0
+        ) {
+            continue;
+        }
+
+        const phaseConfidence = Math.min(
+            0.94,
+            0.38
+            + (nextMethods.length > 0 ? 0.2 : 0)
+            + (stateWrites.length > 0 ? 0.16 : 0)
+            + ((messageContext.handledMessages || []).length > 0 ? 0.12 : 0)
+            + (timing.length > 0 ? 0.08 : 0)
+        );
+
+        patterns.push({
+            kind: 'phase-sequence',
+            name: methodRef.name,
+            entryMethod: methodRef.name,
+            handledMessages: messageContext.handledMessages || [],
+            emittedMessages: messageContext.emittedMessages || [],
+            stateReads,
+            stateWrites,
+            directNextMethods,
+            asyncNextMethods,
+            nextMethods,
+            timingKinds: unique(timing.map(item => item.kind)).sort((left, right) => left.localeCompare(right)),
+            confidence: Number(phaseConfidence.toFixed(2)),
+            evidenceFiles: [normalize(rawMethodRecord.scriptPath)],
+        });
+    }
+
+    return patterns.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function learnTransitionPatterns(phasePatterns = [], timingPatterns = []) {
+    const timingByOwner = new Map();
+    for (const pattern of timingPatterns) {
+        const bucket = timingByOwner.get(pattern.ownerMethod) || [];
+        bucket.push(pattern);
+        timingByOwner.set(pattern.ownerMethod, bucket);
+    }
+
+    const transitions = [];
+    for (const phase of phasePatterns) {
+        const timing = timingByOwner.get(phase.entryMethod) || [];
+        for (const stateName of phase.stateWrites || []) {
+            transitions.push({
+                kind: 'state-transition',
+                name: `${phase.entryMethod} -> ${stateName}`,
+                state: stateName,
+                driverMethod: phase.entryMethod,
+                handledMessages: phase.handledMessages || [],
+                emittedMessages: phase.emittedMessages || [],
+                nextMethods: phase.nextMethods || [],
+                timingKinds: phase.timingKinds || [],
+                transitionKind: (phase.stateReads || []).includes(stateName) ? 'state-cycle' : 'state-progress',
+                delayKinds: unique(timing.map(item => item.kind)).sort((left, right) => left.localeCompare(right)),
+                confidence: Number(Math.min(
+                    0.95,
+                    0.45
+                    + ((phase.nextMethods || []).length > 0 ? 0.18 : 0)
+                    + ((phase.handledMessages || []).length > 0 ? 0.12 : 0)
+                    + ((phase.timingKinds || []).length > 0 ? 0.08 : 0)
+                    + ((phase.stateReads || []).includes(stateName) ? 0.06 : 0)
+                ).toFixed(2)),
+                evidenceFiles: phase.evidenceFiles || [],
+            });
+        }
+    }
+
+    return dedupeBy(
+        transitions,
+        item => `${item.state}::${item.driverMethod}::${item.transitionKind}::${(item.handledMessages || []).join(',')}`
+    ).sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function learnRoutingPatterns(raw, messagePatterns = []) {
     const routeKinds = new Map();
     const requestProtocols = new Map();
@@ -388,6 +681,9 @@ function learnProjectProtocols(raw, graph, lookup, root) {
     const messagePatterns = learnMessagePatterns(raw, indexes);
     const dispatcherPatterns = learnDispatcherPatterns(messagePatterns);
     const stateMachinePatterns = learnStateMachinePatterns(messagePatterns, indexes);
+    const timingPatterns = learnTimingPatterns(raw, indexes, messagePatterns);
+    const phasePatterns = learnPhasePatterns(raw, indexes, messagePatterns, timingPatterns);
+    const transitionPatterns = learnTransitionPatterns(phasePatterns, timingPatterns);
     const routingPatterns = learnRoutingPatterns(raw, messagePatterns);
 
     return {
@@ -398,11 +694,17 @@ function learnProjectProtocols(raw, graph, lookup, root) {
         messagePatterns,
         dispatcherPatterns,
         stateMachinePatterns,
+        timingPatterns,
+        phasePatterns,
+        transitionPatterns,
         routingPatterns,
         summary: {
             messages: messagePatterns.length,
             dispatchers: dispatcherPatterns.length,
             statePatterns: stateMachinePatterns.length,
+            timingPatterns: timingPatterns.length,
+            phasePatterns: phasePatterns.length,
+            transitionPatterns: transitionPatterns.length,
             routeKinds: routingPatterns.routeKinds.length,
             requestProtocols: routingPatterns.requestProtocols.length,
         },
@@ -435,6 +737,9 @@ function run(argv = process.argv.slice(2)) {
     console.log(`- messages: ${protocols.summary.messages}`);
     console.log(`- dispatchers: ${protocols.summary.dispatchers}`);
     console.log(`- statePatterns: ${protocols.summary.statePatterns}`);
+    console.log(`- timingPatterns: ${protocols.summary.timingPatterns}`);
+    console.log(`- phasePatterns: ${protocols.summary.phasePatterns}`);
+    console.log(`- transitionPatterns: ${protocols.summary.transitionPatterns}`);
 }
 
 module.exports = {

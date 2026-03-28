@@ -146,6 +146,7 @@ project-memory/
 
 - project-global 全盘扫描
 - 项目级协议学习（message / dispatcher / state pattern）
+- 项目级业务时序学习（timing / phase / transition pattern）
 - project 级查询入口
 - 方法上下游查询
 - 组件与 handler 绑定查询
@@ -194,6 +195,7 @@ project-memory/
 各文件的推荐用途：
 
 - `scripts/query_project_kb.js`：全局查询入口，先看 project summary、message、state、跨区域链路
+- `project-protocols.json`：项目协议与业务时序学习结果，包含 message / timing / phase / transition patterns
 - `scripts/query_kb.js`：统一查询入口，先看 feature 摘要、再做上下游和节点查询
 - `build.report.json`：给人看的构建汇总与使用说明
 - `chain.lookup.json`：查询脚本使用的索引，通常不要手读

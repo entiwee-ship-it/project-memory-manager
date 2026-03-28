@@ -1182,6 +1182,7 @@ function createEmptyCallInfo() {
         callbackInvocations: [],
         stateReads: [],
         stateWrites: [],
+        timingSignals: [],
         httpEndpoints: [],
         messageRoutes: [],
         notifyRoutes: [],
@@ -1263,6 +1264,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
     const eventSubscriptions = [];
     const eventDispatches = [];
     const networkRequests = [];
+    const timingSignals = [];
     const importMap = new Map();
     const paramSet = new Set(paramNames || []);
 
@@ -1475,6 +1477,40 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                     callbackInvocations: callbackCallInfo.callbackInvocations,
                 });
             }
+
+            if (['setTimeout', 'setInterval', 'scheduleOnce'].includes(normalizedPath)) {
+                const callbackArg = node.arguments?.[0] || null;
+                const delayArg = node.arguments?.[1] || null;
+                const callbackMethodRef = stripThisPrefix(readThisAccessPathFromAst(callbackArg, ts) || '');
+                const callbackCallInfo = callbackArg && (ts.isArrowFunction(callbackArg) || ts.isFunctionExpression(callbackArg))
+                    ? analyzeInlineCallableFromAst(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__timing_callback__', knownMethodNames)
+                    : createEmptyCallInfo();
+                timingSignals.push(buildTimingSignal(
+                    normalizedPath === 'scheduleOnce' ? 'scheduled-delay' : 'timer-delay',
+                    calleePath,
+                    {
+                        delayMs: delayArg ? delayArg.getText(sourceFile) : '',
+                        callbackKind: callbackArg && (ts.isArrowFunction(callbackArg) || ts.isFunctionExpression(callbackArg))
+                            ? 'inline'
+                            : callbackMethodRef
+                              ? 'methodRef'
+                              : callbackArg && paramSet.has(callbackArg.getText(sourceFile).trim())
+                                ? 'paramRef'
+                                : 'none',
+                        callbackRef: callbackArg && (ts.isArrowFunction(callbackArg) || ts.isFunctionExpression(callbackArg))
+                            ? ''
+                            : callbackMethodRef || (callbackArg && paramSet.has(callbackArg.getText(sourceFile).trim()) ? callbackArg.getText(sourceFile).trim() : ''),
+                    },
+                    callbackArg && (ts.isArrowFunction(callbackArg) || ts.isFunctionExpression(callbackArg))
+                        ? callbackCallInfo
+                        : callbackMethodRef
+                          ? {
+                                ...createEmptyCallInfo(),
+                                localCalls: [callbackMethodRef],
+                            }
+                          : createEmptyCallInfo()
+                ));
+            }
         }
 
         ts.forEachChild(node, visit);
@@ -1508,6 +1544,10 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
         callbackInvocations: uniqueSorted(callbackInvocations),
         stateReads: [],
         stateWrites: [],
+        timingSignals: dedupeBy(
+            timingSignals,
+            item => `${item.kind || ''}::${item.callee || ''}::${item.delayMs || ''}::${item.callbackKind || ''}::${item.callbackRef || ''}::${(item.callbackLocalCalls || []).join(',')}`
+        ),
         httpEndpoints: [],
         messageRoutes: [],
         notifyRoutes: [],
@@ -1619,6 +1659,7 @@ function createInlineActionSummary(callInfo) {
         callbackInvocations: callInfo.callbackInvocations,
         stateReads: callInfo.stateReads,
         stateWrites: callInfo.stateWrites,
+        timingSignals: callInfo.timingSignals,
         notifyRoutes: callInfo.notifyRoutes,
         dbReads: callInfo.dbReads,
         dbWrites: callInfo.dbWrites,
@@ -1765,6 +1806,7 @@ function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, han
             callbackInvocations: callInfo.callbackInvocations,
             stateReads: callInfo.stateReads,
             stateWrites: callInfo.stateWrites,
+            timingSignals: callInfo.timingSignals,
             notifyRoutes: callInfo.notifyRoutes,
             dbReads: callInfo.dbReads,
             dbWrites: callInfo.dbWrites,
@@ -2033,6 +2075,85 @@ function buildHttpRequestFromArgs(callee, args = [], transport, explicitMethod =
         args[0] || normalizedCallee,
         explicitMethod || 'GET',
         transport
+    );
+}
+
+function buildTimingSignal(kind, callee, extra = {}, callbackInfo = createEmptyCallInfo()) {
+    return {
+        kind,
+        callee: String(callee || '').trim(),
+        delayMs: normalizeInlineExpression(extra.delayMs || ''),
+        event: normalizeInlineExpression(extra.event || ''),
+        callbackKind: extra.callbackKind || 'none',
+        callbackRef: extra.callbackRef || '',
+        callbackLocalCalls: callbackInfo.localCalls || [],
+        callbackImportedCalls: callbackInfo.importedCalls || [],
+        callbackFieldCalls: callbackInfo.fieldCalls || [],
+        callbackEventDispatches: callbackInfo.eventDispatches || [],
+        callbackInvocations: callbackInfo.callbackInvocations || [],
+        callbackStateReads: callbackInfo.stateReads || [],
+        callbackStateWrites: callbackInfo.stateWrites || [],
+    };
+}
+
+function extractTimingSignals(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames = []) {
+    const signals = [];
+    const timerPattern = /\b(?:(this)\.)?(setTimeout|setInterval|scheduleOnce)\s*\(/g;
+    let match = null;
+
+    while ((match = timerPattern.exec(methodBody))) {
+        const openParenIndex = timerPattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const callbackArg = args[0] || '';
+        const delayArg = args[1] || '';
+        const callbackBody = callbackArg && /=>|function\b/.test(callbackArg)
+            ? extractInlineCallbackBody(callbackArg)
+            : '';
+        const callbackMethodRefMatch = callbackArg.trim().match(/^this\.([A-Za-z_$][\w$]*)$/);
+        const callbackMethodRef = callbackMethodRefMatch ? callbackMethodRefMatch[1] : '';
+        const callbackCallInfo = callbackBody
+            ? extractMethodCalls(callbackBody, '__timing_callback__', imports, fieldTypes, handlerMaps, paramNames, knownMethodNames)
+            : createEmptyCallInfo();
+        signals.push(buildTimingSignal(
+            match[2] === 'scheduleOnce' ? 'scheduled-delay' : 'timer-delay',
+            match[1] ? `this.${match[2]}` : match[2],
+            {
+                delayMs: delayArg,
+                callbackKind: callbackBody
+                    ? 'inline'
+                    : callbackMethodRef
+                      ? 'methodRef'
+                      : callbackArg && paramNames.includes(callbackArg.trim())
+                        ? 'paramRef'
+                        : 'none',
+                callbackRef: callbackBody
+                    ? ''
+                    : callbackMethodRef || (callbackArg && paramNames.includes(callbackArg.trim()) ? callbackArg.trim() : ''),
+            },
+            callbackBody
+                ? callbackCallInfo
+                : callbackMethodRef
+                  ? {
+                        ...createEmptyCallInfo(),
+                        localCalls: [callbackMethodRef],
+                    }
+                  : createEmptyCallInfo()
+        ));
+        timerPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
+    return dedupeBy(
+        signals,
+        signal => [
+            signal.kind,
+            signal.callee,
+            signal.delayMs,
+            signal.callbackKind,
+            signal.callbackRef,
+            (signal.callbackLocalCalls || []).join(','),
+            (signal.callbackStateWrites || []).join(','),
+        ].join('::')
     );
 }
 
@@ -2323,6 +2444,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         dispatch => `${dispatch.bus}::${dispatch.mode}::${dispatch.event}`
     );
     const networkRequests = extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
+    const timingSignals = extractTimingSignals(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
     const callbackInvocations = extractInvokedIdentifierNames(directBody, paramNames);
     const stateAccesses = extractStateAccesses(directBody, fieldTypes, knownMethodNames);
     const notifyRoutes = extractNotifyRoutes(directBody);
@@ -2363,6 +2485,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         callbackInvocations,
         stateReads: stateAccesses.reads,
         stateWrites: stateAccesses.writes,
+        timingSignals,
         httpEndpoints: [],
         messageRoutes: [],
         notifyRoutes,
@@ -2456,6 +2579,10 @@ function mergeCallInfo(regexInfo, astInfo) {
         mergedNetworkRequestsMap.set(primaryKey, preferred);
     }
     const mergedNetworkRequests = Array.from(mergedNetworkRequestsMap.values());
+    const mergedTimingSignals = dedupeBy(
+        [...(regexInfo.timingSignals || []), ...(astInfo.timingSignals || [])],
+        item => `${item.kind || ''}::${item.callee || ''}::${item.delayMs || ''}::${item.event || ''}::${item.callbackKind || ''}::${item.callbackRef || ''}::${(item.callbackLocalCalls || []).join(',')}::${(item.callbackStateWrites || []).join(',')}`
+    );
 
     return {
         ...regexInfo,
@@ -2473,6 +2600,7 @@ function mergeCallInfo(regexInfo, astInfo) {
         callbackInvocations: uniqueSorted([...(regexInfo.callbackInvocations || []), ...(astInfo.callbackInvocations || [])]),
         stateReads: uniqueSorted([...(regexInfo.stateReads || []), ...(astInfo.stateReads || [])]),
         stateWrites: uniqueSorted([...(regexInfo.stateWrites || []), ...(astInfo.stateWrites || [])]),
+        timingSignals: mergedTimingSignals,
         httpEndpoints: dedupeBy(
             [...(regexInfo.httpEndpoints || []), ...(astInfo.httpEndpoints || [])],
             item => `${item.method || ''}::${item.path || ''}::${item.handlerName || ''}`
@@ -2501,6 +2629,10 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
         ),
         stateWrites: uniqueSorted(
             (callInfo.stateWrites || []).filter(item => !knownMethodNames.includes(String(item || '').split('.')[0]))
+        ),
+        timingSignals: dedupeBy(
+            [...(callInfo.timingSignals || [])],
+            item => `${item.kind || ''}::${item.callee || ''}::${item.delayMs || ''}::${item.event || ''}::${item.callbackKind || ''}::${item.callbackRef || ''}::${(item.callbackLocalCalls || []).join(',')}::${(item.callbackStateWrites || []).join(',')}`
         ),
         httpEndpoints: dedupeBy(
             [...(callInfo.httpEndpoints || [])],
@@ -2676,6 +2808,7 @@ function extractScriptInsights(methodRoots, context) {
                     callbackInvocations: callInfo.callbackInvocations,
                     stateReads: callInfo.stateReads,
                     stateWrites: callInfo.stateWrites,
+                    timingSignals: callInfo.timingSignals,
                     httpEndpoints: callInfo.httpEndpoints,
                     messageRoutes: callInfo.messageRoutes,
                     notifyRoutes: callInfo.notifyRoutes,

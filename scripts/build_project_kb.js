@@ -247,6 +247,9 @@ function updateProjectGlobalReport(report, graph, lookup, protocols) {
             messages: protocols.summary?.messages || 0,
             dispatchers: protocols.summary?.dispatchers || 0,
             statePatterns: protocols.summary?.statePatterns || 0,
+            timingPatterns: protocols.summary?.timingPatterns || 0,
+            phasePatterns: protocols.summary?.phasePatterns || 0,
+            transitionPatterns: protocols.summary?.transitionPatterns || 0,
             routeKinds: protocols.summary?.routeKinds || 0,
             requestProtocols: protocols.summary?.requestProtocols || 0,
         },
@@ -255,6 +258,9 @@ function updateProjectGlobalReport(report, graph, lookup, protocols) {
             'node scripts/query_project_kb.js --root <project-root>',
             'node scripts/query_project_kb.js --root <project-root> --message <message> --downstream',
             'node scripts/query_project_kb.js --root <project-root> --state <state> --upstream',
+            'node scripts/query_project_kb.js --root <project-root> --timing <query>',
+            'node scripts/query_project_kb.js --root <project-root> --phase <query>',
+            'node scripts/query_project_kb.js --root <project-root> --transition <query>',
         ]),
     };
 }
@@ -307,6 +313,9 @@ function run(argv = process.argv.slice(2)) {
             messages: protocols.summary?.messages || 0,
             dispatchers: protocols.summary?.dispatchers || 0,
             statePatterns: protocols.summary?.statePatterns || 0,
+            timingPatterns: protocols.summary?.timingPatterns || 0,
+            phasePatterns: protocols.summary?.phasePatterns || 0,
+            transitionPatterns: protocols.summary?.transitionPatterns || 0,
         },
     };
 
@@ -322,6 +331,9 @@ function run(argv = process.argv.slice(2)) {
     console.log(`- messages: ${result.counts.messages}`);
     console.log(`- dispatchers: ${result.counts.dispatchers}`);
     console.log(`- statePatterns: ${result.counts.statePatterns}`);
+    console.log(`- timingPatterns: ${result.counts.timingPatterns}`);
+    console.log(`- phasePatterns: ${result.counts.phasePatterns}`);
+    console.log(`- transitionPatterns: ${result.counts.transitionPatterns}`);
 }
 
 module.exports = {

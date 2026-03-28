@@ -26,6 +26,19 @@ node scripts/query_project_kb.js --root <repo-root> --message <message> --downst
 - handler / remote / table-msg 注册
 - state read / write 模式
 - message -> handler -> method 调用链基座
+- timer / delay 证据，例如 `setTimeout`、`scheduleOnce`
+- event / callback 驱动的异步推进
+- phase sequence：方法 -> 下一阶段方法 -> state 写入
+- transition pattern：哪个方法/消息推动了哪个 state 变化
+
+## 当前查询入口
+
+```bash
+node scripts/query_project_kb.js --root <repo-root> --message <message>
+node scripts/query_project_kb.js --root <repo-root> --timing <query>
+node scripts/query_project_kb.js --root <repo-root> --phase <query>
+node scripts/query_project_kb.js --root <repo-root> --transition <query>
+```
 
 ## 不做的事
 

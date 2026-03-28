@@ -53,6 +53,7 @@
 - `--feature <key>` 的 feature-summary 摘要输出
 - `--root <repo-root>` 的 project-summary 摘要输出
 - 推荐单入口 `query_kb.js`，`query_chain_kb.js` 作为兼容入口保留
+- `query_project_kb.js --timing/--phase/--transition` 的项目协议查询
 
 ## 配置与注册表规范
 
@@ -101,8 +102,8 @@
   - purpose: 原始抽取结果
   - useWhen: 通常不要手读；只有怀疑 extractor 漏抓时才打开
 - `project-protocols.json`
-  - purpose: 项目级协议学习结果，包含 message / dispatcher / state pattern
-  - useWhen: 排查项目自定义消息路径、状态机和 dispatcher 约定时优先看
+  - purpose: 项目级协议学习结果，包含 message / dispatcher / state / timing / phase / transition patterns
+  - useWhen: 排查项目自定义消息路径、状态机、阶段推进和时序阻塞点时优先看
 
 ### feature-summary / build-report 自描述要求
 

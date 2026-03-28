@@ -71,13 +71,13 @@ function parseTraversal(output) {
 function runVersionAssertions() {
     const versionInfo = loadSkillVersion(repoRoot);
     assert.equal(versionInfo.name, 'project-memory-manager');
-    assert.equal(versionInfo.version, '0.6.0');
+    assert.equal(versionInfo.version, '0.7.0');
     assert.ok(Array.isArray(versionInfo.capabilities) && versionInfo.capabilities.length > 0);
     assert.equal(versionInfo.upgradePolicy, 'edit-source-repo-only');
     assert.ok(String(versionInfo.rebuildCommand || '').includes('rebuild_kbs.js'));
 
     const textOutput = runWithCapturedOutput(showSkillVersion, ['--text', repoRoot], repoRoot);
-    assert.ok(textOutput.includes('project-memory-manager@0.6.0'));
+    assert.ok(textOutput.includes('project-memory-manager@0.7.0'));
     assert.ok(textOutput.includes('capabilities:'));
     assert.ok(textOutput.includes('upgradePolicy: edit-source-repo-only'));
     assert.ok(textOutput.includes('postUpdateRebuild:'));
@@ -249,17 +249,17 @@ function runFixtureAssertions() {
     assert.ok(Array.isArray(featureSummary.artifacts) && featureSummary.artifacts.some(item => item.key === 'entrypoint' && item.file === 'scripts/query_kb.js'));
     assert.ok(Array.isArray(featureSummary.examples) && featureSummary.examples.length > 0);
     assert.ok(featureSummary.examples.some(item => item.includes('scripts/query_kb.js')));
-    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, '0.6.0');
+    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, '0.7.0');
     assert.equal(featureSummary.kbVersionStatus.stale, false);
 
     const featureSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
     assert.ok(featureSummaryText.includes('scripts/query_kb.js'));
     assert.ok(featureSummaryText.includes('build.report.json'));
-    assert.ok(featureSummaryText.includes('builtWithSkill: project-memory-manager@0.6.0'));
+    assert.ok(featureSummaryText.includes('builtWithSkill: project-memory-manager@0.7.0'));
 
     assert.equal(report.kind, 'kb-build-report');
     assert.ok(report.purpose.includes('构建汇总'));
-    assert.equal(report.builtWithSkill.version, '0.6.0');
+    assert.equal(report.builtWithSkill.version, '0.7.0');
     assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('scripts/query_kb.js')));
     assert.ok(String(report.postSkillUpdateAction || '').includes('rebuild_kbs.js'));
     assert.ok(Array.isArray(report.artifacts) && report.artifacts.some(item => item.key === 'lookup'));
@@ -332,7 +332,13 @@ function runProjectGlobalAssertions() {
     assert.ok(protocols.messagePatterns.some(item => item.name === 'PKPut' && item.handlers.some(handler => handler.name === 'TableMsg.pkPut')));
     assert.ok(protocols.messagePatterns.some(item => item.name === 'PKPut' && item.senders.some(sender => sender.name === 'DaMaZiGameApi.sendPut')));
     assert.ok(protocols.stateMachinePatterns.some(item => item.message === 'PKPut' && item.state === 'waitPut'));
+    assert.ok(protocols.timingPatterns.some(item => item.ownerMethod === 'DaMaZiView.doAfterHands' && item.kind === 'scheduled-delay'));
+    assert.ok(protocols.phasePatterns.some(item => item.entryMethod === 'DaMaZiView.doAfterHands' && item.nextMethods.includes('DaMaZiView.enterPutPhase')));
+    assert.ok(protocols.transitionPatterns.some(item => item.state === 'phase' && item.driverMethod === 'DaMaZiView.doAfterHands'));
     assert.ok(report.protocolLearning.messages >= 1);
+    assert.ok(report.protocolLearning.timingPatterns >= 1);
+    assert.ok(report.protocolLearning.phasePatterns >= 1);
+    assert.ok(report.protocolLearning.transitionPatterns >= 1);
     assert.ok(report.queryExamples.some(item => item.includes('query_project_kb.js')));
 
     const nestedCwd = path.join(tempRoot, 'client', 'assets', 'script', 'game');
@@ -341,6 +347,9 @@ function runProjectGlobalAssertions() {
     );
     assert.equal(projectSummary.kind, 'project-summary');
     assert.ok(projectSummary.counts.messages >= 1);
+    assert.ok(projectSummary.counts.timingPatterns >= 1);
+    assert.ok(projectSummary.counts.phasePatterns >= 1);
+    assert.ok(projectSummary.counts.transitionPatterns >= 1);
 
     const messageDownstream = namesFromTraversal(
         runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--message', 'PKPut', '--downstream', '--depth', '3', '--json'], nestedCwd)
@@ -359,6 +368,21 @@ function runProjectGlobalAssertions() {
     );
     assert.equal(messageDetail.type, 'message');
     assert.ok(Array.isArray(messageDetail.handlers) && messageDetail.handlers.includes('TableMsg.pkPut'));
+
+    const timingPatterns = parseTraversal(
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--timing', 'doAfterHands', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(timingPatterns) && timingPatterns.some(item => item.kind === 'scheduled-delay' && item.nextMethods.includes('DaMaZiView.enterPutPhase')));
+
+    const phasePatterns = parseTraversal(
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--phase', 'doAfterHands', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(phasePatterns) && phasePatterns.some(item => item.entryMethod === 'DaMaZiView.doAfterHands'));
+
+    const transitionPatterns = parseTraversal(
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--transition', 'phase', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(transitionPatterns) && transitionPatterns.some(item => item.driverMethod === 'DaMaZiView.doAfterHands'));
 }
 
 function runRebuildAssertions() {
@@ -389,8 +413,8 @@ function runRebuildAssertions() {
 
     const rebuiltGraph = readJson(graphPath);
     const rebuiltReport = readJson(reportPath);
-    assert.equal(rebuiltGraph.builtWithSkill.version, '0.6.0');
-    assert.equal(rebuiltReport.builtWithSkill.version, '0.6.0');
+    assert.equal(rebuiltGraph.builtWithSkill.version, '0.7.0');
+    assert.equal(rebuiltReport.builtWithSkill.version, '0.7.0');
 }
 
 function runLegacyCompatibilityAssertions() {
