@@ -5,6 +5,17 @@ const path = require('path');
 const { runExtract } = require('./extract_feature_facts');
 const { hasOwn, inferArea, inferStacks, loadProjectProfile, normalize, pathExists, readJson, repoRelative, resolveProjectRoot, slugify, timestamp, writeJson } = require('./lib/common');
 const { normalizeConfig, normalizeFeatureRecord } = require('./lib/feature-kb');
+const { loadSkillVersion } = require('./show_skill_version');
+
+function loadCurrentSkillBuildInfo() {
+    const versionInfo = loadSkillVersion(path.resolve(__dirname, '..'));
+    return {
+        name: versionInfo.name || '',
+        version: versionInfo.version || '',
+        repo: versionInfo.repo || '',
+        capabilities: Array.isArray(versionInfo.capabilities) ? versionInfo.capabilities : [],
+    };
+}
 
 function parseArgs(argv) {
     const args = { config: '', root: '' };
@@ -404,6 +415,7 @@ function buildKbArtifactGuide(outputs = {}) {
 }
 
 function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup) {
+    const builtWithSkill = graph.builtWithSkill || loadCurrentSkillBuildInfo();
     const nodesByType = Object.fromEntries(
         Object.entries(lookup.nodesByType || {}).map(([type, ids]) => [type, Array.isArray(ids) ? ids.length : 0])
     );
@@ -419,6 +431,7 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
         generatedAt: timestamp(),
         featureKey: config.featureKey,
         featureName: config.featureName,
+        builtWithSkill,
         purpose: '功能知识库构建汇总与使用说明。优先用它确认 KB 覆盖范围、推荐查询入口和产物用途。',
         useWhen: '当你刚构建完 KB，或升级后不确定该查哪个文件、该先跑什么命令时。',
         configPath: repoRelative(configPath, root),
@@ -441,6 +454,7 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
             `node scripts/query_kb.js --feature ${config.featureKey} --method <name> --downstream`,
             `node scripts/query_kb.js --feature ${config.featureKey} --type method --name <keyword>`,
         ],
+        postSkillUpdateAction: 'node scripts/rebuild_kbs.js --root <project-root>',
         artifacts: buildKbArtifactGuide(outputs),
         legacyCompatibility: {
             oldOutputNamesSupported: ['graph.json', 'lookup.json', 'scan.json', 'report.json'],
@@ -1275,6 +1289,7 @@ function buildGraph(raw, config, projectProfile, root) {
         generatedAt: timestamp(),
         featureKey: config.featureKey,
         featureName: config.featureName,
+        builtWithSkill: loadCurrentSkillBuildInfo(),
         nodes,
         edges,
     };
@@ -1394,6 +1409,7 @@ function buildLookup(graph) {
         generatedAt: timestamp(),
         featureKey: graph.featureKey,
         featureName: graph.featureName,
+        builtWithSkill: graph.builtWithSkill || loadCurrentSkillBuildInfo(),
         nodesById,
         adjacency: {
             outgoing,

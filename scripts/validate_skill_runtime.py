@@ -333,6 +333,11 @@ def validate_skill_version(skill_path: Path, expected_skill_name: str = "") -> t
     release_date = str(version_info.get("releaseDate", "")).strip()
     repo = str(version_info.get("repo", "")).strip()
     capabilities = version_info.get("capabilities")
+    upgrade_policy = str(version_info.get("upgradePolicy", "")).strip()
+    upgrade_message = str(version_info.get("upgradeMessage", "")).strip()
+    install_command = str(version_info.get("installCommand", "")).strip()
+    rebuild_command = str(version_info.get("rebuildCommand", "")).strip()
+    update_commands = version_info.get("updateCommands")
 
     if not name:
         return False, "skill-version.json 缺少 'name'", None
@@ -346,6 +351,19 @@ def validate_skill_version(skill_path: Path, expected_skill_name: str = "") -> t
         return False, f"skill-version.json 的 repo 无效: {repo or '(empty)'}", None
     if not isinstance(capabilities, list) or not capabilities or any(not isinstance(item, str) or not item.strip() for item in capabilities):
         return False, "skill-version.json 的 capabilities 必须是非空字符串数组", None
+    if upgrade_policy and upgrade_policy != "edit-source-repo-only":
+        return False, f"skill-version.json 的 upgradePolicy 无效: {upgrade_policy}", None
+    if upgrade_message and len(upgrade_message) < 16:
+        return False, "skill-version.json 的 upgradeMessage 过短", None
+    if install_command and "skills add" not in install_command:
+        return False, "skill-version.json 的 installCommand 必须包含 skills add", None
+    if rebuild_command and "rebuild_kbs.js" not in rebuild_command:
+        return False, "skill-version.json 的 rebuildCommand 必须指向 rebuild_kbs.js", None
+    if update_commands is not None and (
+        not isinstance(update_commands, list)
+        or any(not isinstance(item, str) or not item.strip() for item in update_commands)
+    ):
+        return False, "skill-version.json 的 updateCommands 必须是字符串数组", None
 
     return (
         True,
@@ -356,6 +374,11 @@ def validate_skill_version(skill_path: Path, expected_skill_name: str = "") -> t
             "releaseDate": release_date,
             "repo": repo,
             "capabilities": capabilities,
+            "upgradePolicy": upgrade_policy,
+            "upgradeMessage": upgrade_message,
+            "installCommand": install_command,
+            "rebuildCommand": rebuild_command,
+            "updateCommands": update_commands or [],
         },
     )
 
@@ -372,6 +395,13 @@ def validate_required_structure(skill_path: Path) -> tuple[bool, str]:
         if not required_path.exists():
             return False, f"缺少必要路径: {required_path.relative_to(skill_path)}"
     return True, "必要目录结构完整"
+
+
+def detect_install_context(skill_path: Path) -> str:
+    normalized = str(skill_path.resolve()).replace("\\", "/").lower()
+    if "/.codex/skills/" in normalized or "/.agents/skills/" in normalized:
+        return "installed-copy"
+    return "source-repo"
 
 
 def portable_validate(skill_path: Path) -> int:
@@ -464,6 +494,14 @@ def portable_validate(skill_path: Path) -> int:
     print(f"- version: {version_info['name']}@{version_info['version']}")
     print(f"- repo: {version_info['repo']}")
     print(f"- capabilities: {', '.join(version_info['capabilities'])}")
+    if version_info.get("upgradePolicy"):
+        print(f"- upgrade-policy: {version_info['upgradePolicy']}")
+    if version_info.get("rebuildCommand"):
+        print(f"- post-update-rebuild: {version_info['rebuildCommand']}")
+    print(f"- install-context: {detect_install_context(skill_path)}")
+    if detect_install_context(skill_path) == "installed-copy":
+        print("- upgrade-policy: do not edit the installed copy directly; fix the source repo, update the skill, then rebuild KBs")
+        print(f"- post-update-rebuild: node \"{skill_path / 'scripts' / 'rebuild_kbs.js'}\" --root <project-root>")
     return 0
 
 
@@ -523,6 +561,14 @@ def strict_validate_with_yaml(skill_path: Path) -> int:
     print(f"- version: {version_info['name']}@{version_info['version']}")
     print(f"- repo: {version_info['repo']}")
     print(f"- capabilities: {', '.join(version_info['capabilities'])}")
+    if version_info.get("upgradePolicy"):
+        print(f"- upgrade-policy: {version_info['upgradePolicy']}")
+    if version_info.get("rebuildCommand"):
+        print(f"- post-update-rebuild: {version_info['rebuildCommand']}")
+    print(f"- install-context: {detect_install_context(skill_path)}")
+    if detect_install_context(skill_path) == "installed-copy":
+        print("- upgrade-policy: do not edit the installed copy directly; fix the source repo, update the skill, then rebuild KBs")
+        print(f"- post-update-rebuild: node \"{skill_path / 'scripts' / 'rebuild_kbs.js'}\" --root <project-root>")
     return 0
 
 

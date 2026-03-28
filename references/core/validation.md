@@ -11,6 +11,16 @@ node scripts/show_skill_version.js --text
 python scripts/validate_skill_runtime.py <skill-path> --mode auto
 ```
 
+## 技能升级后的推荐动作
+
+```bash
+npx skills check
+npx skills update
+node "<skill-path>/scripts/show_skill_version.js" --text
+python "<skill-path>/scripts/validate_skill_runtime.py" "<skill-path>" --mode auto
+node "<skill-path>/scripts/rebuild_kbs.js" --root <project-root>
+```
+
 ## 模式
 
 ### `auto`
@@ -35,6 +45,8 @@ python scripts/validate_skill_runtime.py <skill-path> --mode auto
 
 - 便携校验能力比完整 YAML 解析窄，但足以覆盖当前技能的 `SKILL.md` 与 `agents/openai.yaml` 结构。
 - `skill-version.json` 是公开安装版技能的版本指纹；缺失它通常说明当前安装副本仍是旧版。
+- 当 `show_skill_version.js` 或 `validate_skill_runtime.py` 判断当前路径是已安装副本时，会明确提示：不要直接修改安装副本，而是更新源仓库并重新安装/升级。
+- 技能升级后，现有 KB 可能仍是旧技能版本构建的；请运行 `rebuild_kbs.js` 统一重建。
 - `auto` 模式的默认策略是：能补环境就补环境，补不了才做最后兜底。
 - 本地 venv 默认放在运行时目录下的 `validation-tools-venv`，临时安装缓存放在 `validation-temp/` 会话目录。
 - 若要启用 TypeScript AST 抽取，可在技能目录执行 `npm install` 安装 `package.json` 中的 `typescript`，或将 `PMM_TYPESCRIPT_PATH` 指向 `typescript` 包目录。

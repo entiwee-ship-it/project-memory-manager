@@ -9,8 +9,9 @@ const cocosFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-http-sample');
 const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: queryChainKb } = require('../scripts/query_chain_kb');
 const { run: queryKb } = require('../scripts/query_kb');
+const { run: rebuildKbs } = require('../scripts/rebuild_kbs');
 const { run: refreshMemoryIndexes } = require('../scripts/refresh_memory_indexes');
-const { loadSkillVersion, run: showSkillVersion } = require('../scripts/show_skill_version');
+const { detectInstallContext, loadSkillVersion, run: showSkillVersion } = require('../scripts/show_skill_version');
 const { validateSkillVersion } = require('../scripts/validate_skill_package');
 
 function readJson(filePath) {
@@ -66,12 +67,18 @@ function parseTraversal(output) {
 function runVersionAssertions() {
     const versionInfo = loadSkillVersion(repoRoot);
     assert.equal(versionInfo.name, 'project-memory-manager');
-    assert.equal(versionInfo.version, '0.4.0');
+    assert.equal(versionInfo.version, '0.5.0');
     assert.ok(Array.isArray(versionInfo.capabilities) && versionInfo.capabilities.length > 0);
+    assert.equal(versionInfo.upgradePolicy, 'edit-source-repo-only');
+    assert.ok(String(versionInfo.rebuildCommand || '').includes('rebuild_kbs.js'));
 
     const textOutput = runWithCapturedOutput(showSkillVersion, ['--text', repoRoot], repoRoot);
-    assert.ok(textOutput.includes('project-memory-manager@0.4.0'));
+    assert.ok(textOutput.includes('project-memory-manager@0.5.0'));
     assert.ok(textOutput.includes('capabilities:'));
+    assert.ok(textOutput.includes('upgradePolicy: edit-source-repo-only'));
+    assert.ok(textOutput.includes('postUpdateRebuild:'));
+
+    assert.equal(detectInstallContext(path.join(repoRoot, '.codex', 'skills', 'project-memory-manager')), 'installed-copy');
 
     const missingVersionCheck = validateSkillVersion(pinusFixtureRoot, 'project-memory-manager');
     assert.equal(missingVersionCheck.valid, false);
@@ -161,14 +168,19 @@ function runFixtureAssertions() {
     assert.ok(Array.isArray(featureSummary.artifacts) && featureSummary.artifacts.some(item => item.key === 'entrypoint' && item.file === 'scripts/query_kb.js'));
     assert.ok(Array.isArray(featureSummary.examples) && featureSummary.examples.length > 0);
     assert.ok(featureSummary.examples.some(item => item.includes('scripts/query_kb.js')));
+    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, '0.5.0');
+    assert.equal(featureSummary.kbVersionStatus.stale, false);
 
     const featureSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
     assert.ok(featureSummaryText.includes('scripts/query_kb.js'));
     assert.ok(featureSummaryText.includes('build.report.json'));
+    assert.ok(featureSummaryText.includes('builtWithSkill: project-memory-manager@0.5.0'));
 
     assert.equal(report.kind, 'kb-build-report');
     assert.ok(report.purpose.includes('构建汇总'));
+    assert.equal(report.builtWithSkill.version, '0.5.0');
     assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('scripts/query_kb.js')));
+    assert.ok(String(report.postSkillUpdateAction || '').includes('rebuild_kbs.js'));
     assert.ok(Array.isArray(report.artifacts) && report.artifacts.some(item => item.key === 'lookup'));
     assert.ok(report.counts.nodesByType.method > 0);
 
@@ -222,6 +234,38 @@ function runFrontendHttpAssertions() {
         runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-http-sample', '--type', 'request', '--name', 'getOrderPayment', '--json'], nestedCwd)
     );
     assert.ok(Array.isArray(requestSearch) && requestSearch.some(item => item.requestHttpMethod === 'POST' && item.requestTransport === 'http-client'));
+}
+
+function runRebuildAssertions() {
+    const tempRoot = copyFixtureToTemp(pinusFixtureRoot, 'pmm-rebuild-');
+    buildFixture(tempRoot, 'pinus-kb.json', 'pinus-sample');
+
+    const graphPath = path.join(tempRoot, 'project-memory', 'kb', 'features', 'pinus-sample', 'chain.graph.json');
+    const lookupPath = path.join(tempRoot, 'project-memory', 'kb', 'features', 'pinus-sample', 'chain.lookup.json');
+    const reportPath = path.join(tempRoot, 'project-memory', 'kb', 'features', 'pinus-sample', 'build.report.json');
+    const staleGraph = readJson(graphPath);
+    const staleLookup = readJson(lookupPath);
+    const staleReport = readJson(reportPath);
+    staleGraph.builtWithSkill = { name: 'project-memory-manager', version: '0.0.0', repo: staleGraph.builtWithSkill?.repo || '' };
+    staleLookup.builtWithSkill = { name: 'project-memory-manager', version: '0.0.0', repo: staleLookup.builtWithSkill?.repo || '' };
+    staleReport.builtWithSkill = { name: 'project-memory-manager', version: '0.0.0', repo: staleReport.builtWithSkill?.repo || '' };
+    fs.writeFileSync(graphPath, `${JSON.stringify(staleGraph, null, 2)}\n`);
+    fs.writeFileSync(lookupPath, `${JSON.stringify(staleLookup, null, 2)}\n`);
+    fs.writeFileSync(reportPath, `${JSON.stringify(staleReport, null, 2)}\n`);
+
+    const nestedCwd = path.join(tempRoot, 'app', 'http', 'routes', 'activity');
+    const staleSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
+    assert.ok(staleSummaryText.includes('[stale-kb]'));
+    assert.ok(staleSummaryText.includes('rebuild_kbs.js'));
+
+    const rebuildLogs = runWithCapturedOutput(rebuildKbs, ['--root', tempRoot], repoRoot);
+    assert.ok(rebuildLogs.includes('重建 KB:'));
+    assert.ok(rebuildLogs.includes('KB 重建完成: 1 个 feature'));
+
+    const rebuiltGraph = readJson(graphPath);
+    const rebuiltReport = readJson(reportPath);
+    assert.equal(rebuiltGraph.builtWithSkill.version, '0.5.0');
+    assert.equal(rebuiltReport.builtWithSkill.version, '0.5.0');
 }
 
 function runLegacyCompatibilityAssertions() {
@@ -381,6 +425,7 @@ try {
     runVersionAssertions();
     runFixtureAssertions();
     runFrontendHttpAssertions();
+    runRebuildAssertions();
     runLegacyCompatibilityAssertions();
     runQyserverAssertions();
     console.log('pinus-backend validation passed');

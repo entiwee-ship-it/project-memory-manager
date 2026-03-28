@@ -1,13 +1,23 @@
 {
   "name": "project-memory-manager",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "releaseDate": "2026-03-28",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
+  "upgradePolicy": "edit-source-repo-only",
+  "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
+  "installCommand": "npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y",
+  "updateCommands": [
+    "npx skills check",
+    "npx skills update"
+  ],
+  "rebuildCommand": "node \"<skill-path>/scripts/rebuild_kbs.js\" --root <project-root>",
   "capabilities": [
     "pinus-backend-kb",
     "cocos-static-call-kb",
     "frontend-http-request-kb",
     "kb-query-entrypoint",
+    "kb-version-stamp",
+    "kb-post-update-rebuild",
     "auto-feature-registry-sync",
     "endpoint-route-table-graph",
     "upstream-downstream-query",

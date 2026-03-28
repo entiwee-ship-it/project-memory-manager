@@ -3,6 +3,7 @@
 const path = require('path');
 const { readJson, resolveProjectRoot } = require('./lib/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
+const { loadSkillVersion } = require('./show_skill_version');
 
 function parseArgs(argv) {
     const args = {
@@ -143,6 +144,51 @@ function loadFeatureLookup(root, featureKey) {
     }
 
     return loadFeatureLookupArtifacts(root, feature);
+}
+
+function currentSkillVersionInfo() {
+    try {
+        return loadSkillVersion(path.resolve(__dirname, '..'));
+    } catch {
+        return null;
+    }
+}
+
+function buildKbVersionStatus(graph) {
+    const currentSkill = currentSkillVersionInfo();
+    const builtWithSkill = graph?.builtWithSkill || null;
+    const stale = Boolean(
+        currentSkill
+        && builtWithSkill?.version
+        && currentSkill.version
+        && builtWithSkill.version !== currentSkill.version
+    );
+
+    return {
+        builtWithSkill: builtWithSkill || null,
+        currentSkill: currentSkill
+            ? {
+                name: currentSkill.name || '',
+                version: currentSkill.version || '',
+                repo: currentSkill.repo || '',
+            }
+            : null,
+        stale,
+        recommendedAction: stale
+            ? 'node scripts/rebuild_kbs.js --root <project-root>'
+            : '',
+    };
+}
+
+function warnIfKbStale(status) {
+    if (!status?.stale) {
+        return;
+    }
+    console.warn(
+        `[stale-kb] 当前 KB 由 ${status.builtWithSkill?.name || 'unknown'}@${status.builtWithSkill?.version || 'unknown'} 构建，`
+        + `当前技能版本是 ${status.currentSkill?.name || 'unknown'}@${status.currentSkill?.version || 'unknown'}。`
+        + ` 请先运行 ${status.recommendedAction} 重建 KB。`
+    );
 }
 
 function normalizeText(value) {
@@ -581,6 +627,7 @@ function buildFeatureSummary(feature, graph, lookup) {
     );
     const examples = buildRecommendedCommands(feature.featureKey);
     const artifacts = buildArtifactGuide(feature);
+    const kbVersionStatus = buildKbVersionStatus(graph);
 
     return {
         kind: 'feature-summary',
@@ -601,6 +648,7 @@ function buildFeatureSummary(feature, graph, lookup) {
             '再用 --downstream / --upstream 或 --method / --event / --request / --state 精确查询。',
             '只有 KB 结果不足以回答问题时，再读相关 docs；最后才用 rg/grep 回源码确认。'
         ],
+        kbVersionStatus,
         artifacts,
         examples,
     };
@@ -624,6 +672,13 @@ function printFeatureSummary(summary, asJson) {
         .forEach(([type, count]) => console.log(`  - ${type}: ${count}`));
     console.log('- defaultWorkflow:');
     (summary.defaultWorkflow || []).forEach(item => console.log(`  - ${item}`));
+    if (summary.kbVersionStatus?.builtWithSkill) {
+        console.log(`- builtWithSkill: ${summary.kbVersionStatus.builtWithSkill.name}@${summary.kbVersionStatus.builtWithSkill.version}`);
+    }
+    if (summary.kbVersionStatus?.stale) {
+        console.log(`- staleKb: yes`);
+        console.log(`- rebuild: ${summary.kbVersionStatus.recommendedAction}`);
+    }
     console.log('- artifacts:');
     (summary.artifacts || [])
         .sort((left, right) => (left.priority || 99) - (right.priority || 99))
@@ -719,6 +774,10 @@ function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
     const { feature, graph, lookup } = loadFeatureLookup(root, args.feature);
+    const kbVersionStatus = buildKbVersionStatus(graph);
+    if (!args.json) {
+        warnIfKbStale(kbVersionStatus);
+    }
 
     const traversalSpec = resolveTraversalSpec(args, graph, lookup);
     if (traversalSpec) {
@@ -734,6 +793,7 @@ function run(argv = process.argv.slice(2)) {
             {
                 inputQuery: traversalSpec.inputQuery,
                 resolvedStart: startNode ? summarizeNode(startNode, lookup) : null,
+                kbVersionStatus,
                 node: startNode,
                 direction: traversalSpec.direction,
                 depth: args.depth,
@@ -754,6 +814,7 @@ function run(argv = process.argv.slice(2)) {
                 type: 'event',
                 name: args.event,
                 bus: event.bus || '',
+                kbVersionStatus,
                 subscribers: event.subscribers || [],
                 emitters: event.emitters || [],
                 node: summarizeNode(lookup.nodesById[event.id], lookup),
@@ -784,6 +845,7 @@ function run(argv = process.argv.slice(2)) {
                 type: 'request',
                 name: args.request,
                 callee: request.callee || '',
+                kbVersionStatus,
                 callers: request.callers || [],
                 protocol: request.protocol || '',
                 httpMethod: request.httpMethod || '',
@@ -803,6 +865,7 @@ function run(argv = process.argv.slice(2)) {
             {
                 type: 'state',
                 name: args.state,
+                kbVersionStatus,
                 readers: state.readers || [],
                 writers: state.writers || [],
                 node: summarizeNode(lookup.nodesById[state.id], lookup),

@@ -34,6 +34,18 @@ node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\show_s
 python "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\validate_skill_runtime.py" "C:\Users\Administrator\.codex\skills\project-memory-manager" --mode auto
 ```
 
+技能升级完成后，建议立刻在目标项目重建现有 KB：
+
+```powershell
+node "C:\Users\Administrator\.codex\skills\project-memory-manager\scripts\rebuild_kbs.js" --root "<project-root>"
+```
+
+升级这个技能本身时，请遵循这条规则：
+
+- 不要直接修改已安装副本目录
+- 先执行 `npx skills update`
+- 最后执行 `rebuild_kbs.js`
+
 ## 这个技能解决什么问题
 
 这个技能解决的是“AI 进入复杂项目后如何稳定接管、定位、开发、沉淀”的问题。

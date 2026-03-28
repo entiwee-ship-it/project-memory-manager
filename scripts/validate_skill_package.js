@@ -175,6 +175,11 @@ function validateSkillVersion(skillPath, expectedSkillName) {
     const releaseDate = String(versionInfo.releaseDate || '').trim();
     const repo = String(versionInfo.repo || '').trim();
     const capabilities = Array.isArray(versionInfo.capabilities) ? versionInfo.capabilities : null;
+    const upgradePolicy = String(versionInfo.upgradePolicy || '').trim();
+    const upgradeMessage = String(versionInfo.upgradeMessage || '').trim();
+    const installCommand = String(versionInfo.installCommand || '').trim();
+    const rebuildCommand = String(versionInfo.rebuildCommand || '').trim();
+    const updateCommands = Array.isArray(versionInfo.updateCommands) ? versionInfo.updateCommands : null;
 
     if (!name) {
         return fail("skill-version.json 缺少 'name'");
@@ -194,6 +199,21 @@ function validateSkillVersion(skillPath, expectedSkillName) {
     if (!capabilities || capabilities.length <= 0 || capabilities.some(item => typeof item !== 'string' || !item.trim())) {
         return fail("skill-version.json 的 capabilities 必须是非空字符串数组");
     }
+    if (upgradePolicy && upgradePolicy !== 'edit-source-repo-only') {
+        return fail(`skill-version.json 的 upgradePolicy 无效: ${upgradePolicy}`);
+    }
+    if (upgradeMessage && upgradeMessage.length < 16) {
+        return fail("skill-version.json 的 upgradeMessage 过短");
+    }
+    if (installCommand && !/skills add/.test(installCommand)) {
+        return fail("skill-version.json 的 installCommand 必须包含 skills add");
+    }
+    if (rebuildCommand && !/rebuild_kbs\.js/.test(rebuildCommand)) {
+        return fail("skill-version.json 的 rebuildCommand 必须指向 rebuild_kbs.js");
+    }
+    if (updateCommands && updateCommands.some(item => typeof item !== 'string' || !item.trim())) {
+        return fail("skill-version.json 的 updateCommands 必须是字符串数组");
+    }
 
     return {
         valid: true,
@@ -204,6 +224,11 @@ function validateSkillVersion(skillPath, expectedSkillName) {
             releaseDate,
             repo,
             capabilities,
+            upgradePolicy,
+            upgradeMessage,
+            installCommand,
+            rebuildCommand,
+            updateCommands,
         },
     };
 }
@@ -265,6 +290,12 @@ function run(argv = process.argv.slice(2)) {
         console.log(`- version: ${versionResult.data.name}@${versionResult.data.version}`);
         console.log(`- repo: ${versionResult.data.repo}`);
         console.log(`- capabilities: ${versionResult.data.capabilities.join(', ')}`);
+        if (versionResult.data.upgradePolicy) {
+            console.log(`- upgrade-policy: ${versionResult.data.upgradePolicy}`);
+        }
+        if (versionResult.data.rebuildCommand) {
+            console.log(`- post-update-rebuild: ${versionResult.data.rebuildCommand}`);
+        }
     }
 }
 
