@@ -1296,19 +1296,23 @@ function buildGraph(raw, config, projectProfile, root) {
 }
 
 function buildLookup(graph) {
-    const nodesById = Object.fromEntries(graph.nodes.map(node => [node.id, node]));
-    const outgoing = {};
-    const incoming = {};
-    const events = {};
-    const messages = {};
-    const methods = {};
-    const methodAliases = {};
-    const requests = {};
-    const routes = {};
-    const endpoints = {};
-    const states = {};
-    const tables = {};
-    const nodesByType = {};
+    const nodesById = Object.create(null);
+    const outgoing = Object.create(null);
+    const incoming = Object.create(null);
+    const events = Object.create(null);
+    const messages = Object.create(null);
+    const methods = Object.create(null);
+    const methodAliases = Object.create(null);
+    const requests = Object.create(null);
+    const routes = Object.create(null);
+    const endpoints = Object.create(null);
+    const states = Object.create(null);
+    const tables = Object.create(null);
+    const nodesByType = Object.create(null);
+
+    for (const node of graph.nodes) {
+        nodesById[node.id] = node;
+    }
 
     const pushEdge = (bucket, nodeId, edge) => {
         if (!bucket[nodeId]) {
@@ -1340,7 +1344,7 @@ function buildLookup(graph) {
                 incoming: incoming[node.id] || [],
             };
             const methodName = node.meta?.methodName || label.split('.').slice(-1)[0];
-            if (!methodAliases[methodName]) {
+            if (!hasOwn(methodAliases, methodName)) {
                 methodAliases[methodName] = [];
             }
             methodAliases[methodName].push(label);

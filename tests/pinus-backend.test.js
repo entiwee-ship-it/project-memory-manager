@@ -9,6 +9,7 @@ const cocosFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-http-sample');
 const projectGlobalFixtureRoot = path.join(__dirname, 'fixtures', 'project-global-sample');
 const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: buildProjectKb } = require('../scripts/build_project_kb');
+const { buildLookup } = require('../scripts/build_chain_kb');
 const { run: queryChainKb } = require('../scripts/query_chain_kb');
 const { run: queryKb } = require('../scripts/query_kb');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
@@ -86,6 +87,83 @@ function runVersionAssertions() {
     const missingVersionCheck = validateSkillVersion(pinusFixtureRoot, 'project-memory-manager');
     assert.equal(missingVersionCheck.valid, false);
     assert.ok(missingVersionCheck.message.includes('旧版安装副本'));
+}
+
+function runPrototypePollutionAssertions() {
+    const graph = {
+        featureKey: 'prototype-safety',
+        featureName: 'Prototype Safety',
+        nodes: [
+            {
+                id: 'method:proto:constructor',
+                type: 'method',
+                name: 'Proto.constructor',
+                file: 'Proto.ts',
+                line: 1,
+                area: 'frontend',
+                stack: [],
+                meta: {
+                    methodName: 'constructor',
+                    scriptPath: 'Proto.ts',
+                },
+            },
+            {
+                id: 'method:proto:tostring',
+                type: 'method',
+                name: 'Proto.toString',
+                file: 'Proto.ts',
+                line: 2,
+                area: 'frontend',
+                stack: [],
+                meta: {
+                    methodName: 'toString',
+                    scriptPath: 'Proto.ts',
+                },
+            },
+        ],
+        edges: [],
+        builtWithSkill: {
+            name: 'project-memory-manager',
+            version: '0.6.0',
+            repo: 'https://github.com/entiwee-ship-it/project-memory-manager.git',
+        },
+    };
+
+    const lookup = buildLookup(graph);
+    assert.deepEqual(lookup.methodAliases.constructor, ['Proto.constructor']);
+    assert.deepEqual(lookup.methodAliases.toString, ['Proto.toString']);
+    assert.equal(typeof lookup.methodAliases.hasOwnProperty, 'undefined');
+    assert.equal(typeof lookup.methods.constructor, 'undefined');
+    assert.equal(lookup.methods['Proto.constructor'].id, 'method:proto:constructor');
+
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-proto-'));
+    fs.mkdirSync(path.join(tempRoot, 'project-memory', 'kb', 'features', 'prototype-safety'), { recursive: true });
+    fs.mkdirSync(path.join(tempRoot, 'project-memory', 'state'), { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'project-memory', 'kb', 'features', 'prototype-safety', 'chain.graph.json'), `${JSON.stringify(graph, null, 2)}\n`);
+    fs.writeFileSync(path.join(tempRoot, 'project-memory', 'kb', 'features', 'prototype-safety', 'chain.lookup.json'), `${JSON.stringify(lookup, null, 2)}\n`);
+    fs.writeFileSync(
+        path.join(tempRoot, 'project-memory', 'state', 'feature-registry.json'),
+        `${JSON.stringify({
+            generatedAt: null,
+            features: [
+                {
+                    featureKey: 'prototype-safety',
+                    featureName: 'Prototype Safety',
+                    kbDir: 'project-memory/kb/features/prototype-safety',
+                },
+            ],
+        }, null, 2)}\n`
+    );
+
+    const constructorSummary = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'prototype-safety', '--method', 'constructor', '--json'], tempRoot)
+    );
+    assert.equal(constructorSummary.name, 'Proto.constructor');
+
+    assert.throws(
+        () => runWithCapturedOutput(queryChainKb, ['--feature', 'prototype-safety', '--method', 'hasOwnProperty', '--json'], tempRoot),
+        /未找到方法/
+    );
 }
 
 function runFixtureAssertions() {
@@ -470,6 +548,7 @@ function runQyserverAssertions() {
 
 try {
     runVersionAssertions();
+    runPrototypePollutionAssertions();
     runFixtureAssertions();
     runFrontendHttpAssertions();
     runProjectGlobalAssertions();

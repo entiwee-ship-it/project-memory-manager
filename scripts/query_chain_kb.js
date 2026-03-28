@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { readJson, resolveProjectRoot } = require('./lib/common');
+const { hasOwn, readJson, resolveProjectRoot } = require('./lib/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
@@ -208,13 +208,21 @@ function matchContains(value, needle) {
     return normalizeText(value).includes(normalizeText(needle));
 }
 
-function resolveMethod(lookup, query) {
-    if (lookup.methods[query]) {
-        return lookup.methods[query];
+function getOwnEntry(bucket, key) {
+    if (!bucket || !hasOwn(bucket, key)) {
+        return undefined;
     }
-    const alias = lookup.methodAliases?.[query] || [];
+    return bucket[key];
+}
+
+function resolveMethod(lookup, query) {
+    const directMethod = getOwnEntry(lookup.methods, query);
+    if (directMethod) {
+        return directMethod;
+    }
+    const alias = getOwnEntry(lookup.methodAliases, query) || [];
     if (alias.length === 1) {
-        return lookup.methods[alias[0]];
+        return getOwnEntry(lookup.methods, alias[0]) || null;
     }
     if (alias.length > 1) {
         return { ambiguous: alias };
@@ -223,8 +231,9 @@ function resolveMethod(lookup, query) {
 }
 
 function resolveState(lookup, query) {
-    if (lookup.states?.[query]) {
-        return lookup.states[query];
+    const state = getOwnEntry(lookup.states, query);
+    if (state) {
+        return state;
     }
     return null;
 }
@@ -253,7 +262,7 @@ function findMatchingNodes(graph, query) {
 }
 
 function resolveNodeId(graph, lookup, query) {
-    if (lookup.nodesById[query]) {
+    if (getOwnEntry(lookup.nodesById, query)) {
         return query;
     }
     const exactNodeMatches = graph.nodes.filter(node => node.name === query || node.id === query || node.meta?.statePath === query);
@@ -272,26 +281,33 @@ function resolveNodeId(graph, lookup, query) {
     if (method?.ambiguous) {
         return { ambiguous: method.ambiguous };
     }
-    if (lookup.events[query]?.id) {
-        return lookup.events[query].id;
+    const event = getOwnEntry(lookup.events, query);
+    if (event?.id) {
+        return event.id;
     }
-    if (lookup.messages?.[query]?.id) {
-        return lookup.messages[query].id;
+    const message = getOwnEntry(lookup.messages, query);
+    if (message?.id) {
+        return message.id;
     }
-    if (lookup.requests[query]?.id) {
-        return lookup.requests[query].id;
+    const request = getOwnEntry(lookup.requests, query);
+    if (request?.id) {
+        return request.id;
     }
-    if (lookup.routes?.[query]?.id) {
-        return lookup.routes[query].id;
+    const route = getOwnEntry(lookup.routes, query);
+    if (route?.id) {
+        return route.id;
     }
-    if (lookup.endpoints?.[query]?.id) {
-        return lookup.endpoints[query].id;
+    const endpoint = getOwnEntry(lookup.endpoints, query);
+    if (endpoint?.id) {
+        return endpoint.id;
     }
-    if (lookup.tables?.[query]?.id) {
-        return lookup.tables[query].id;
+    const table = getOwnEntry(lookup.tables, query);
+    if (table?.id) {
+        return table.id;
     }
-    if (lookup.states?.[query]?.id) {
-        return lookup.states[query].id;
+    const state = getOwnEntry(lookup.states, query);
+    if (state?.id) {
+        return state.id;
     }
 
     const matches = findMatchingNodes(graph, query);
@@ -320,7 +336,7 @@ function traverse(lookup, startId, direction, depth) {
             result.push({
                 depth: current.depth + 1,
                 edge,
-                node: lookup.nodesById[nextId] || null,
+                node: getOwnEntry(lookup.nodesById, nextId) || null,
             });
             if (current.depth + 1 >= depth || visited.has(nextId)) {
                 continue;
@@ -337,8 +353,8 @@ function summarizeEdges(edges, lookup, limit = 8) {
     return (edges || []).slice(0, limit).map(edge => ({
         type: edge.type,
         sourceKind: edge.sourceKind,
-        to: lookup.nodesById[edge.to]?.name || edge.to,
-        from: lookup.nodesById[edge.from]?.name || edge.from,
+        to: getOwnEntry(lookup.nodesById, edge.to)?.name || edge.to,
+        from: getOwnEntry(lookup.nodesById, edge.from)?.name || edge.from,
         meta: edge.meta || {},
     }));
 }
@@ -720,21 +736,21 @@ function resolveTypedStart(graph, lookup, selectorType, query) {
         return method;
     }
     if (selectorType === 'event') {
-        const event = lookup.events[query];
+        const event = getOwnEntry(lookup.events, query);
         if (!event) {
             throw new Error(`未找到事件: ${query}`);
         }
         return event;
     }
     if (selectorType === 'message') {
-        const message = lookup.messages?.[query];
+        const message = getOwnEntry(lookup.messages, query);
         if (!message) {
             throw new Error(`未找到消息: ${query}`);
         }
         return message;
     }
     if (selectorType === 'request') {
-        const request = lookup.requests[query];
+        const request = getOwnEntry(lookup.requests, query);
         if (!request) {
             throw new Error(`未找到 request: ${query}`);
         }
@@ -815,7 +831,7 @@ function run(argv = process.argv.slice(2)) {
         }
 
         const startId = typeof resolved === 'string' ? resolved : resolved.id;
-        const startNode = lookup.nodesById[startId];
+        const startNode = getOwnEntry(lookup.nodesById, startId);
         printTraversal(
             {
                 inputQuery: traversalSpec.inputQuery,
@@ -832,7 +848,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     if (args.event) {
-        const event = lookup.events[args.event];
+        const event = getOwnEntry(lookup.events, args.event);
         if (!event) {
             throw new Error(`未找到事件: ${args.event}`);
         }
@@ -844,14 +860,14 @@ function run(argv = process.argv.slice(2)) {
                 kbVersionStatus,
                 subscribers: event.subscribers || [],
                 emitters: event.emitters || [],
-                node: summarizeNode(lookup.nodesById[event.id], lookup),
+                node: summarizeNode(getOwnEntry(lookup.nodesById, event.id), lookup),
             },
             args.json
         );
         return;
     }
     if (args.message) {
-        const message = lookup.messages?.[args.message];
+        const message = getOwnEntry(lookup.messages, args.message);
         if (!message) {
             throw new Error(`未找到消息: ${args.message}`);
         }
@@ -865,7 +881,7 @@ function run(argv = process.argv.slice(2)) {
                 dispatchers: message.dispatchers || [],
                 emitters: message.emitters || [],
                 handlers: message.handlers || [],
-                node: summarizeNode(lookup.nodesById[message.id], lookup),
+                node: summarizeNode(getOwnEntry(lookup.nodesById, message.id), lookup),
             },
             args.json
         );
@@ -880,11 +896,11 @@ function run(argv = process.argv.slice(2)) {
             printSummary(method, args.json);
             return;
         }
-        printSummary(summarizeNode(lookup.nodesById[method.id], lookup), args.json);
+        printSummary(summarizeNode(getOwnEntry(lookup.nodesById, method.id), lookup), args.json);
         return;
     }
     if (args.request) {
-        const request = lookup.requests[args.request];
+        const request = getOwnEntry(lookup.requests, args.request);
         if (!request) {
             throw new Error(`未找到 request: ${args.request}`);
         }
@@ -898,7 +914,7 @@ function run(argv = process.argv.slice(2)) {
                 protocol: request.protocol || '',
                 httpMethod: request.httpMethod || '',
                 transport: request.transport || '',
-                node: summarizeNode(lookup.nodesById[request.id], lookup),
+                node: summarizeNode(getOwnEntry(lookup.nodesById, request.id), lookup),
             },
             args.json
         );
@@ -916,7 +932,7 @@ function run(argv = process.argv.slice(2)) {
                 kbVersionStatus,
                 readers: state.readers || [],
                 writers: state.writers || [],
-                node: summarizeNode(lookup.nodesById[state.id], lookup),
+                node: summarizeNode(getOwnEntry(lookup.nodesById, state.id), lookup),
             },
             args.json
         );
