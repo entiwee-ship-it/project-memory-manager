@@ -10,7 +10,7 @@ project-memory-manager
 
 它用来把一个普通代码仓库接管成可持续开发的 AI 工作空间。
 
-## What This Skill Is For
+## 这个技能解决什么问题
 
 这个技能解决的是“AI 进入复杂项目后如何稳定接管、定位、开发、沉淀”的问题。
 
@@ -27,7 +27,7 @@ project-memory-manager
 - feature 级链路知识库
 - 面向前后端协同的工作协议
 
-## When This Skill Should Trigger
+## 在什么场景触发
 
 在这些场景下，AI 应该使用这个技能：
 
@@ -48,7 +48,7 @@ project-memory-manager
 - Go
 - Python
 
-## What This Skill Produces
+## 这个技能会产出什么
 
 当技能接管一个仓库后，通常会形成这些结构：
 
@@ -70,7 +70,7 @@ project-memory/
 - `project-memory/kb/`：feature 级可查询链路知识库
 - `project-memory/state/`：项目画像、active work、feature registry
 
-## How The Skill Thinks
+## 这个技能如何工作
 
 这个技能遵循 KB-first 的定位协议：
 
@@ -88,7 +88,7 @@ project-memory/
 
 这也是这个技能存在的核心原因：避免 AI 一上来就退回到全仓库搜索。
 
-## Current Extraction Capabilities
+## 当前具备的提取能力
 
 这版技能已经支持：
 
@@ -110,7 +110,7 @@ project-memory/
 
 若运行环境缺少 `typescript`，会自动回退到正则模式。
 
-## Repository Layout
+## 仓库结构
 
 ```text
 agents/       技能 UI 与 agent 接口配置
@@ -121,7 +121,7 @@ SKILL.md      技能主说明
 README.md     仓库级技能说明
 ```
 
-## Read These Files
+## 建议先读这些文件
 
 - [SKILL.md](./SKILL.md)
 - [references/core/onboarding-playbook.md](./references/core/onboarding-playbook.md)
@@ -129,7 +129,7 @@ README.md     仓库级技能说明
 - [references/core/kb-schema.md](./references/core/kb-schema.md)
 - [references/core/document-boundaries.md](./references/core/document-boundaries.md)
 
-## Notes
+## 说明
 
 - 这个仓库是技能仓库，不是通用应用仓库
 - `.runtime/`、`node_modules/`、`__pycache__/` 已被忽略，不应提交
