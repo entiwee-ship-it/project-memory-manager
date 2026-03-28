@@ -1,0 +1,31 @@
+{
+  "featureKey": "cocos-prefab-sample",
+  "featureName": "Cocos Prefab Sample",
+  "summary": "Fixture for Cocos prefab, meta, node, component, asset, and nested prefab binding extraction",
+  "extractorAdapter": "cocos",
+  "areas": [
+    "frontend"
+  ],
+  "componentRoots": [
+    "assets/script"
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "methodRoots": [
+    "assets/script"
+  ],
+  "prefabs": [
+    "assets/ui/prefabs/SamplePanel.prefab"
+  ],
+  "outputs": {
+    "scan": "project-memory/kb/features/cocos-prefab-sample/scan.raw.json",
+    "graph": "project-memory/kb/features/cocos-prefab-sample/chain.graph.json",
+    "lookup": "project-memory/kb/features/cocos-prefab-sample/chain.lookup.json",
+    "report": "project-memory/kb/features/cocos-prefab-sample/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/cocos-prefab-sample",
+    "featureIndex": "project-memory/docs/features/cocos-prefab-sample/FEATURE.md"
+  }
+}

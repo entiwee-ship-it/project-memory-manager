@@ -6,6 +6,7 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const pinusFixtureRoot = path.join(__dirname, 'fixtures', 'pinus-sample');
 const cocosFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-http-sample');
+const cocosPrefabFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-prefab-sample');
 const projectGlobalFixtureRoot = path.join(__dirname, 'fixtures', 'project-global-sample');
 const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: buildProjectKb } = require('../scripts/build_project_kb');
@@ -71,13 +72,14 @@ function parseTraversal(output) {
 function runVersionAssertions() {
     const versionInfo = loadSkillVersion(repoRoot);
     assert.equal(versionInfo.name, 'project-memory-manager');
-    assert.equal(versionInfo.version, '0.7.0');
+    assert.equal(versionInfo.version, '0.8.0');
     assert.ok(Array.isArray(versionInfo.capabilities) && versionInfo.capabilities.length > 0);
+    assert.ok(versionInfo.capabilities.includes('cocos-prefab-binding-kb'));
     assert.equal(versionInfo.upgradePolicy, 'edit-source-repo-only');
     assert.ok(String(versionInfo.rebuildCommand || '').includes('rebuild_kbs.js'));
 
     const textOutput = runWithCapturedOutput(showSkillVersion, ['--text', repoRoot], repoRoot);
-    assert.ok(textOutput.includes('project-memory-manager@0.7.0'));
+    assert.ok(textOutput.includes('project-memory-manager@0.8.0'));
     assert.ok(textOutput.includes('capabilities:'));
     assert.ok(textOutput.includes('upgradePolicy: edit-source-repo-only'));
     assert.ok(textOutput.includes('postUpdateRebuild:'));
@@ -249,17 +251,17 @@ function runFixtureAssertions() {
     assert.ok(Array.isArray(featureSummary.artifacts) && featureSummary.artifacts.some(item => item.key === 'entrypoint' && item.file === 'scripts/query_kb.js'));
     assert.ok(Array.isArray(featureSummary.examples) && featureSummary.examples.length > 0);
     assert.ok(featureSummary.examples.some(item => item.includes('scripts/query_kb.js')));
-    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, '0.7.0');
+    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, '0.8.0');
     assert.equal(featureSummary.kbVersionStatus.stale, false);
 
     const featureSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
     assert.ok(featureSummaryText.includes('scripts/query_kb.js'));
     assert.ok(featureSummaryText.includes('build.report.json'));
-    assert.ok(featureSummaryText.includes('builtWithSkill: project-memory-manager@0.7.0'));
+    assert.ok(featureSummaryText.includes('builtWithSkill: project-memory-manager@0.8.0'));
 
     assert.equal(report.kind, 'kb-build-report');
     assert.ok(report.purpose.includes('构建汇总'));
-    assert.equal(report.builtWithSkill.version, '0.7.0');
+    assert.equal(report.builtWithSkill.version, '0.8.0');
     assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('scripts/query_kb.js')));
     assert.ok(String(report.postSkillUpdateAction || '').includes('rebuild_kbs.js'));
     assert.ok(Array.isArray(report.artifacts) && report.artifacts.some(item => item.key === 'lookup'));
@@ -315,6 +317,60 @@ function runFrontendHttpAssertions() {
         runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-http-sample', '--type', 'request', '--name', 'getOrderPayment', '--json'], nestedCwd)
     );
     assert.ok(Array.isArray(requestSearch) && requestSearch.some(item => item.requestHttpMethod === 'POST' && item.requestTransport === 'http-client'));
+}
+
+function runCocosPrefabAssertions() {
+    const tempRoot = copyFixtureToTemp(cocosPrefabFixtureRoot, 'pmm-cocos-prefab-');
+    const { graph, report } = buildFixture(tempRoot, 'cocos-prefab-kb.json', 'cocos-prefab-sample');
+    const scan = readJson(path.join(tempRoot, 'project-memory', 'kb', 'features', 'cocos-prefab-sample', 'scan.raw.json'));
+
+    assert.ok(graph.nodes.some(node => node.type === 'ui-node' && node.name === 'RootPanel/StartButton'));
+    assert.ok(graph.nodes.some(node => node.type === 'binding' && node.name === 'SampleView.actionNode@RootPanel'));
+    assert.ok(graph.nodes.some(node => node.type === 'binding' && node.name === 'SampleView.slotView#override@RootPanel'));
+    assert.ok(graph.nodes.some(node => node.type === 'asset' && node.name === 'start-button'));
+    assert.ok(graph.nodes.some(node => node.type === 'component' && node.name === 'CardSlot@CardSlotRoot'));
+
+    const assetNode = graph.nodes.find(node => node.type === 'asset' && node.name === 'start-button');
+    assert.equal(assetNode.meta?.assetKind, 'SpriteFrame');
+    assert.ok(String(assetNode.meta?.assetPath || '').endsWith('/assets/ui/sprites/start-button.png'));
+
+    const bindingNode = graph.nodes.find(node => node.type === 'binding' && node.name === 'SampleView.actionButton@RootPanel');
+    assert.equal(bindingNode.meta?.bindingKind, 'component-reference');
+    assert.equal(bindingNode.meta?.editTarget, 'prefab-field');
+    assert.equal(bindingNode.meta?.targetComponentName, 'cc.Button');
+
+    const nestedOverrideNode = graph.nodes.find(node => node.type === 'binding' && node.name === 'SampleView.slotView#override@RootPanel');
+    assert.equal(nestedOverrideNode.meta?.bindingKind, 'nested-prefab-override');
+    assert.equal(nestedOverrideNode.meta?.editTarget, 'prefab-override');
+    assert.equal(nestedOverrideNode.meta?.targetComponentName, 'CardSlot');
+
+    const prefabBindingFacts = scan.prefabs?.[0]?.bindingFacts;
+    assert.ok(Array.isArray(prefabBindingFacts?.componentAttachments) && prefabBindingFacts.componentAttachments.some(item => item.componentName === 'SampleView'));
+    assert.ok(Array.isArray(prefabBindingFacts?.fieldBindings) && prefabBindingFacts.fieldBindings.some(item => item.field === 'iconSprite' && item.binding?.kind === 'asset-reference'));
+    assert.ok(Array.isArray(prefabBindingFacts?.eventBindings) && prefabBindingFacts.eventBindings.some(item => item.handler === 'onClickStart' && item.binding?.kind === 'event-handler'));
+
+    const nestedCwd = path.join(tempRoot, 'assets', 'script', 'ui');
+    const fieldBindingSearch = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-prefab-sample', '--type', 'binding', '--name', 'actionNode', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(fieldBindingSearch) && fieldBindingSearch.some(item => item.bindingKind === 'node-reference' && item.editTarget === 'prefab-field'));
+
+    const assetSearch = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-prefab-sample', '--type', 'asset', '--name', 'start-button', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(assetSearch) && assetSearch.some(item => item.assetKind === 'SpriteFrame'));
+
+    const bindingTraversal = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-prefab-sample', '--downstream', 'SampleView.actionNode@RootPanel', '--depth', '2', '--json'], nestedCwd)
+    );
+    assert.ok(bindingTraversal.includes('RootPanel/StartButton'));
+
+    const overrideTraversal = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-prefab-sample', '--downstream', 'SampleView.slotView#override@RootPanel', '--depth', '2', '--json'], nestedCwd)
+    );
+    assert.ok(overrideTraversal.includes('CardSlot@CardSlotRoot'));
+
+    assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('--type binding')));
 }
 
 function runProjectGlobalAssertions() {
@@ -413,8 +469,8 @@ function runRebuildAssertions() {
 
     const rebuiltGraph = readJson(graphPath);
     const rebuiltReport = readJson(reportPath);
-    assert.equal(rebuiltGraph.builtWithSkill.version, '0.7.0');
-    assert.equal(rebuiltReport.builtWithSkill.version, '0.7.0');
+    assert.equal(rebuiltGraph.builtWithSkill.version, '0.8.0');
+    assert.equal(rebuiltReport.builtWithSkill.version, '0.8.0');
 }
 
 function runLegacyCompatibilityAssertions() {
@@ -575,6 +631,7 @@ try {
     runPrototypePollutionAssertions();
     runFixtureAssertions();
     runFrontendHttpAssertions();
+    runCocosPrefabAssertions();
     runProjectGlobalAssertions();
     runRebuildAssertions();
     runLegacyCompatibilityAssertions();

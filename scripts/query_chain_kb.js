@@ -399,6 +399,32 @@ function summarizeNode(node, lookup) {
     if (node.type === 'table') {
         summary.importPath = node.meta?.importPath || '';
     }
+    if (node.type === 'ui-node') {
+        summary.prefabPath = node.meta?.prefabPath || '';
+        summary.nodePath = node.meta?.nodePath || node.name;
+        summary.active = node.meta?.active ?? null;
+        summary.nestedPrefabPath = node.meta?.nestedPrefabPath || '';
+    }
+    if (node.type === 'asset') {
+        summary.assetPath = node.meta?.assetPath || node.file || '';
+        summary.assetKind = node.meta?.assetKind || '';
+        summary.importer = node.meta?.importer || '';
+    }
+    if (node.type === 'binding') {
+        summary.prefabPath = node.meta?.prefabPath || '';
+        summary.nodePath = node.meta?.nodePath || '';
+        summary.componentName = node.meta?.componentName || '';
+        summary.field = node.meta?.field || '';
+        summary.bindingKind = node.meta?.bindingKind || node.meta?.kind || '';
+        summary.editTarget = node.meta?.editTarget || '';
+        summary.applyVia = node.meta?.applyVia || '';
+        summary.valueKind = node.meta?.valueKind || '';
+        summary.targetNodePath = node.meta?.targetNodePath || '';
+        summary.targetComponentName = node.meta?.targetComponentName || '';
+        summary.targetScriptPath = node.meta?.targetScriptPath || '';
+        summary.assetPath = node.meta?.assetPath || '';
+        summary.assetKind = node.meta?.assetKind || '';
+    }
 
     return summary;
 }
@@ -422,6 +448,15 @@ function searchNodes(graph, lookup, args) {
                 matchContains(node.meta?.httpMethod, args.name) ||
                 matchContains(node.meta?.transport, args.name) ||
                 matchContains(node.meta?.callee, args.name) ||
+                matchContains(node.meta?.nodePath, args.name) ||
+                matchContains(node.meta?.prefabPath, args.name) ||
+                matchContains(node.meta?.field, args.name) ||
+                matchContains(node.meta?.bindingKind, args.name) ||
+                matchContains(node.meta?.editTarget, args.name) ||
+                matchContains(node.meta?.assetPath, args.name) ||
+                matchContains(node.meta?.assetKind, args.name) ||
+                matchContains(node.meta?.targetNodePath, args.name) ||
+                matchContains(node.meta?.targetComponentName, args.name) ||
                 (node.meta?.tags || []).some(tag => matchContains(tag, args.name))
             );
         });
@@ -604,14 +639,22 @@ function printTraversal(result, asJson) {
         });
 }
 
-function buildRecommendedCommands(featureKey) {
-    return [
+function buildRecommendedCommands(featureKey, lookup = {}) {
+    const commands = [
         `node scripts/query_kb.js --feature ${featureKey}`,
         `node scripts/query_kb.js --feature ${featureKey} --downstream <query>`,
         `node scripts/query_kb.js --feature ${featureKey} --method <name> --downstream`,
         `node scripts/query_kb.js --feature ${featureKey} --type method --name <keyword>`,
         `node scripts/query_chain_kb.js --feature ${featureKey} --downstream <query>`,
     ];
+
+    if (Array.isArray(lookup.nodesByType?.binding) && lookup.nodesByType.binding.length > 0) {
+        commands.push(`node scripts/query_kb.js --feature ${featureKey} --type binding --name <field|handler>`);
+    }
+    if (Array.isArray(lookup.nodesByType?.['ui-node']) && lookup.nodesByType['ui-node'].length > 0) {
+        commands.push(`node scripts/query_kb.js --feature ${featureKey} --type ui-node --name <node-path>`);
+    }
+    return commands;
 }
 
 function buildArtifactGuide(feature) {
@@ -621,7 +664,7 @@ function buildArtifactGuide(feature) {
             key: 'entrypoint',
             file: 'scripts/query_kb.js',
             purpose: '统一查询入口，优先用于 feature 摘要、链路遍历和节点检索。',
-            useWhen: '遇到入口、关闭窗口链路、事件绑定、request、state 流转时先运行它。',
+            useWhen: '遇到入口、关闭窗口链路、prefab 事件绑定、节点/资源引用、request、state 流转时先运行它。',
             priority: 1,
         },
         {
@@ -661,14 +704,14 @@ function buildFeatureSummary(feature, graph, lookup) {
     const nodesByType = Object.fromEntries(
         Object.entries(lookup.nodesByType || {}).map(([type, ids]) => [type, Array.isArray(ids) ? ids.length : 0])
     );
-    const examples = buildRecommendedCommands(feature.featureKey);
+    const examples = buildRecommendedCommands(feature.featureKey, lookup);
     const artifacts = buildArtifactGuide(feature);
     const kbVersionStatus = buildKbVersionStatus(graph);
 
     return {
         kind: 'feature-summary',
         purpose: '功能知识库摘要与默认查询入口。先用它确认当前 feature 的范围、常见节点类型和推荐命令，再决定是否继续看 docs 或源码。',
-        useWhen: '当你还不确定该查哪个 KB 文件，或刚准备开始定位一个 feature 的入口、调用链、request、event、state 时。',
+        useWhen: '当你还不确定该查哪个 KB 文件，或刚准备开始定位一个 feature 的入口、调用链、request、event、state、prefab 绑定时。',
         feature: {
             featureKey: feature.featureKey,
             featureName: feature.featureName,
@@ -681,7 +724,7 @@ function buildFeatureSummary(feature, graph, lookup) {
         },
         defaultWorkflow: [
             '先运行 feature 摘要，确认这个 KB 里有哪些节点类型和推荐命令。',
-            '再用 --downstream / --upstream 或 --method / --event / --request / --state 精确查询。',
+            '再用 --downstream / --upstream 或 --method / --event / --request / --state / --type binding 精确查询。',
             '只有 KB 结果不足以回答问题时，再读相关 docs；最后才用 rg/grep 回源码确认。'
         ],
         kbVersionStatus,

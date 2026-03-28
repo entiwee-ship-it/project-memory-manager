@@ -1,0 +1,37 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "data": {
+      "__id__": 1
+    }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "CardSlotRoot",
+    "_children": [],
+    "_components": [
+      {
+        "__id__": 2
+      }
+    ],
+    "_prefab": {
+      "__id__": 3
+    },
+    "_active": true
+  },
+  {
+    "__type__": "22222222-2222-2222-2222-222222222222",
+    "node": {
+      "__id__": 1
+    },
+    "__prefab": {
+      "__id__": 4
+    }
+  },
+  {
+    "__type__": "cc.PrefabInfo"
+  },
+  {
+    "fileId": "card-slot-view"
+  }
+]

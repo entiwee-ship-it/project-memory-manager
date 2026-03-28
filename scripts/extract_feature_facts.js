@@ -258,6 +258,17 @@ function collectPrefabMeta(assetRoots, context) {
     return map;
 }
 
+function collectAssetMeta(assetRoots, context) {
+    const map = new Map();
+    for (const adapter of context.adapters) {
+        const adapterMap = adapter.collectAssetMeta?.(assetRoots, context) || new Map();
+        for (const [key, value] of adapterMap.entries()) {
+            map.set(key, value);
+        }
+    }
+    return map;
+}
+
 function cleanDocBlock(docBlock) {
     return docBlock
         .replace(/^\/\*\*[\r\n]?/, '')
@@ -2842,7 +2853,7 @@ function extractScriptInsights(methodRoots, context) {
     return result;
 }
 
-function createAnalyzer(prefabPath, scriptMetaMap, prefabMetaMap, prefabCache) {
+function createAnalyzer(prefabPath, scriptMetaMap, prefabMetaMap, assetMetaMap, prefabCache) {
     const normalizedPrefabPath = normalize(prefabPath);
     if (prefabCache.has(normalizedPrefabPath)) {
         return prefabCache.get(normalizedPrefabPath);
@@ -2854,6 +2865,7 @@ function createAnalyzer(prefabPath, scriptMetaMap, prefabMetaMap, prefabCache) {
         objects,
         scriptMetaMap,
         prefabMetaMap,
+        assetMetaMap,
         prefabCache,
         pathByNodeId: new Map(),
         infoByNodeId: new Map(),
@@ -2863,6 +2875,11 @@ function createAnalyzer(prefabPath, scriptMetaMap, prefabMetaMap, prefabCache) {
         customComponents: [],
         keyNodes: [],
         events: [],
+        bindingFacts: {
+            componentAttachments: [],
+            fieldBindings: [],
+            eventBindings: [],
+        },
         rootNodeId: objects?.[0]?.data?.__id__ ?? 1,
     };
     prefabCache.set(normalizedPrefabPath, analyzer);
@@ -2874,6 +2891,7 @@ function createAnalyzer(prefabPath, scriptMetaMap, prefabMetaMap, prefabCache) {
     analyzer.keyNodes = collectKeyNodes(analyzer);
     analyzer.customComponents = collectCustomComponents(analyzer);
     analyzer.events = collectEvents(analyzer);
+    analyzer.bindingFacts = collectBindingFacts(analyzer);
 
     return analyzer;
 }
@@ -3054,6 +3072,117 @@ function isCustomComponent(componentObject, scriptMetaMap) {
     return Boolean(scriptMetaMap.get(componentObject.__type__)) || !componentObject.__type__.startsWith('cc.');
 }
 
+function createBindingDescriptor(partial = {}) {
+    return {
+        owner: 'prefab',
+        scriptChangeRequired: false,
+        ...partial,
+    };
+}
+
+function describeComponentAttachment(nodeInfo, descriptor, prefabPath) {
+    return createBindingDescriptor({
+        kind: 'component-attachment',
+        editTarget: 'prefab-component-list',
+        applyVia: 'attach-script-to-node',
+        prefabPath,
+        nodePath: nodeInfo.path,
+        componentName: descriptor.name,
+        scriptPath: descriptor.scriptPath || null,
+    });
+}
+
+function describeSerializedFieldBinding(fieldName, describedValue) {
+    const base = {
+        field: fieldName,
+        valueKind: describedValue.kind,
+        editTarget: 'prefab-field',
+        applyVia: 'serialized-field',
+    };
+
+    if (describedValue.kind === 'node') {
+        return createBindingDescriptor({
+            ...base,
+            kind: 'node-reference',
+            targetNodePath: describedValue.nodePath || null,
+            nestedPrefabPath: describedValue.nestedPrefabPath || null,
+        });
+    }
+
+    if (describedValue.kind === 'component') {
+        return createBindingDescriptor({
+            ...base,
+            kind: 'component-reference',
+            targetNodePath: describedValue.nodePath || null,
+            targetComponentName: describedValue.componentName || null,
+            targetScriptPath: describedValue.scriptPath || null,
+        });
+    }
+
+    if (describedValue.kind === 'asset') {
+        return createBindingDescriptor({
+            ...base,
+            kind: 'asset-reference',
+            assetPath: describedValue.assetPath || null,
+            assetKind: describedValue.assetKind || null,
+            importer: describedValue.importer || null,
+            subAssetName: describedValue.subAssetName || null,
+        });
+    }
+
+    if (describedValue.kind === 'array') {
+        return createBindingDescriptor({
+            ...base,
+            kind: 'serialized-collection',
+        });
+    }
+
+    if (describedValue.kind === 'object') {
+        return createBindingDescriptor({
+            ...base,
+            kind: 'serialized-object',
+        });
+    }
+
+    if (describedValue.kind === 'reference') {
+        return createBindingDescriptor({
+            ...base,
+            kind: 'unresolved-reference',
+            targetType: describedValue.targetType || null,
+        });
+    }
+
+    return createBindingDescriptor({
+        ...base,
+        kind: 'serialized-value',
+    });
+}
+
+function describeFieldOverrideBinding(propertyPath, targetNodePath, nestedPrefabPath, resolvedTarget) {
+    return createBindingDescriptor({
+        kind: 'nested-prefab-override',
+        field: propertyPath,
+        editTarget: 'prefab-override',
+        applyVia: 'target-override-info',
+        targetNodePath: targetNodePath || null,
+        nestedPrefabPath: nestedPrefabPath || null,
+        targetComponentName: resolvedTarget?.componentName || null,
+        targetScriptPath: resolvedTarget?.scriptPath || null,
+    });
+}
+
+function describeEventBinding(eventInfo) {
+    return createBindingDescriptor({
+        kind: 'event-handler',
+        editTarget: 'prefab-event-binding',
+        applyVia: eventInfo.sourceKind,
+        targetNodePath: eventInfo.targetNodePath || null,
+        targetComponentName: eventInfo.targetComponentName || null,
+        targetScriptPath: eventInfo.targetScriptPath || null,
+        handler: eventInfo.handler || '',
+    });
+}
+
 function collectCustomComponents(analyzer) {
     const components = [];
 
@@ -3072,6 +3201,7 @@ function collectCustomComponents(analyzer) {
                 componentName: descriptor.name,
                 scriptPath: descriptor.scriptPath,
                 rawType: descriptor.rawType,
+                componentBinding: describeComponentAttachment(nodeInfo, descriptor, analyzer.prefabPath),
                 serializedFields: collectSerializedFields(componentObject, analyzer),
                 fieldOverrides: collectFieldOverrides(componentId, analyzer),
             });
@@ -3095,6 +3225,10 @@ function collectSerializedFields(componentObject, analyzer) {
         });
     }
 
+    fields.forEach(field => {
+        field.binding = describeSerializedFieldBinding(field.field, field.value);
+    });
+
     return fields;
 }
 
@@ -3115,7 +3249,13 @@ function collectFieldOverrides(componentId, analyzer) {
         let resolvedTarget = null;
 
         if (nestedPrefabInfo?.nestedPrefabPath && localId) {
-            const nestedAnalyzer = createAnalyzer(path.resolve(nestedPrefabInfo.nestedPrefabPath), analyzer.scriptMetaMap, analyzer.prefabMetaMap, analyzer.prefabCache);
+            const nestedAnalyzer = createAnalyzer(
+                path.resolve(nestedPrefabInfo.nestedPrefabPath),
+                analyzer.scriptMetaMap,
+                analyzer.prefabMetaMap,
+                analyzer.assetMetaMap,
+                analyzer.prefabCache
+            );
             const nestedComponent = nestedAnalyzer.componentByFileId.get(localId);
             if (nestedComponent) {
                 const nestedDescriptor = getComponentDescriptor(nestedComponent.object, analyzer.scriptMetaMap);
@@ -3135,6 +3275,12 @@ function collectFieldOverrides(componentId, analyzer) {
             targetNodePath: targetNodeInfo?.path || null,
             nestedPrefabPath: nestedPrefabInfo?.nestedPrefabPath || null,
             resolvedTarget,
+            binding: describeFieldOverrideBinding(
+                propertyPath,
+                targetNodeInfo?.path || null,
+                nestedPrefabInfo?.nestedPrefabPath || null,
+                resolvedTarget
+            ),
         });
     });
 
@@ -3153,6 +3299,19 @@ function describeValue(value, analyzer) {
     }
     if (typeof value !== 'object') {
         return { kind: 'primitive', value };
+    }
+    if (value.__uuid__ != null) {
+        const assetInfo = analyzer.assetMetaMap?.get(value.__uuid__) || null;
+        return {
+            kind: 'asset',
+            uuid: assetInfo?.uuid || value.__uuid__,
+            assetPath: assetInfo?.path || null,
+            assetName: assetInfo?.name || null,
+            assetKind: assetInfo?.assetKind || null,
+            importer: assetInfo?.importer || null,
+            subAssetName: assetInfo?.subAssetName || null,
+            isPrefab: Boolean(assetInfo?.isPrefab),
+        };
     }
     if (value.__id__ == null) {
         return { kind: 'object', value };
@@ -3215,6 +3374,11 @@ function collectEvents(analyzer) {
                         sourceKind,
                         ...extra,
                         ...resolvedEvent,
+                        binding: describeEventBinding({
+                            sourceKind,
+                            ...extra,
+                            ...resolvedEvent,
+                        }),
                     });
                 }
             };
@@ -3241,6 +3405,61 @@ function collectEvents(analyzer) {
     });
 
     return eventList;
+}
+
+function collectBindingFacts(analyzer) {
+    const componentAttachments = [];
+    const fieldBindings = [];
+    const eventBindings = [];
+
+    for (const component of analyzer.customComponents || []) {
+        if (component.componentBinding) {
+            componentAttachments.push({
+                nodePath: component.nodePath,
+                componentName: component.componentName,
+                scriptPath: component.scriptPath || null,
+                ...component.componentBinding,
+            });
+        }
+
+        for (const field of component.serializedFields || []) {
+            fieldBindings.push({
+                nodePath: component.nodePath,
+                componentName: component.componentName,
+                scriptPath: component.scriptPath || null,
+                field: field.field,
+                value: field.value,
+                binding: field.binding,
+            });
+        }
+
+        for (const override of component.fieldOverrides || []) {
+            fieldBindings.push({
+                nodePath: component.nodePath,
+                componentName: component.componentName,
+                scriptPath: component.scriptPath || null,
+                field: override.field,
+                override: true,
+                targetNodePath: override.targetNodePath || null,
+                nestedPrefabPath: override.nestedPrefabPath || null,
+                resolvedTarget: override.resolvedTarget || null,
+                binding: override.binding,
+            });
+        }
+    }
+
+    for (const eventInfo of analyzer.events || []) {
+        eventBindings.push({
+            ...eventInfo,
+            binding: eventInfo.binding || describeEventBinding(eventInfo),
+        });
+    }
+
+    return {
+        componentAttachments,
+        fieldBindings,
+        eventBindings,
+    };
 }
 
 function dereference(ref, objects) {
@@ -3304,6 +3523,9 @@ function collectTrackedFiles(prefabs, scripts) {
                 if (value?.kind === 'component') {
                     addFile(value.scriptPath);
                 }
+                if (value?.kind === 'asset') {
+                    addFile(value.assetPath);
+                }
             }
 
             for (const override of ensureArray(component.fieldOverrides)) {
@@ -3333,17 +3555,19 @@ function runScan(rawArgs = process.argv.slice(2)) {
     const extractContext = createExtractContext(args, process.cwd());
     const scriptMetaMap = collectScriptMeta(args.componentRoots.map(root => path.resolve(root)), extractContext);
     const prefabMetaMap = collectPrefabMeta(args.assetRoots.map(root => path.resolve(root)), extractContext);
+    const assetMetaMap = collectAssetMeta(args.assetRoots.map(root => path.resolve(root)), extractContext);
     const scripts = extractScriptInsights(args.methodRoots.map(root => path.resolve(root)), extractContext);
     const prefabCache = new Map();
 
     const prefabs = args.prefabs.map(prefabPath => {
         const resolvedPrefabPath = path.resolve(prefabPath);
-        const analyzer = createAnalyzer(resolvedPrefabPath, scriptMetaMap, prefabMetaMap, prefabCache);
+        const analyzer = createAnalyzer(resolvedPrefabPath, scriptMetaMap, prefabMetaMap, assetMetaMap, prefabCache);
         return {
             prefabPath: analyzer.prefabPath,
             keyNodes: analyzer.keyNodes,
             customComponents: analyzer.customComponents,
             events: analyzer.events,
+            bindingFacts: analyzer.bindingFacts,
         };
     });
 

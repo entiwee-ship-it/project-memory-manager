@@ -3,12 +3,17 @@
 ## 使用场景
 
 - 当前端区域是 Cocos Creator 项目时使用
-- 当 prefab 绑定与组件脚本是主要入口时使用
+- 当 prefab 绑定、组件脚本、`.meta` UUID、nested prefab override 是主要入口时使用
 
 ## 关注点
 
 - prefab 根节点
+- prefab 节点路径
 - 自定义组件
+- 脚本 `.ts.meta` UUID 与组件类型的映射
+- 资源 `.meta` UUID 与 `SpriteFrame / Prefab / AudioClip / JsonAsset` 的映射
+- serialized field 的节点 / 组件 / 资源引用
+- nested prefab override
 - click / toggle / 列表渲染事件绑定
 - VM 路径
 - 事件总线链路
@@ -27,9 +32,66 @@
   - `axios.get/post/put/delete(url, ...)`
   - `axios.request({ url, method, ... })`
   - `axios({ url, method, ... })`
+- 读取 `.ts.meta`，把 prefab 里的脚本组件 `__type__` / event `_componentId` 还原成真实脚本
+- 读取通用资源 `.meta` 与 `subMetas`，把 prefab 里的 `__uuid__` 还原成真实资源路径
+- 识别 prefab 中的：
+  - 组件挂载：脚本挂在哪个节点上
+  - 字段绑定：脚本字段当前引用的是节点、组件、资源还是普通值
+  - nested prefab override：字段绑定其实落在嵌套预制体的哪个组件上
+  - 事件绑定：按钮 / Toggle / 列表事件最终绑到哪个脚本方法
+
+## 绑定语义
+
+这层最容易被 AI 搞混，所以现在的知识库会显式区分：
+
+- `component-attachment`
+  - 含义：某个脚本组件被挂到某个节点上
+  - 应该改哪里：`prefab` 的组件列表
+  - 不是：改脚本文件本身就能让它自动挂上去
+- `node-reference`
+  - 含义：脚本字段当前引用了某个节点
+  - 应该改哪里：`prefab` 的 serialized field
+- `component-reference`
+  - 含义：脚本字段当前引用了某个组件
+  - 应该改哪里：`prefab` 的 serialized field
+- `asset-reference`
+  - 含义：脚本字段当前引用了某个资源 UUID，例如 `SpriteFrame / Prefab / AudioClip`
+  - 应该改哪里：`prefab` 的 serialized field
+- `nested-prefab-override`
+  - 含义：当前 prefab 没有直接持有目标组件，而是通过 override 指向 nested prefab 内部组件
+  - 应该改哪里：当前 prefab 的 override 数据，而不是直接改嵌套脚本
+- `event-handler`
+  - 含义：Button / Toggle / ScrollView 的事件列表里挂了脚本方法
+  - 应该改哪里：`prefab` 的事件配置
+
+## 什么时候改脚本，什么时候改 prefab
+
+- 想把脚本挂到另一个节点：改 `prefab`，不是改脚本
+- 想把脚本字段改绑到另一个节点 / 组件 / 资源：改 `prefab` serialized field
+- 想改默认行为、增加新字段、改方法逻辑：改脚本
+- 想让编辑器里多一个可绑定字段：先改脚本定义，再去 `prefab` 里赋值
+- 想改按钮点击后调用哪个方法：改 `prefab` 事件绑定
+- 想改 nested prefab 内部某个目标组件的外部引用：优先看 override，而不是直接猜脚本
+
+## 推荐查询
+
+- `node scripts/query_kb.js --feature <feature-key>`
+- `node scripts/query_kb.js --feature <feature-key> --type binding --name <field|handler>`
+- `node scripts/query_kb.js --feature <feature-key> --type ui-node --name <node-path>`
+- `node scripts/query_kb.js --feature <feature-key> --type asset --name <asset-name>`
+- `node scripts/query_chain_kb.js --feature <feature-key> --downstream <binding-node-name>`
+
+## 推荐理解顺序
+
+- 先看 `component-attachment`，确认脚本实际挂在哪个节点
+- 再看 `binding` 节点，确认字段当前绑的是节点、组件还是资源
+- 再看 `event-handler`，确认按钮 / Toggle / 列表事件到底调了哪个方法
+- 如果目标节点来自 nested prefab，再顺着 `nested-prefab-override` 往下查
 
 ## 当前限制
 
 - 动态拼接后的 URL 目前只保留原始表达式，不做跨变量求值
 - `HttpClient.getInstance().request(config)` 这类“config 变量来自更早赋值”的场景，还不会反推出内层 `url/method`
 - 还没有实现前后端自动联查；前端 `request` 节点与后端 `endpoint/route` 节点仍需分别查询
+- 目前仍然是静态分析，不会真的打开 Cocos 编辑器去回放场景操作
+- 对没有出现在 prefab 里的“潜在可绑定字段”，知识库不会凭空猜；它只报告当前实际序列化出来的绑定

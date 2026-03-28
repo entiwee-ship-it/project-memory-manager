@@ -1,0 +1,150 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "data": {
+      "__id__": 1
+    }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "RootPanel",
+    "_children": [
+      {
+        "__id__": 2
+      },
+      {
+        "__id__": 3
+      }
+    ],
+    "_components": [
+      {
+        "__id__": 8
+      }
+    ],
+    "_prefab": {
+      "__id__": 12
+    },
+    "_active": true
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "StartButton",
+    "_children": [],
+    "_components": [
+      {
+        "__id__": 4
+      }
+    ],
+    "_prefab": {
+      "__id__": 13
+    },
+    "_active": true
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "CardSlot",
+    "_children": [],
+    "_components": [],
+    "_prefab": {
+      "__id__": 7
+    },
+    "_active": true
+  },
+  {
+    "__type__": "cc.Button",
+    "node": {
+      "__id__": 2
+    },
+    "clickEvents": [
+      {
+        "__id__": 9
+      }
+    ],
+    "__prefab": {
+      "__id__": 15
+    }
+  },
+  {
+    "__type__": "cc.PrefabInstance",
+    "propertyOverrides": []
+  },
+  {
+    "__type__": "cc.TargetOverrideInfo",
+    "source": {
+      "__id__": 8
+    },
+    "propertyPath": [
+      "slotView"
+    ],
+    "target": {
+      "__id__": 3
+    },
+    "targetInfo": {
+      "__id__": 11
+    }
+  },
+  {
+    "__type__": "cc.PrefabInfo",
+    "asset": {
+      "__uuid__": "44444444-4444-4444-4444-444444444444"
+    },
+    "instance": {
+      "__id__": 10
+    }
+  },
+  {
+    "__type__": "11111111-1111-1111-1111-111111111111",
+    "node": {
+      "__id__": 1
+    },
+    "actionNode": {
+      "__id__": 2
+    },
+    "actionButton": {
+      "__id__": 4
+    },
+    "iconSprite": {
+      "__uuid__": "66666666-6666-6666-6666-666666666666"
+    },
+    "slotPrefab": {
+      "__uuid__": "44444444-4444-4444-4444-444444444444"
+    },
+    "delayMs": 0.25,
+    "__prefab": {
+      "__id__": 16
+    }
+  },
+  {
+    "__type__": "cc.ClickEvent",
+    "target": {
+      "__id__": 1
+    },
+    "_componentId": "11111111-1111-1111-1111-111111111111",
+    "handler": "onClickStart",
+    "customEventData": "primary"
+  },
+  {
+    "__type__": "cc.PrefabInstance",
+    "propertyOverrides": []
+  },
+  {
+    "localID": [
+      "card-slot-view"
+    ]
+  },
+  {
+    "__type__": "cc.PrefabInfo"
+  },
+  {
+    "__type__": "cc.PrefabInfo"
+  },
+  {
+    "__type__": "cc.PrefabInfo"
+  },
+  {
+    "fileId": "button-comp"
+  },
+  {
+    "fileId": "sample-view-comp"
+  }
+]

@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "releaseDate": "2026-03-28",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -14,6 +14,7 @@
   "capabilities": [
     "pinus-backend-kb",
     "cocos-static-call-kb",
+    "cocos-prefab-binding-kb",
     "frontend-http-request-kb",
     "kb-query-entrypoint",
     "kb-version-stamp",

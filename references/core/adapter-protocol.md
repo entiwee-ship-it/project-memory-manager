@@ -44,6 +44,7 @@
 - `resolveImportPath(specifier, scriptFile, context)`
 - `collectScriptMeta(componentRoots, context)`
 - `collectPrefabMeta(assetRoots, context)`
+- `collectAssetMeta(assetRoots, context)`
 
 ### 可选扩展
 
@@ -57,6 +58,7 @@
 
 - 提供技术栈相关的导入路径解析
 - 提供脚本元数据与资源元数据补充能力
+- 对需要 UUID 反解的框架，返回脚本 / prefab / 资源的可追踪映射
 - 让主抽取器在统一 KB schema 下输出事实
 
 ## 演进规则

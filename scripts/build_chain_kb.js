@@ -380,7 +380,7 @@ function buildKbArtifactGuide(outputs = {}) {
             key: 'entrypoint',
             file: 'scripts/query_kb.js',
             purpose: '统一知识库查询入口，优先用于 feature 摘要、链路遍历和节点检索。',
-            useWhen: '遇到入口、关闭窗口链路、request、事件绑定、状态流转时先运行。',
+            useWhen: '遇到入口、关闭窗口链路、prefab 事件绑定、节点/资源引用、request、状态流转时先运行。',
             priority: 1,
         },
         {
@@ -425,6 +425,16 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
         lookup: repoRelative(outputPaths.lookup.canonicalPath, root),
         report: repoRelative(outputPaths.report.canonicalPath, root),
     };
+    const queryExamples = [
+        `node scripts/query_kb.js --feature ${config.featureKey}`,
+        `node scripts/query_kb.js --feature ${config.featureKey} --downstream <query>`,
+        `node scripts/query_kb.js --feature ${config.featureKey} --method <name> --downstream`,
+        `node scripts/query_kb.js --feature ${config.featureKey} --type method --name <keyword>`,
+    ];
+    if ((raw.prefabs || []).length > 0) {
+        queryExamples.push(`node scripts/query_kb.js --feature ${config.featureKey} --type binding --name <field|handler>`);
+        queryExamples.push(`node scripts/query_kb.js --feature ${config.featureKey} --type ui-node --name <node-path>`);
+    }
 
     return {
         kind: 'kb-build-report',
@@ -433,7 +443,7 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
         featureName: config.featureName,
         builtWithSkill,
         purpose: '功能知识库构建汇总与使用说明。优先用它确认 KB 覆盖范围、推荐查询入口和产物用途。',
-        useWhen: '当你刚构建完 KB，或升级后不确定该查哪个文件、该先跑什么命令时。',
+        useWhen: '当你刚构建完 KB，或升级后不确定该查哪个文件、该先跑什么命令，尤其是 prefab/meta 绑定问题该怎么查时。',
         configPath: repoRelative(configPath, root),
         outputs,
         counts: {
@@ -445,15 +455,10 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
         },
         defaultWorkflow: [
             '先运行 node scripts/query_kb.js --feature <feature-key> 查看 feature 摘要。',
-            '再用 --downstream / --upstream 或 --method / --event / --request / --state 做精确查询。',
+            '再用 --downstream / --upstream 或 --method / --event / --request / --state / --type binding 做精确查询。',
             '只有 KB 结果不足以回答问题时，再读 docs；最后才用 rg/grep 回源码确认。'
         ],
-        queryExamples: [
-            `node scripts/query_kb.js --feature ${config.featureKey}`,
-            `node scripts/query_kb.js --feature ${config.featureKey} --downstream <query>`,
-            `node scripts/query_kb.js --feature ${config.featureKey} --method <name> --downstream`,
-            `node scripts/query_kb.js --feature ${config.featureKey} --type method --name <keyword>`,
-        ],
+        queryExamples,
         postSkillUpdateAction: 'node scripts/rebuild_kbs.js --root <project-root>',
         artifacts: buildKbArtifactGuide(outputs),
         legacyCompatibility: {
@@ -782,6 +787,120 @@ function buildGraph(raw, config, projectProfile, root) {
     };
 
     const makeComponentKey = (prefabPath, nodePath, componentName) => [prefabPath, nodePath || '', componentName || ''].join('::');
+    const makeUiNodeKey = (prefabPath, nodePath) => [prefabPath, nodePath || ''].join('::');
+    const uiNodeMap = new Map();
+
+    const ensureUiNode = (prefabPath, nodeInfo = {}) => {
+        const nodePath = nodeInfo.path || nodeInfo.nodePath || '';
+        const key = makeUiNodeKey(prefabPath, nodePath);
+        const existingNodeId = uiNodeMap.get(key);
+        if (existingNodeId) {
+            return nodeMap.get(existingNodeId);
+        }
+
+        const uiNode = addNode({
+            id: makeNodeId('ui-node', prefabPath, nodePath),
+            type: 'ui-node',
+            name: nodePath || path.basename(prefabPath, path.extname(prefabPath)),
+            file: prefabPath,
+            area: 'frontend',
+            stack: inferStacks('frontend', projectProfile),
+            meta: {
+                prefabPath,
+                nodePath,
+                active: nodeInfo.active ?? null,
+                nestedPrefabPath: nodeInfo.nestedPrefabPath || null,
+            },
+        });
+        appendNodeTags(uiNode, nodePath, prefabPath, nodeInfo.nestedPrefabPath || '', 'ui-node');
+        uiNodeMap.set(key, uiNode.id);
+        return uiNode;
+    };
+
+    const ensureAssetNode = assetInfo => {
+        const assetPath = assetInfo.assetPath || assetInfo.path || '';
+        const assetName = assetInfo.assetName || assetInfo.name || path.basename(assetPath || assetInfo.uuid || '', path.extname(assetPath || ''));
+        const assetNode = addNode({
+            id: makeNodeId('asset', assetPath || assetInfo.uuid || assetName, assetName),
+            type: 'asset',
+            name: assetName,
+            file: assetPath,
+            area: 'frontend',
+            stack: inferStacks('frontend', projectProfile),
+            meta: {
+                assetKind: assetInfo.assetKind || '',
+                importer: assetInfo.importer || '',
+                assetPath,
+                uuid: assetInfo.uuid || '',
+                subAssetName: assetInfo.subAssetName || '',
+            },
+        });
+        appendNodeTags(assetNode, assetName, assetPath, assetInfo.assetKind || '', assetInfo.subAssetName || '', 'asset');
+        return assetNode;
+    };
+
+    const ensureBindingNode = (prefabPath, component, bindingKey, bindingMeta = {}) => {
+        const bindingNode = addNode({
+            id: makeNodeId('binding', prefabPath, component.nodePath, component.componentName, bindingKey),
+            type: 'binding',
+            name: `${component.componentName}.${bindingKey}@${component.nodePath}`,
+            file: prefabPath,
+            area: 'frontend',
+            stack: inferStacks('frontend', projectProfile),
+            meta: {
+                prefabPath,
+                nodePath: component.nodePath,
+                componentName: component.componentName,
+                ...bindingMeta,
+            },
+        });
+        appendNodeTags(
+            bindingNode,
+            bindingKey,
+            component.componentName,
+            component.nodePath,
+            bindingMeta.bindingKind || bindingMeta.kind || '',
+            bindingMeta.editTarget || '',
+            bindingMeta.assetPath || '',
+            bindingMeta.targetNodePath || '',
+            bindingMeta.targetComponentName || '',
+            'binding'
+        );
+        return bindingNode;
+    };
+
+    const ensurePrefabComponentNode = componentInfo => {
+        const componentNode = addNode({
+            id: makeNodeId('component', componentInfo.prefabPath, componentInfo.nodePath, componentInfo.componentName),
+            type: 'component',
+            name: `${componentInfo.componentName}@${componentInfo.nodePath}`,
+            file: componentInfo.scriptPath || componentInfo.prefabPath,
+            area: componentInfo.scriptPath ? inferNodeArea(componentInfo.scriptPath) : 'frontend',
+            stack: componentInfo.scriptPath
+                ? inferStacks(inferNodeArea(componentInfo.scriptPath), projectProfile)
+                : inferStacks('frontend', projectProfile),
+            meta: {
+                prefabPath: componentInfo.prefabPath,
+                nodePath: componentInfo.nodePath,
+                rawType: componentInfo.rawType || componentInfo.componentName,
+                category: componentInfo.category || 'prefab-component',
+                bindingKind: componentInfo.bindingKind || 'component-attachment',
+                editTarget: componentInfo.editTarget || 'prefab-component-list',
+                applyVia: componentInfo.applyVia || 'attach-script-to-node',
+            },
+        });
+        appendNodeTags(
+            componentNode,
+            componentInfo.componentName,
+            componentInfo.nodePath,
+            componentInfo.rawType || '',
+            componentInfo.scriptPath || '',
+            componentInfo.bindingKind || 'component-attachment',
+            componentInfo.editTarget || 'prefab-component-list'
+        );
+        componentNodeMap.set(makeComponentKey(componentInfo.prefabPath, componentInfo.nodePath, componentInfo.componentName), componentNode.id);
+        return componentNode;
+    };
 
     addNode({
         id: featureId,
@@ -809,29 +928,181 @@ function buildGraph(raw, config, projectProfile, root) {
         });
         appendNodeTags(prefabNode, prefab.prefabPath, prefabNode.name, 'prefab');
         addEdge({ from: featureId, to: prefabNode.id, type: 'contains', sourceKind: 'prefab', area: 'frontend' });
+        const keyNodeInfoMap = new Map((prefab.keyNodes || []).map(nodeInfo => [nodeInfo.path, nodeInfo]));
+
+        for (const keyNode of prefab.keyNodes || []) {
+            const uiNode = ensureUiNode(prefab.prefabPath, keyNode);
+            addEdge({ from: prefabNode.id, to: uiNode.id, type: 'contains', sourceKind: 'prefab', area: 'frontend' });
+        }
 
         for (const component of prefab.customComponents || []) {
-            const componentNode = addNode({
-                id: makeNodeId('component', prefab.prefabPath, component.nodePath, component.componentName),
-                type: 'component',
-                name: `${component.componentName}@${component.nodePath}`,
-                file: component.scriptPath || prefab.prefabPath,
-                area: component.scriptPath ? inferNodeArea(component.scriptPath) : 'frontend',
-                stack: component.scriptPath
-                    ? inferStacks(inferNodeArea(component.scriptPath), projectProfile)
-                    : inferStacks('frontend', projectProfile),
-                meta: {
-                    prefabPath: prefab.prefabPath,
-                    nodePath: component.nodePath,
-                    rawType: component.rawType,
-                },
+            const ownerNodeInfo = keyNodeInfoMap.get(component.nodePath) || { path: component.nodePath };
+            const uiNode = ensureUiNode(prefab.prefabPath, ownerNodeInfo);
+            addEdge({ from: prefabNode.id, to: uiNode.id, type: 'contains', sourceKind: 'prefab', area: 'frontend' });
+            const componentNode = ensurePrefabComponentNode({
+                prefabPath: prefab.prefabPath,
+                nodePath: component.nodePath,
+                componentName: component.componentName,
+                scriptPath: component.scriptPath || '',
+                rawType: component.rawType,
+                bindingKind: component.componentBinding?.kind || 'component-attachment',
+                editTarget: component.componentBinding?.editTarget || 'prefab-component-list',
+                applyVia: component.componentBinding?.applyVia || 'attach-script-to-node',
             });
-            appendNodeTags(componentNode, component.componentName, component.nodePath, component.rawType || '', component.scriptPath || '');
-            componentNodeMap.set(makeComponentKey(prefab.prefabPath, component.nodePath, component.componentName), componentNode.id);
             addEdge({ from: prefabNode.id, to: componentNode.id, type: 'contains', sourceKind: 'prefab', area: componentNode.area });
+            addEdge({ from: uiNode.id, to: componentNode.id, type: 'contains', sourceKind: 'prefab', area: componentNode.area });
             if (component.scriptPath) {
                 const scriptNode = ensureScriptNode(component.scriptPath);
                 addEdge({ from: componentNode.id, to: scriptNode.id, type: 'binds', sourceKind: 'prefab', area: componentNode.area });
+            }
+
+            for (const field of component.serializedFields || []) {
+                const bindingNode = ensureBindingNode(prefab.prefabPath, component, field.field, {
+                    field: field.field,
+                    bindingKind: field.binding?.kind || '',
+                    editTarget: field.binding?.editTarget || '',
+                    applyVia: field.binding?.applyVia || '',
+                    valueKind: field.value?.kind || '',
+                    targetNodePath: field.binding?.targetNodePath || '',
+                    targetComponentName: field.binding?.targetComponentName || '',
+                    targetScriptPath: field.binding?.targetScriptPath || '',
+                    assetPath: field.binding?.assetPath || field.value?.assetPath || '',
+                    assetKind: field.binding?.assetKind || field.value?.assetKind || '',
+                    nestedPrefabPath: field.binding?.nestedPrefabPath || field.value?.nestedPrefabPath || '',
+                    override: false,
+                });
+                addEdge({ from: componentNode.id, to: bindingNode.id, type: 'contains', sourceKind: 'prefab-binding', area: componentNode.area });
+
+                if (field.value?.kind === 'node' && field.value.nodePath) {
+                    const targetNode = ensureUiNode(prefab.prefabPath, {
+                        path: field.value.nodePath,
+                        active: field.value.active,
+                        nestedPrefabPath: field.value.nestedPrefabPath || null,
+                    });
+                    addEdge({
+                        from: bindingNode.id,
+                        to: targetNode.id,
+                        type: 'binds',
+                        sourceKind: 'prefab-binding',
+                        area: componentNode.area,
+                        meta: {
+                            field: field.field,
+                            bindingKind: field.binding?.kind || 'node-reference',
+                            editTarget: field.binding?.editTarget || 'prefab-field',
+                        },
+                    });
+                }
+
+                if (field.value?.kind === 'component' && field.value.nodePath && field.value.componentName) {
+                    const targetNode = ensureUiNode(prefab.prefabPath, {
+                        path: field.value.nodePath,
+                    });
+                    addEdge({ from: prefabNode.id, to: targetNode.id, type: 'contains', sourceKind: 'prefab', area: 'frontend' });
+                    const targetComponentNode = ensurePrefabComponentNode({
+                        prefabPath: prefab.prefabPath,
+                        nodePath: field.value.nodePath,
+                        componentName: field.value.componentName,
+                        scriptPath: field.value.scriptPath || '',
+                        rawType: field.value.componentName,
+                        category: 'prefab-component-reference',
+                        bindingKind: 'component-reference',
+                        editTarget: 'prefab-field',
+                        applyVia: 'serialized-field',
+                    });
+                    addEdge({ from: targetNode.id, to: targetComponentNode.id, type: 'contains', sourceKind: 'prefab', area: targetComponentNode.area });
+                    addEdge({
+                        from: bindingNode.id,
+                        to: targetComponentNode.id,
+                        type: 'binds',
+                        sourceKind: 'prefab-binding',
+                        area: componentNode.area,
+                        meta: {
+                            field: field.field,
+                            bindingKind: field.binding?.kind || 'component-reference',
+                            editTarget: field.binding?.editTarget || 'prefab-field',
+                        },
+                    });
+                }
+
+                if (field.value?.kind === 'asset' && (field.value.assetPath || field.value.uuid)) {
+                    const assetNode = ensureAssetNode(field.value);
+                    addEdge({
+                        from: bindingNode.id,
+                        to: assetNode.id,
+                        type: 'binds',
+                        sourceKind: 'prefab-binding',
+                        area: componentNode.area,
+                        meta: {
+                            field: field.field,
+                            bindingKind: field.binding?.kind || 'asset-reference',
+                            editTarget: field.binding?.editTarget || 'prefab-field',
+                        },
+                    });
+                }
+            }
+
+            for (const override of component.fieldOverrides || []) {
+                const bindingNode = ensureBindingNode(prefab.prefabPath, component, `${override.field}#override`, {
+                    field: override.field,
+                    bindingKind: override.binding?.kind || 'nested-prefab-override',
+                    editTarget: override.binding?.editTarget || 'prefab-override',
+                    applyVia: override.binding?.applyVia || 'target-override-info',
+                    targetNodePath: override.targetNodePath || '',
+                    targetComponentName: override.resolvedTarget?.componentName || '',
+                    targetScriptPath: override.resolvedTarget?.scriptPath || '',
+                    nestedPrefabPath: override.nestedPrefabPath || '',
+                    override: true,
+                });
+                addEdge({ from: componentNode.id, to: bindingNode.id, type: 'contains', sourceKind: 'prefab-override', area: componentNode.area });
+
+                if (override.targetNodePath) {
+                    const targetNode = ensureUiNode(prefab.prefabPath, {
+                        path: override.targetNodePath,
+                        nestedPrefabPath: override.nestedPrefabPath || null,
+                    });
+                    addEdge({
+                        from: bindingNode.id,
+                        to: targetNode.id,
+                        type: 'binds',
+                        sourceKind: 'prefab-override',
+                        area: componentNode.area,
+                        meta: {
+                            field: override.field,
+                            bindingKind: override.binding?.kind || 'nested-prefab-override',
+                            editTarget: override.binding?.editTarget || 'prefab-override',
+                        },
+                    });
+                }
+
+                if (override.resolvedTarget?.nodePath && override.resolvedTarget?.componentName) {
+                    const nestedTargetNode = ensureUiNode(override.resolvedTarget.prefabPath || prefab.prefabPath, {
+                        path: override.resolvedTarget.nodePath,
+                    });
+                    const nestedComponentNode = ensurePrefabComponentNode({
+                        prefabPath: override.resolvedTarget.prefabPath || prefab.prefabPath,
+                        nodePath: override.resolvedTarget.nodePath,
+                        componentName: override.resolvedTarget.componentName,
+                        scriptPath: override.resolvedTarget.scriptPath || '',
+                        rawType: override.resolvedTarget.componentName,
+                        category: 'nested-prefab-component',
+                        bindingKind: 'nested-prefab-override',
+                        editTarget: 'prefab-override',
+                        applyVia: 'target-override-info',
+                    });
+                    addEdge({ from: nestedTargetNode.id, to: nestedComponentNode.id, type: 'contains', sourceKind: 'prefab', area: nestedComponentNode.area });
+                    addEdge({
+                        from: bindingNode.id,
+                        to: nestedComponentNode.id,
+                        type: 'binds',
+                        sourceKind: 'prefab-override',
+                        area: componentNode.area,
+                        meta: {
+                            field: override.field,
+                            bindingKind: override.binding?.kind || 'nested-prefab-override',
+                            editTarget: override.binding?.editTarget || 'prefab-override',
+                        },
+                    });
+                }
             }
         }
 
@@ -843,6 +1114,38 @@ function buildGraph(raw, config, projectProfile, root) {
                 componentNodeMap.get(makeComponentKey(prefab.prefabPath, eventInfo.sourceNodePath, eventInfo.sourceComponent)) || prefabNode.id;
             const sourceArea = nodeMap.get(sourceComponentId)?.area || 'frontend';
             const targetMethodNode = ensureMethodNode(eventInfo.targetScriptPath, eventInfo.handler, { area: sourceArea });
+            const eventBindingNode = ensureBindingNode(
+                prefab.prefabPath,
+                {
+                    nodePath: eventInfo.sourceNodePath || path.basename(prefab.prefabPath, path.extname(prefab.prefabPath)),
+                    componentName: eventInfo.sourceComponent || 'Prefab',
+                },
+                `${eventInfo.sourceKind}:${eventInfo.handler}`,
+                {
+                    field: eventInfo.sourceKind || '',
+                    bindingKind: eventInfo.binding?.kind || 'event-handler',
+                    editTarget: eventInfo.binding?.editTarget || 'prefab-event-binding',
+                    applyVia: eventInfo.binding?.applyVia || eventInfo.sourceKind || '',
+                    targetNodePath: eventInfo.targetNodePath || '',
+                    targetComponentName: eventInfo.targetComponentName || '',
+                    targetScriptPath: eventInfo.targetScriptPath || '',
+                    handler: eventInfo.handler,
+                }
+            );
+            addEdge({ from: sourceComponentId, to: eventBindingNode.id, type: 'contains', sourceKind: 'prefab-event', area: sourceArea });
+            addEdge({
+                from: eventBindingNode.id,
+                to: targetMethodNode.id,
+                type: 'binds',
+                sourceKind: 'prefab-event',
+                area: sourceArea,
+                meta: {
+                    sourceNodePath: eventInfo.sourceNodePath,
+                    sourceComponent: eventInfo.sourceComponent || '',
+                    sourceEventKind: eventInfo.sourceKind,
+                    handler: eventInfo.handler,
+                },
+            });
             appendNodeTags(nodeMap.get(sourceComponentId), eventInfo.sourceKind, eventInfo.handler, eventInfo.sourceNodePath, eventInfo.targetComponentName || '');
             appendNodeTags(targetMethodNode, eventInfo.sourceKind, eventInfo.handler, eventInfo.targetComponentName || '');
             addEdge({

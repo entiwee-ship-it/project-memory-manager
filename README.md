@@ -80,6 +80,7 @@ node scripts/rebuild_kbs.js --root "<project-root>"
 适用技术方向包括：
 
 - Cocos
+  - 包含 prefab / `.meta` / serialized field / nested prefab override 绑定分析
 - Vue
 - React
 - Node.js

@@ -20,6 +20,17 @@ function compressUuid(uuid) {
     return compressed;
 }
 
+function registerUuidVariants(map, uuid, info) {
+    if (!uuid) {
+        return;
+    }
+
+    map.set(uuid, info);
+    const shortUuid = compressUuid(uuid);
+    map.set(shortUuid, info);
+    map.set(shortUuid.replace(/\+/g, 'P').replace(/\//g, 'S'), info);
+}
+
 function findAssetBases(context) {
     return Array.from(new Set([...(context.assetRootsAbs || []), ...(context.componentRootsAbs || [])]));
 }
@@ -76,16 +87,92 @@ function collectScriptMeta(componentRoots) {
                 continue;
             }
 
-            const shortUuid = compressUuid(meta.uuid);
             const scriptInfo = {
-                shortUuid,
+                shortUuid: compressUuid(meta.uuid),
                 uuid: meta.uuid,
                 path: normalize(scriptFile),
                 name: path.basename(scriptFile, '.ts'),
             };
 
-            map.set(shortUuid, scriptInfo);
-            map.set(shortUuid.replace(/\+/g, 'P').replace(/\//g, 'S'), scriptInfo);
+            registerUuidVariants(map, meta.uuid, scriptInfo);
+        }
+    }
+    return map;
+}
+
+function inferAssetKind(assetPath, meta = {}, options = {}) {
+    const extension = path.extname(assetPath).toLowerCase();
+    if (options.subAssetKind) {
+        return options.subAssetKind;
+    }
+    if (extension === '.prefab' || meta.importer === 'prefab') {
+        return 'Prefab';
+    }
+    if (extension === '.png' || extension === '.jpg' || extension === '.jpeg' || extension === '.webp') {
+        return meta.importer === 'texture' ? 'Texture2D' : 'ImageAsset';
+    }
+    if (extension === '.plist' || meta.importer === 'sprite-atlas') {
+        return 'SpriteAtlas';
+    }
+    if (extension === '.mp3' || extension === '.wav' || extension === '.ogg') {
+        return 'AudioClip';
+    }
+    if (extension === '.json') {
+        return 'JsonAsset';
+    }
+    return meta.importer || extension.replace(/^\./, '') || 'Asset';
+}
+
+function collectAssetMeta(assetRoots) {
+    const map = new Map();
+    for (const root of assetRoots) {
+        const metaFiles = listFilesRecursive(root, filePath => filePath.endsWith('.meta'));
+        for (const metaFile of metaFiles) {
+            const meta = readJson(metaFile);
+            if (!meta.uuid) {
+                continue;
+            }
+
+            const assetFile = metaFile.slice(0, -5);
+            if (!fs.existsSync(assetFile)) {
+                continue;
+            }
+
+            const assetInfo = {
+                uuid: meta.uuid,
+                shortUuid: compressUuid(meta.uuid),
+                path: normalize(assetFile),
+                name: path.basename(assetFile, path.extname(assetFile)),
+                ext: path.extname(assetFile).toLowerCase(),
+                importer: meta.importer || '',
+                assetKind: inferAssetKind(assetFile, meta),
+                isPrefab: assetFile.endsWith('.prefab'),
+            };
+            registerUuidVariants(map, meta.uuid, assetInfo);
+
+            const subMetas = meta.subMetas && typeof meta.subMetas === 'object' ? meta.subMetas : {};
+            for (const [subAssetName, subMeta] of Object.entries(subMetas)) {
+                if (!subMeta?.uuid) {
+                    continue;
+                }
+                const subAssetInfo = {
+                    uuid: subMeta.uuid,
+                    shortUuid: compressUuid(subMeta.uuid),
+                    path: normalize(assetFile),
+                    name: subMeta.displayName || subAssetName || assetInfo.name,
+                    ext: assetInfo.ext,
+                    importer: meta.importer || '',
+                    assetKind: inferAssetKind(assetFile, meta, {
+                        subAssetKind: subMeta.importer === 'sprite-frame' || meta.importer === 'texture'
+                            ? 'SpriteFrame'
+                            : subMeta.importer || '',
+                    }),
+                    parentUuid: meta.uuid,
+                    subAssetName,
+                    isPrefab: false,
+                };
+                registerUuidVariants(map, subMeta.uuid, subAssetInfo);
+            }
         }
     }
     return map;
@@ -110,6 +197,7 @@ function collectPrefabMeta(assetRoots) {
 module.exports = {
     name: 'cocos',
     resolveImportPath,
+    collectAssetMeta,
     collectScriptMeta,
     collectPrefabMeta,
 };
