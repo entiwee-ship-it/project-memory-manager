@@ -41,6 +41,8 @@ function parseArgs(argv) {
         output: '',
         prefabs: [],
         adapter: 'auto',
+        bodySnippetMaxLength: 500,
+        extractFullBody: false,
     };
 
     for (let i = 0; i < argv.length; i++) {
@@ -63,6 +65,14 @@ function parseArgs(argv) {
         }
         if (token === '--adapter') {
             args.adapter = argv[++i];
+            continue;
+        }
+        if (token === '--body-snippet-max-length') {
+            args.bodySnippetMaxLength = parseInt(argv[++i], 10) || 500;
+            continue;
+        }
+        if (token === '--extract-full-body') {
+            args.extractFullBody = true;
             continue;
         }
         args.prefabs.push(token);
@@ -3115,7 +3125,8 @@ function extractScriptSummary(source, scriptFile, exports) {
     return basenameWithoutExt(scriptFile);
 }
 
-function extractScriptInsights(methodRoots, context) {
+function extractScriptInsights(methodRoots, context, options = {}) {
+    const { bodySnippetMaxLength = 500, extractFullBody = false } = options;
     const result = [];
 
     for (const root of methodRoots) {
@@ -3154,7 +3165,8 @@ function extractScriptInsights(methodRoots, context) {
                 const callInfo = normalizeFinalCallInfo(mergeCallInfo(regexCallInfo, astCallInfo), knownMethodNames);
 
                 // 提取方法体关键逻辑（截断以避免过大）
-                const bodySnippet = extractMethodBodySnippet(methodBody, 500);
+                const maxLength = extractFullBody ? methodBody.length : bodySnippetMaxLength;
+                const bodySnippet = extractMethodBodySnippet(methodBody, maxLength);
                 
                 // 解析 JSDoc 获取详细文档
                 const jsdoc = parseJSDoc(docBlock);
@@ -3929,7 +3941,11 @@ function runScan(rawArgs = process.argv.slice(2)) {
     const scriptMetaMap = collectScriptMeta(args.componentRoots.map(root => path.resolve(root)), extractContext);
     const prefabMetaMap = collectPrefabMeta(args.assetRoots.map(root => path.resolve(root)), extractContext);
     const assetMetaMap = collectAssetMeta(args.assetRoots.map(root => path.resolve(root)), extractContext);
-    const scripts = extractScriptInsights(args.methodRoots.map(root => path.resolve(root)), extractContext);
+    const scripts = extractScriptInsights(
+        args.methodRoots.map(root => path.resolve(root)), 
+        extractContext,
+        { bodySnippetMaxLength: args.bodySnippetMaxLength, extractFullBody: args.extractFullBody }
+    );
     const prefabCache = new Map();
 
     const prefabs = args.prefabs.map(prefabPath => {

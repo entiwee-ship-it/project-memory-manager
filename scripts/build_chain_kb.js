@@ -1961,6 +1961,17 @@ function run(argv = process.argv.slice(2)) {
     for (const item of extractInputs.methodRoots) {
         extractArgs.push('--method-root', item);
     }
+    
+    // 添加提取选项
+    if (config.extractOptions) {
+        if (config.extractOptions.bodySnippetMaxLength) {
+            extractArgs.push('--body-snippet-max-length', String(config.extractOptions.bodySnippetMaxLength));
+        }
+        if (config.extractOptions.extractFullBody) {
+            extractArgs.push('--extract-full-body');
+        }
+    }
+    
     extractArgs.push('--output', scanPath);
     for (const prefabPath of extractInputs.prefabs) {
         extractArgs.push(prefabPath);
