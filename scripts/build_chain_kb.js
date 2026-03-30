@@ -1716,6 +1716,42 @@ function buildGraph(raw, config, projectProfile, root) {
     };
 }
 
+function computeImportResolutionStats(raw) {
+    const stats = {
+        scriptCount: 0,
+        methodCount: 0,
+        totalImports: 0,
+        resolvedImports: 0,
+        resolutionRate: 0,
+        unresolvedImports: [],
+    };
+    
+    if (!raw?.scripts) {
+        return stats;
+    }
+    
+    for (const script of raw.scripts) {
+        stats.scriptCount++;
+        stats.methodCount += script.methods?.length || 0;
+        
+        for (const imp of script.imports || []) {
+            stats.totalImports++;
+            if (imp.resolvedPath) {
+                stats.resolvedImports++;
+            } else if (!imp.specifier?.startsWith('cc') && !imp.specifier?.startsWith('db://') && !imp.specifier?.includes('node_modules')) {
+                // 只记录非库导入的未解析项
+                stats.unresolvedImports.push(imp.specifier);
+            }
+        }
+    }
+    
+    stats.resolutionRate = stats.totalImports > 0 
+        ? Math.round((stats.resolvedImports / stats.totalImports) * 100) 
+        : 0;
+    
+    return stats;
+}
+
 function buildLookup(graph) {
     const nodesById = Object.create(null);
     const outgoing = Object.create(null);
@@ -1939,7 +1975,14 @@ function run(argv = process.argv.slice(2)) {
             }
         }
         
+        // 显示导入解析统计
+        const importStats = computeImportResolutionStats(raw);
         console.log(`链路知识库已构建: ${config.featureKey}`);
+        console.log(`  - 脚本: ${importStats.scriptCount}, 方法: ${importStats.methodCount}`);
+        console.log(`  - 导入解析: ${importStats.resolvedImports}/${importStats.totalImports} (${importStats.resolutionRate}%)`);
+        if (importStats.unresolvedImports.length > 0) {
+            console.log(`  - 未解析导入: ${importStats.unresolvedImports.slice(0, 5).join(', ')}${importStats.unresolvedImports.length > 5 ? '...' : ''}`);
+        }
     } catch (error) {
         // 回滚事务
         transaction.rollback();
