@@ -7,7 +7,9 @@ const path = require('path');
  */
 function resolveFromProjectRoot(specifier, context) {
     const cwd = context?.cwd || process.cwd();
-    const basePath = path.resolve(cwd, specifier);
+    // 统一使用正斜杠，然后让 path.resolve 处理平台差异
+    const normalizedSpecifier = normalizeSlashes(specifier);
+    const basePath = path.resolve(cwd, normalizedSpecifier);
     const candidates = [
         basePath,
         `${basePath}.ts`,
@@ -30,10 +32,20 @@ function resolveFromProjectRoot(specifier, context) {
 }
 
 /**
+ * 规范化路径分隔符为 /
+ */
+function normalizeSlashes(filePath) {
+    return String(filePath || '').replace(/\\/g, '/');
+}
+
+/**
  * 检查是否为项目根目录路径导入
  * 支持常见的根目录路径前缀
  */
 function isProjectRootPath(specifier) {
+    // 统一使用正斜杠进行匹配（兼容 Windows 反斜杠）
+    const normalized = normalizeSlashes(specifier);
+    
     // 支持常见的项目根目录路径模式
     const rootPathPatterns = [
         /^app\//,           // app/common/utils
@@ -51,7 +63,7 @@ function isProjectRootPath(specifier) {
         /^api\//,           // api/...
         /^db\//,            // db/schema/...
     ];
-    return rootPathPatterns.some(pattern => pattern.test(specifier));
+    return rootPathPatterns.some(pattern => pattern.test(normalized));
 }
 
 function resolveImportPath(specifier, scriptFile, context) {
