@@ -1,7 +1,6 @@
-
 ---
 name: project-memory-manager
-description: 为包含 frontend、backend、shared、contract、data、ops 等区域的仓库建立和维护 KB-first 的 AI 项目记忆、feature 链路知识库与开发工作流。当 Codex 需要初始化或刷新项目接管记忆系统、迁移旧记忆体系（如 `.kimi`）、识别仓库拓扑与技术栈区域、创建或刷新 active work、构建或刷新 feature 级 method/event/request/state 链路知识库、查询调用链与状态流转，或为 Cocos、Vue、React、Java Spring、Node.js、Go、Python 等仓库建立统一协作协议时使用。
+description: 'KB-first AI project memory manager for full-stack repositories. Use when initializing project memory, building knowledge bases, querying call chains, or working with Cocos/Pinus/Vue/React/Node.js projects.'
 ---
 
 # 项目记忆管理器
