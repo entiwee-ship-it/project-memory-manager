@@ -563,6 +563,29 @@ function printSummary(result, asJson) {
         if (meta.bodySnippet) {
             console.log(`- body: ${meta.bodySnippet.slice(0, 100)}${meta.bodySnippet.length > 100 ? '...' : ''}`);
         }
+        // JSDoc 信息
+        if (meta.jsdoc) {
+            const jsdoc = meta.jsdoc;
+            if (jsdoc.description && jsdoc.description !== meta.summary) {
+                console.log(`- description: ${jsdoc.description.slice(0, 150)}${jsdoc.description.length > 150 ? '...' : ''}`);
+            }
+            if (Object.keys(jsdoc.params || {}).length > 0) {
+                console.log('- params docs:');
+                for (const [paramName, paramInfo] of Object.entries(jsdoc.params)) {
+                    const typeStr = paramInfo.type ? `{${paramInfo.type}} ` : '';
+                    console.log(`    - ${paramName}: ${typeStr}${paramInfo.description}`);
+                }
+            }
+            if (jsdoc.returns) {
+                console.log(`- returns: ${jsdoc.returns}`);
+            }
+            if (jsdoc.deprecated) {
+                console.log('- ⚠️ deprecated');
+            }
+            if (jsdoc.examples && jsdoc.examples.length > 0) {
+                console.log(`- example: ${jsdoc.examples[0].slice(0, 100)}${jsdoc.examples[0].length > 100 ? '...' : ''}`);
+            }
+        }
     }
     
     if (result.type === 'endpoint') {
