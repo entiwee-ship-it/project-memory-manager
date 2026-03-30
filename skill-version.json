@@ -1,7 +1,7 @@
 {
   "name": "project-memory-manager",
-  "version": "0.13.1",
-  "releaseDate": "2026-04-01",
+  "version": "0.14.0",
+  "releaseDate": "2026-04-02",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
   "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
@@ -33,6 +33,7 @@
     "skills-cli-install",
     "fullstack-adapter",
     "auto-prefab-scan",
-    "root-path-import-resolution"
+    "root-path-import-resolution",
+    "method-body-extraction"
   ]
 }
