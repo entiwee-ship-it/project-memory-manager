@@ -787,6 +787,60 @@ function extractBlockContent(source, openBraceIndex) {
     return '';
 }
 
+/**
+ * 提取方法体的关键内容片段
+ * - 移除注释和多余空白
+ * - 保留关键逻辑（条件、循环、赋值、调用）
+ * - 限制长度避免输出过大
+ */
+function extractMethodBodySnippet(bodyText, maxLength = 500) {
+    if (!bodyText) {
+        return '';
+    }
+    
+    // 移除单行注释
+    let cleaned = bodyText.replace(/\/\/.*$/gm, '');
+    // 移除多行注释
+    cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+    // 规范化空白
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    // 提取关键逻辑模式
+    const keyPatterns = [
+        // filter/map/reduce 等数组操作
+        /\.(filter|map|reduce|find|some|every)\s*\([^)]+\)/g,
+        // if/for/while 条件
+        /\b(if|for|while|switch)\s*\([^)]+\)/g,
+        // 赋值操作（重点关注）
+        /\b(let|const|var)\s+\w+\s*=\s*[^;]+/g,
+        // this.xxx = 
+        /this\.\w+\s*=\s*[^;]+/g,
+        // return 语句
+        /return\s+[^;]+/g,
+        // 函数调用
+        /\w+\([^)]*\)/g,
+    ];
+    
+    const snippets = [];
+    for (const pattern of keyPatterns) {
+        const matches = cleaned.match(pattern);
+        if (matches) {
+            snippets.push(...matches.slice(0, 5)); // 每类最多5个
+        }
+    }
+    
+    // 去重并组合
+    const uniqueSnippets = [...new Set(snippets)];
+    let result = uniqueSnippets.join('; ');
+    
+    // 如果关键片段太少，返回清理后的前N个字符
+    if (result.length < 50 && cleaned.length > 0) {
+        result = cleaned.slice(0, maxLength);
+    }
+    
+    return result.length > maxLength ? result.slice(0, maxLength) + '...' : result;
+}
+
 function extractWrappedContent(source, openIndex, openChar = '(', closeChar = ')') {
     const range = extractWrappedRange(source, openIndex, openChar, closeChar);
     return range ? range.content : '';
@@ -3009,6 +3063,9 @@ function extractScriptInsights(methodRoots, context) {
                 const astCallInfo = extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
                 const callInfo = normalizeFinalCallInfo(mergeCallInfo(regexCallInfo, astCallInfo), knownMethodNames);
 
+                // 提取方法体关键逻辑（截断以避免过大）
+                const bodySnippet = extractMethodBodySnippet(methodBody, 500);
+                
                 methods.push({
                     name: methodDef.name,
                     access: methodDef.access,
@@ -3019,6 +3076,7 @@ function extractScriptInsights(methodRoots, context) {
                     paramNames,
                     line,
                     summary: summarizeDocBlock(docBlock),
+                    bodySnippet,  // 方法体内容片段
                     localCalls: callInfo.localCalls,
                     localCallSites: callInfo.localCallSites,
                     importedCalls: callInfo.importedCalls,
