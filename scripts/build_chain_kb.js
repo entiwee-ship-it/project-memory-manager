@@ -800,6 +800,13 @@ function buildGraph(raw, config, projectProfile, root) {
         const methodInfo = methodMap.get(methodKey(scriptPath, methodName)) || null;
         const area = options.area || methodInfo?.area || scriptNode.area || inferNodeArea(scriptPath);
         const routeTags = inferPinusMethodRoutes(scriptPath, methodName);
+        
+        // 合并参数类型信息
+        const params = options.params || methodInfo?.params || '';
+        const returnType = options.returnType || methodInfo?.returnType || '';
+        const paramNames = options.paramNames || methodInfo?.paramNames || [];
+        const bodySnippet = options.bodySnippet || methodInfo?.bodySnippet || '';
+        
         const methodNode = addNode({
             id: makeNodeId('method', scriptPath, methodName),
             type: 'method',
@@ -813,6 +820,15 @@ function buildGraph(raw, config, projectProfile, root) {
                 scriptPath,
                 summary: options.summary || methodInfo?.summary || methodInfo?.scriptSummary || '',
                 synthetic: !methodInfo,
+                // 类型信息
+                params,
+                returnType,
+                paramNames,
+                bodySnippet,
+                // 修饰符
+                access: options.access || methodInfo?.access || 'public',
+                async: options.isAsync || methodInfo?.async || false,
+                static: options.isStatic || methodInfo?.static || false,
             },
         });
         appendNodeTags(methodNode, methodName, methodNode.name, scriptPath, options.summary || methodInfo?.summary || '');
@@ -1307,6 +1323,13 @@ function buildGraph(raw, config, projectProfile, root) {
                 area: methodArea,
                 line: method.line,
                 summary: method.summary || '',
+                params: method.params || '',
+                returnType: method.returnType || '',
+                paramNames: method.paramNames || [],
+                bodySnippet: method.bodySnippet || '',
+                access: method.access || 'public',
+                isAsync: method.async || false,
+                isStatic: method.static || false,
             });
             const currentMethodId = currentMethodNode.id;
             addEdge({ from: scriptNode.id, to: currentMethodId, type: 'contains', sourceKind: 'script', area: methodArea });

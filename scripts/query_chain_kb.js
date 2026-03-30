@@ -544,6 +544,27 @@ function printSummary(result, asJson) {
     console.log(`- area: ${result.area || 'unknown'}`);
     console.log(`- outgoing: ${result.outgoingCount}`);
     console.log(`- incoming: ${result.incomingCount}`);
+    
+    // 方法类型信息
+    if (result.type === 'method') {
+        const meta = result.meta || {};
+        if (meta.params) {
+            console.log(`- params: ${meta.params}`);
+        }
+        if (meta.returnType) {
+            console.log(`- return: ${meta.returnType}`);
+        }
+        if (meta.access) {
+            console.log(`- access: ${meta.access}${meta.async ? ' async' : ''}${meta.static ? ' static' : ''}`);
+        }
+        if (meta.summary) {
+            console.log(`- summary: ${meta.summary}`);
+        }
+        if (meta.bodySnippet) {
+            console.log(`- body: ${meta.bodySnippet.slice(0, 100)}${meta.bodySnippet.length > 100 ? '...' : ''}`);
+        }
+    }
+    
     if (result.type === 'endpoint') {
         console.log(`- httpMethod: ${result.httpMethod || '(none)'}`);
         console.log(`- httpPath: ${result.httpPath || '(none)'}`);
