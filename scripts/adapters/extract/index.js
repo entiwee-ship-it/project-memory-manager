@@ -44,12 +44,17 @@ function getExtractAdapters(mode = 'auto', args = {}) {
             return [cocos, generic];
         case 'pinus':
             return [pinus, generic];
+        case 'fullstack':
+            // 全栈模式：同时支持 Cocos 前端和 Pinus 后端
+            return [cocos, pinus, generic];
         default:
             return selectedMode === 'cocos'
                 ? [cocos, generic]
                 : selectedMode === 'pinus'
                   ? [pinus, generic]
-                  : [generic];
+                  : selectedMode === 'fullstack'
+                    ? [cocos, pinus, generic]
+                    : [generic];
     }
 }
 

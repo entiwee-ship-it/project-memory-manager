@@ -12,7 +12,8 @@
   "type": "",
   "summary": "",
   "uiEntry": "",
-  "extractorAdapter": "generic",
+  "extractorAdapter": "auto",
+  "_comment_extractorAdapter": "可选: generic | cocos | pinus | fullstack | auto。fullstack 同时支持前端 Cocos 和后端 Pinus",
   "areas": [],
   "componentRoots": [],
   "assetRoots": [],
@@ -28,6 +29,7 @@
     "schemas": []
   },
   "prefabs": [],
+  "_comment_prefabs": "预制体路径列表。如果为空，会自动从 assetRoots 递归扫描 .prefab 文件",
   "outputs": {
     "scan": "project-memory/kb/features/<feature-key>/scan.raw.json",
     "graph": "project-memory/kb/features/<feature-key>/chain.graph.json",

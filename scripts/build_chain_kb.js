@@ -178,6 +178,19 @@ function expandConfiguredTargets(root, inputs = []) {
     ).sort((left, right) => left.localeCompare(right));
 }
 
+function discoverPrefabsFromAssetRoots(assetRoots) {
+    const { listFilesRecursive } = require('./lib/common');
+    const discovered = [];
+    for (const root of assetRoots || []) {
+        if (!fs.existsSync(root)) {
+            continue;
+        }
+        const prefabs = listFilesRecursive(root, filePath => filePath.endsWith('.prefab'));
+        discovered.push(...prefabs);
+    }
+    return discovered;
+}
+
 function deriveExtractInputs(config, root) {
     const scanTargets = config.scanTargets && typeof config.scanTargets === 'object' ? config.scanTargets : {};
     const componentInputs = [...asArray(config.componentRoots)];
@@ -201,11 +214,19 @@ function deriveExtractInputs(config, root) {
         methodInputs.push(...asArray(value));
     }
 
+    const expandedAssetRoots = expandConfiguredTargets(root, assetInputs);
+    const expandedPrefabs = expandConfiguredTargets(root, asArray(config.prefabs));
+    
+    // 如果 prefabs 为空，自动从 assetRoots 扫描
+    const finalPrefabs = expandedPrefabs.length > 0 
+        ? expandedPrefabs 
+        : discoverPrefabsFromAssetRoots(expandedAssetRoots);
+
     return {
         componentRoots: expandConfiguredTargets(root, componentInputs),
-        assetRoots: expandConfiguredTargets(root, assetInputs),
+        assetRoots: expandedAssetRoots,
         methodRoots: expandConfiguredTargets(root, methodInputs),
-        prefabs: expandConfiguredTargets(root, asArray(config.prefabs)),
+        prefabs: finalPrefabs,
     };
 }
 
