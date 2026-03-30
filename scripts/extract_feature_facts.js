@@ -370,6 +370,96 @@ function summarizeDocBlock(docBlock) {
     return lines[0] || '';
 }
 
+/**
+ * 解析 JSDoc 注释块，提取结构化信息
+ * @param {string} docBlock - 原始注释块
+ * @returns {object} 解析后的 JSDoc 信息
+ */
+function parseJSDoc(docBlock) {
+    if (!docBlock) {
+        return { description: '', params: {}, returns: '', examples: [], tags: {} };
+    }
+
+    const lines = cleanDocBlock(docBlock);
+    const result = {
+        description: '',
+        params: {},
+        returns: '',
+        returnsType: '',
+        examples: [],
+        tags: {},
+        deprecated: false,
+        since: '',
+        see: [],
+    };
+
+    let inDescription = true;
+    let currentTag = null;
+    let currentContent = [];
+
+    for (const line of lines) {
+        // 处理 JSDoc 标签
+        const tagMatch = line.match(/^@(\w+)(?:\s+(.*))?$/);
+        if (tagMatch) {
+            // 保存之前的内容
+            if (currentTag === 'param' && currentContent.length > 0) {
+                const paramText = currentContent.join(' ');
+                const paramMatch = paramText.match(/^(?:\{([^}]+)\}\s*)?(\w+)\s*-?\s*(.*)$/);
+                if (paramMatch) {
+                    result.params[paramMatch[2]] = {
+                        type: paramMatch[1] || '',
+                        description: paramMatch[3] || '',
+                    };
+                }
+            } else if (currentTag === 'returns' || currentTag === 'return') {
+                result.returns = currentContent.join(' ').replace(/^\{[^}]+\}\s*/, '');
+                const typeMatch = currentContent.join(' ').match(/^\{([^}]+)\}/);
+                result.returnsType = typeMatch ? typeMatch[1] : '';
+            } else if (currentTag === 'example') {
+                result.examples.push(currentContent.join('\n'));
+            } else if (currentTag === 'see') {
+                result.see.push(currentContent.join(' '));
+            } else if (currentTag === 'since') {
+                result.since = currentContent.join(' ');
+            }
+
+            currentTag = tagMatch[1];
+            currentContent = tagMatch[2] ? [tagMatch[2]] : [];
+            inDescription = false;
+
+            if (currentTag === 'deprecated') {
+                result.deprecated = true;
+            }
+            continue;
+        }
+
+        // 收集内容
+        if (inDescription) {
+            result.description += (result.description ? ' ' : '') + line;
+        } else {
+            currentContent.push(line);
+        }
+    }
+
+    // 处理最后一个标签
+    if (currentTag === 'param' && currentContent.length > 0) {
+        const paramText = currentContent.join(' ');
+        const paramMatch = paramText.match(/^(?:\{([^}]+)\}\s*)?(\w+)\s*-?\s*(.*)$/);
+        if (paramMatch) {
+            result.params[paramMatch[2]] = {
+                type: paramMatch[1] || '',
+                description: paramMatch[3] || '',
+            };
+        }
+    } else if ((currentTag === 'returns' || currentTag === 'return') && currentContent.length > 0) {
+        result.returns = currentContent.join(' ').replace(/^\{[^}]+\}\s*/, '');
+        const typeMatch = currentContent.join(' ').match(/^\{([^}]+)\}/);
+        result.returnsType = typeMatch ? typeMatch[1] : '';
+    }
+
+    return result;
+}
+
 function extractLeadingDoc(source, index, allowDecorators = false) {
     let cursor = index;
     while (cursor > 0 && /\s/.test(source[cursor - 1])) {
@@ -3066,17 +3156,31 @@ function extractScriptInsights(methodRoots, context) {
                 // 提取方法体关键逻辑（截断以避免过大）
                 const bodySnippet = extractMethodBodySnippet(methodBody, 500);
                 
+                // 解析 JSDoc 获取详细文档
+                const jsdoc = parseJSDoc(docBlock);
+                
                 methods.push({
                     name: methodDef.name,
                     access: methodDef.access,
                     static: methodDef.static,
                     async: methodDef.async,
                     params: methodDef.params,
-                    returnType: methodDef.returnType,
+                    returnType: methodDef.returnType || jsdoc.returnsType,
                     paramNames,
                     line,
-                    summary: summarizeDocBlock(docBlock),
+                    summary: jsdoc.description || summarizeDocBlock(docBlock),
                     bodySnippet,  // 方法体内容片段
+                    // JSDoc 详细信息
+                    jsdoc: {
+                        description: jsdoc.description,
+                        params: jsdoc.params,
+                        returns: jsdoc.returns,
+                        returnsType: jsdoc.returnsType,
+                        examples: jsdoc.examples,
+                        deprecated: jsdoc.deprecated,
+                        since: jsdoc.since,
+                        see: jsdoc.see,
+                    },
                     localCalls: callInfo.localCalls,
                     localCallSites: callInfo.localCallSites,
                     importedCalls: callInfo.importedCalls,

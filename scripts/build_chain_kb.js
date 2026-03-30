@@ -829,6 +829,8 @@ function buildGraph(raw, config, projectProfile, root) {
                 access: options.access || methodInfo?.access || 'public',
                 async: options.isAsync || methodInfo?.async || false,
                 static: options.isStatic || methodInfo?.static || false,
+                // JSDoc 信息
+                jsdoc: methodInfo?.jsdoc || null,
             },
         });
         appendNodeTags(methodNode, methodName, methodNode.name, scriptPath, options.summary || methodInfo?.summary || '');
