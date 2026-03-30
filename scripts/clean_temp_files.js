@@ -13,20 +13,26 @@ const fs = require('fs');
 const path = require('path');
 
 function parseArgs(argv) {
-    return {
-        dryRun: argv.includes('--dry-run'),
-    };
+    const args = { dryRun: false, root: '' };
+    for (let i = 0; i < argv.length; i++) {
+        if (argv[i] === '--dry-run') {
+            args.dryRun = true;
+        } else if (argv[i] === '--root' && i + 1 < argv.length) {
+            args.root = path.resolve(argv[++i]);
+        }
+    }
+    return args;
 }
 
-function findProjectRoot() {
-    let current = process.cwd();
+function findProjectRoot(startDir = process.cwd()) {
+    let current = startDir;
     while (true) {
         if (fs.existsSync(path.join(current, 'project-memory'))) {
             return current;
         }
         const parent = path.dirname(current);
         if (parent === current) {
-            return process.cwd();
+            return startDir;
         }
         current = parent;
     }
@@ -48,6 +54,12 @@ function findFilesToClean(projectRoot) {
                     
                     // 检查是否为测试配置（没有对应 feature 目录或标记为测试）
                     const featureKey = config.featureKey;
+                    
+                    // 排除 project-global（项目级 KB，不需要 feature 目录）
+                    if (featureKey === 'project-global') {
+                        continue;
+                    }
+                    
                     const featureDir = path.join(projectRoot, 'project-memory', 'docs', 'features', featureKey);
                     const isTestConfig = file.includes('test') || file.includes('temp') || !fs.existsSync(featureDir);
                     
@@ -155,7 +167,7 @@ function main() {
         console.log('⚠️  干运行模式 - 不会实际删除文件\n');
     }
     
-    const projectRoot = findProjectRoot();
+    const projectRoot = args.root || findProjectRoot();
     console.log(`项目根目录: ${projectRoot}\n`);
     
     const filesToClean = findFilesToClean(projectRoot);
