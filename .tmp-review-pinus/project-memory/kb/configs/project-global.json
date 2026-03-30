@@ -1,0 +1,31 @@
+{
+  "featureKey": "project-global",
+  "featureName": "Project Global KB",
+  "summary": "Full-project global knowledge graph",
+  "type": "project-global",
+  "kbDir": "project-memory/kb/project-global",
+  "areas": [
+    "backend",
+    "data"
+  ],
+  "componentRoots": [],
+  "assetRoots": [],
+  "methodRoots": [
+    "app",
+    "app/db/schema",
+    "app/http/routes",
+    "app/modules",
+    "app/servers"
+  ],
+  "prefabs": [],
+  "outputs": {
+    "scan": "project-memory/kb/project-global/scan.raw.json",
+    "graph": "project-memory/kb/project-global/chain.graph.json",
+    "lookup": "project-memory/kb/project-global/chain.lookup.json",
+    "report": "project-memory/kb/project-global/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/project",
+    "featureIndex": "project-memory/docs/project/PROJECT_Overview.md"
+  }
+}

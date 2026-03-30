@@ -1,0 +1,2788 @@
+{
+  "generatedAt": "2026-03-30T03:28:58.361Z",
+  "featureKey": "project-global",
+  "featureName": "Project Global KB",
+  "builtWithSkill": {
+    "name": "project-memory-manager",
+    "version": "0.11.0",
+    "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
+    "capabilities": [
+      "pinus-backend-kb",
+      "cocos-static-call-kb",
+      "cocos-prefab-binding-kb",
+      "cocos-prefab-profile-audit",
+      "cocos-authoring-plan",
+      "cocos-authoring-apply",
+      "frontend-http-request-kb",
+      "kb-query-entrypoint",
+      "kb-version-stamp",
+      "kb-post-update-rebuild",
+      "project-global-kb",
+      "project-protocol-learning",
+      "project-kb-query",
+      "project-timing-learning",
+      "project-phase-transition-query",
+      "auto-feature-registry-sync",
+      "endpoint-route-table-graph",
+      "upstream-downstream-query",
+      "skills-cli-install"
+    ]
+  },
+  "nodes": [
+    {
+      "line": null,
+      "file": "project-memory/docs/project/PROJECT_Overview.md",
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "tags": [
+          "full",
+          "full-project global knowledge graph",
+          "global",
+          "graph",
+          "kb",
+          "knowledge",
+          "project",
+          "project global kb",
+          "project-global"
+        ],
+        "featureKey": "project-global",
+        "uiEntry": "",
+        "summary": "Full-project global knowledge graph"
+      },
+      "id": "module:project-global",
+      "type": "module",
+      "name": "Project Global KB"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "common",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/common/utils.ts",
+          "pinus",
+          "review",
+          "skills",
+          "tmp",
+          "ts",
+          "utils",
+          "utils.ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-common-utils.ts",
+      "type": "script",
+      "name": "utils.ts"
+    },
+    {
+      "line": 2,
+      "file": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "common",
+          "dispatch",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/common/utils.ts",
+          "pinus",
+          "pkplayer",
+          "pkplayerdispatch",
+          "review",
+          "skills",
+          "tmp",
+          "ts",
+          "utils",
+          "utils.pkplayerdispatch"
+        ],
+        "methodName": "pkplayerDispatch",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+        "summary": "utils",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-common-utils.ts:pkplayerdispatch",
+      "type": "method",
+      "name": "utils.pkplayerDispatch"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+      "area": "data",
+      "stack": [
+        "mysql",
+        "drizzle"
+      ],
+      "meta": {
+        "tags": [
+          "记录",
+          "activity",
+          "app",
+          "db",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/db/schema/activity/goldenegglotteryrecordschema.ts",
+          "egg",
+          "golden",
+          "goldenegglotteryrecordschema.ts",
+          "lottery",
+          "pinus",
+          "record",
+          "records",
+          "review",
+          "schema",
+          "skills",
+          "tmp",
+          "ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-db-schema-activity-goldenegglotteryrecordschema.ts",
+      "type": "script",
+      "name": "goldenEggLotteryRecordSchema.ts"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+      "area": "data",
+      "stack": [
+        "mysql",
+        "drizzle"
+      ],
+      "meta": {
+        "tags": [
+          "activity",
+          "app",
+          "db",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/db/schema/activity/goldenegguserinfoschema.ts",
+          "egg",
+          "golden",
+          "goldenegguserinfoschema.ts",
+          "info",
+          "pinus",
+          "review",
+          "schema",
+          "skills",
+          "tmp",
+          "ts",
+          "user"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-db-schema-activity-goldenegguserinfoschema.ts",
+      "type": "script",
+      "name": "goldenEggUserInfoSchema.ts"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+      "area": "data",
+      "stack": [
+        "mysql",
+        "drizzle"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "db",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+          "pinus",
+          "review",
+          "schema",
+          "skills",
+          "tmp",
+          "ts",
+          "users",
+          "users.ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-db-schema-users.ts",
+      "type": "script",
+      "name": "users.ts"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "activity",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/http/routes/activity/goldenegg.ts",
+          "egg",
+          "golden",
+          "goldenegg.ts",
+          "http",
+          "pinus",
+          "review",
+          "routes",
+          "skills",
+          "tmp",
+          "ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts",
+      "type": "script",
+      "name": "goldenEgg.ts"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "activity",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/modules/activity/goldenegg.ts",
+          "egg",
+          "golden",
+          "goldenegg.ts",
+          "modules",
+          "pinus",
+          "review",
+          "skills",
+          "tmp",
+          "ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "type": "script",
+      "name": "goldenEgg.ts"
+    },
+    {
+      "line": 6,
+      "file": "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "activity",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/http/routes/activity/goldenegg.ts",
+          "egg",
+          "get",
+          "getgoldeneggreward",
+          "golden",
+          "goldenegg",
+          "goldenegg.http_get_activity_goldenegg_getgoldeneggreward",
+          "http",
+          "http get /activity/goldenegg/getgoldeneggreward",
+          "http_get_activity_goldenegg_getgoldeneggreward",
+          "pinus",
+          "review",
+          "reward",
+          "routes",
+          "skills",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "http_get_activity_goldenegg_getgoldeneggreward",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+        "summary": "HTTP GET /activity/goldenEgg/getGoldenEggReward",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts:http_get_activity_goldenegg_getgoldeneggreward",
+      "type": "method",
+      "name": "goldenEgg.http_get_activity_goldenegg_getgoldeneggreward"
+    },
+    {
+      "line": 6,
+      "file": "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "/activity/goldenegg/getgoldeneggreward",
+          "activity",
+          "egg",
+          "endpoint",
+          "get",
+          "golden",
+          "reward",
+          "router",
+          "router.get"
+        ],
+        "method": "GET",
+        "path": "/activity/goldenEgg/getGoldenEggReward",
+        "handlerName": "router.get"
+      },
+      "id": "endpoint:get:activity-goldenegg-getgoldeneggreward",
+      "type": "endpoint",
+      "name": "GET /activity/goldenEgg/getGoldenEggReward"
+    },
+    {
+      "line": 10,
+      "file": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "activity",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/modules/activity/goldenegg.ts",
+          "egg",
+          "get",
+          "getgoldeneggreward",
+          "golden",
+          "goldenegg.getgoldeneggreward",
+          "modules",
+          "pinus",
+          "review",
+          "reward",
+          "skills",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "getGoldenEggReward",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+        "summary": "goldenEgg",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "type": "method",
+      "name": "goldenEgg.getGoldenEggReward"
+    },
+    {
+      "line": 10,
+      "file": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "请求",
+          "asset",
+          "pinus",
+          "pinus-rpc",
+          "pinus.rpc",
+          "pkplayer",
+          "pkplayer.rpc.updateuserasset",
+          "request",
+          "rpc",
+          "update",
+          "user"
+        ],
+        "callee": "pinus.rpc",
+        "callbackKind": "none",
+        "route": "pkplayer.Rpc.updateUserAsset",
+        "protocol": "pinus-rpc",
+        "httpMethod": "",
+        "transport": "pinus-rpc"
+      },
+      "id": "request:pinus-rpc::pinus-rpc:pinus.rpc:pkplayer.rpc.updateuserasset",
+      "type": "request",
+      "name": "pkplayer.Rpc.updateUserAsset"
+    },
+    {
+      "line": 2,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "asset",
+          "pinus",
+          "pinus-remote",
+          "pinus-rpc",
+          "pkplayer",
+          "pkplayer.rpc.updateuserasset",
+          "remote",
+          "route",
+          "rpc",
+          "update",
+          "updateuserasset",
+          "user"
+        ],
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset"
+      },
+      "id": "route:pinus-remote:pkplayer.rpc.updateuserasset",
+      "type": "route",
+      "name": "pkplayer.Rpc.updateUserAsset"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/rpc.ts",
+          "pinus",
+          "pkplayer",
+          "remote",
+          "review",
+          "rpc",
+          "rpc.ts",
+          "servers",
+          "skills",
+          "tmp",
+          "ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "type": "script",
+      "name": "Rpc.ts"
+    },
+    {
+      "line": 2,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "asset",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/rpc.ts",
+          "pinus",
+          "pkplayer",
+          "remote",
+          "review",
+          "rpc",
+          "rpc.updateuserasset",
+          "servers",
+          "skills",
+          "tmp",
+          "ts",
+          "update",
+          "updateuserasset",
+          "user",
+          "app.rpc.pkplayer.rpc.updateuserasset",
+          "pkplayer.rpc.updateuserasset",
+          "remote.pkplayer.rpc.updateuserasset"
+        ],
+        "methodName": "updateUserAsset",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+        "summary": "Rpc",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "method",
+      "name": "Rpc.updateUserAsset"
+    },
+    {
+      "line": null,
+      "file": "../../db/schema/activity/goldenEggUserInfoSchema",
+      "area": "data",
+      "stack": [
+        "mysql",
+        "drizzle"
+      ],
+      "meta": {
+        "tags": [
+          "../../db/schema/activity/goldenegguserinfoschema",
+          "activity",
+          "db",
+          "egg",
+          "golden",
+          "goldenegguserinfotable",
+          "info",
+          "schema",
+          "table",
+          "user"
+        ],
+        "importPath": "../../db/schema/activity/goldenEggUserInfoSchema"
+      },
+      "id": "table:..-..-db-schema-activity-goldenegguserinfoschema:goldenegguserinfotable",
+      "type": "table",
+      "name": "goldenEggUserInfoTable"
+    },
+    {
+      "line": null,
+      "file": "../../db/schema/activity/goldenEggLotteryRecordSchema",
+      "area": "data",
+      "stack": [
+        "mysql",
+        "drizzle"
+      ],
+      "meta": {
+        "tags": [
+          "../../db/schema/activity/goldenegglotteryrecordschema",
+          "记录",
+          "activity",
+          "db",
+          "egg",
+          "golden",
+          "goldenegglotteryrecordtable",
+          "lottery",
+          "record",
+          "records",
+          "schema",
+          "table"
+        ],
+        "importPath": "../../db/schema/activity/goldenEggLotteryRecordSchema"
+      },
+      "id": "table:..-..-db-schema-activity-goldenegglotteryrecordschema:goldenegglotteryrecordtable",
+      "type": "table",
+      "name": "goldenEggLotteryRecordTable"
+    },
+    {
+      "line": null,
+      "file": "../../db/schema/users",
+      "area": "data",
+      "stack": [
+        "mysql",
+        "drizzle"
+      ],
+      "meta": {
+        "tags": [
+          "../../db/schema/users",
+          "account",
+          "db",
+          "schema",
+          "table",
+          "tb",
+          "tbuseraccount",
+          "user",
+          "users"
+        ],
+        "importPath": "../../db/schema/users"
+      },
+      "id": "table:..-..-db-schema-users:tbuseraccount",
+      "type": "table",
+      "name": "tbUserAccount"
+    },
+    {
+      "line": 2,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "app.rpc.pkplayer.rpc.updateuserasset",
+          "asset",
+          "pinus",
+          "pinus-remote",
+          "pinus-rpc",
+          "pkplayer",
+          "remote",
+          "route",
+          "rpc",
+          "update",
+          "updateuserasset",
+          "user"
+        ],
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "app.rpc.pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset"
+      },
+      "id": "route:pinus-remote:app.rpc.pkplayer.rpc.updateuserasset",
+      "type": "route",
+      "name": "app.rpc.pkplayer.Rpc.updateUserAsset"
+    },
+    {
+      "line": 2,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "asset",
+          "pinus",
+          "pinus-remote",
+          "pinus-rpc",
+          "pkplayer",
+          "remote",
+          "remote.pkplayer.rpc.updateuserasset",
+          "route",
+          "rpc",
+          "update",
+          "updateuserasset",
+          "user"
+        ],
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "remote.pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset"
+      },
+      "id": "route:pinus-remote:remote.pkplayer.rpc.updateuserasset",
+      "type": "route",
+      "name": "remote.pkplayer.Rpc.updateUserAsset"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/rpc.ts",
+          "notify",
+          "pinus",
+          "pkplayer",
+          "remote",
+          "review",
+          "rpc",
+          "rpc.notify",
+          "servers",
+          "skills",
+          "tmp",
+          "ts",
+          "app.rpc.pkplayer.rpc.notify",
+          "pkplayer.rpc.notify",
+          "remote.pkplayer.rpc.notify"
+        ],
+        "methodName": "notify",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+        "summary": "Rpc",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "method",
+      "name": "Rpc.notify"
+    },
+    {
+      "line": 2,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "asset",
+          "notify",
+          "player",
+          "player-notify",
+          "route",
+          "socket",
+          "update",
+          "updateuserasset",
+          "user"
+        ],
+        "kind": "player-notify",
+        "protocol": "socket",
+        "route": "updateUserAsset",
+        "handler": ""
+      },
+      "id": "route:player-notify:updateuserasset",
+      "type": "route",
+      "name": "updateUserAsset"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "app.rpc.pkplayer.rpc.notify",
+          "notify",
+          "pinus",
+          "pinus-remote",
+          "pinus-rpc",
+          "pkplayer",
+          "remote",
+          "route",
+          "rpc"
+        ],
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "app.rpc.pkplayer.Rpc.notify",
+        "handler": "notify"
+      },
+      "id": "route:pinus-remote:app.rpc.pkplayer.rpc.notify",
+      "type": "route",
+      "name": "app.rpc.pkplayer.Rpc.notify"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "notify",
+          "pinus",
+          "pinus-remote",
+          "pinus-rpc",
+          "pkplayer",
+          "pkplayer.rpc.notify",
+          "remote",
+          "route",
+          "rpc"
+        ],
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "pkplayer.Rpc.notify",
+        "handler": "notify"
+      },
+      "id": "route:pinus-remote:pkplayer.rpc.notify",
+      "type": "route",
+      "name": "pkplayer.Rpc.notify"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "notify",
+          "pinus",
+          "pinus-remote",
+          "pinus-rpc",
+          "pkplayer",
+          "remote",
+          "remote.pkplayer.rpc.notify",
+          "route",
+          "rpc"
+        ],
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "remote.pkplayer.Rpc.notify",
+        "handler": "notify"
+      },
+      "id": "route:pinus-remote:remote.pkplayer.rpc.notify",
+      "type": "route",
+      "name": "remote.pkplayer.Rpc.notify"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "table",
+          "tablemsg.ts",
+          "tmp",
+          "ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "type": "script",
+      "name": "TableMsg.ts"
+    },
+    {
+      "line": 13,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "handler",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "reg",
+          "reghandler",
+          "review",
+          "servers",
+          "skills",
+          "table",
+          "tablemsg.reghandler",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "regHandler",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+        "summary": "TableMsg",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reghandler",
+      "type": "method",
+      "name": "TableMsg.regHandler"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "状态",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "handlers",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "state",
+          "table",
+          "tablemsg.handlers",
+          "tmp",
+          "ts"
+        ],
+        "statePath": "handlers",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      },
+      "id": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlers",
+      "type": "state",
+      "name": "TableMsg.handlers"
+    },
+    {
+      "line": 17,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "handle",
+          "handlemsg",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "table",
+          "tablemsg.handlemsg",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "handleMsg",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+        "summary": "TableMsg",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+      "type": "method",
+      "name": "TableMsg.handleMsg"
+    },
+    {
+      "line": 30,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "msg",
+          "req",
+          "reqsynctable",
+          "route",
+          "sync",
+          "table",
+          "table-msg"
+        ],
+        "kind": "table-msg",
+        "protocol": "table-msg",
+        "route": "reqSyncTable",
+        "handler": "reqSyncTable"
+      },
+      "id": "route:table-msg:reqsynctable",
+      "type": "route",
+      "name": "reqSyncTable"
+    },
+    {
+      "line": 25,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "init",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "table",
+          "tablemsg.init",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "init",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+        "summary": "TableMsg",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:init",
+      "type": "method",
+      "name": "TableMsg.init"
+    },
+    {
+      "line": 30,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "bus",
+          "event",
+          "eventbus",
+          "on",
+          "synced",
+          "table",
+          "tablesynced",
+          "emit"
+        ],
+        "bus": "eventBus"
+      },
+      "id": "event:eventbus:tablesynced",
+      "type": "event",
+      "name": "tableSynced"
+    },
+    {
+      "line": 30,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "req",
+          "reqsynctable",
+          "review",
+          "servers",
+          "skills",
+          "sync",
+          "table",
+          "tablemsg.reqsynctable",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "reqSyncTable",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+        "summary": "TableMsg",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "type": "method",
+      "name": "TableMsg.reqSyncTable"
+    },
+    {
+      "line": 30,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "all",
+          "notify",
+          "room",
+          "room-notify-all",
+          "route",
+          "socket",
+          "sync",
+          "synctable",
+          "table"
+        ],
+        "kind": "room-notify-all",
+        "protocol": "socket",
+        "route": "syncTable",
+        "handler": ""
+      },
+      "id": "route:room-notify-all:synctable",
+      "type": "route",
+      "name": "syncTable"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "状态",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "state",
+          "sync",
+          "syncstate",
+          "table",
+          "tablemsg.syncstate",
+          "tmp",
+          "ts"
+        ],
+        "statePath": "syncState",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      },
+      "id": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:syncstate",
+      "type": "state",
+      "name": "TableMsg.syncState"
+    },
+    {
+      "line": 39,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/tablemsg.ts",
+          "games",
+          "handle",
+          "handletablesynced",
+          "modules",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "synced",
+          "table",
+          "tablemsg.handletablesynced",
+          "tmp",
+          "ts"
+        ],
+        "methodName": "handleTableSynced",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+        "summary": "TableMsg",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handletablesynced",
+      "type": "method",
+      "name": "TableMsg.handleTableSynced"
+    },
+    {
+      "line": null,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "handler",
+          "handler.ts",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "tmp",
+          "ts"
+        ]
+      },
+      "id": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "type": "script",
+      "name": "handler.ts"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "handler",
+          "handler.tablemsg",
+          "msg",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "table",
+          "tablemsg",
+          "tmp",
+          "ts",
+          "app.rpc.pkroom.handler.tablemsg",
+          "handler.pkroom.handler.tablemsg",
+          "pkroom.handler.tablemsg",
+          "rpc"
+        ],
+        "methodName": "tableMsg",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+        "summary": "handler",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "method",
+      "name": "handler.tableMsg"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "app",
+          "app.rpc.pkroom.handler.tablemsg",
+          "handler",
+          "msg",
+          "pinus",
+          "pinus-handler",
+          "pkroom",
+          "route",
+          "rpc",
+          "table",
+          "tablemsg"
+        ],
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "app.rpc.pkroom.handler.tableMsg",
+        "handler": "tableMsg"
+      },
+      "id": "route:pinus-handler:app.rpc.pkroom.handler.tablemsg",
+      "type": "route",
+      "name": "app.rpc.pkroom.handler.tableMsg"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "handler",
+          "handler.pkroom.handler.tablemsg",
+          "msg",
+          "pinus",
+          "pinus-handler",
+          "pkroom",
+          "route",
+          "table",
+          "tablemsg"
+        ],
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "handler.pkroom.handler.tableMsg",
+        "handler": "tableMsg"
+      },
+      "id": "route:pinus-handler:handler.pkroom.handler.tablemsg",
+      "type": "route",
+      "name": "handler.pkroom.handler.tableMsg"
+    },
+    {
+      "line": 4,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "handler",
+          "msg",
+          "pinus",
+          "pinus-handler",
+          "pkroom",
+          "pkroom.handler.tablemsg",
+          "route",
+          "table",
+          "tablemsg"
+        ],
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "pkroom.handler.tableMsg",
+        "handler": "tableMsg"
+      },
+      "id": "route:pinus-handler:pkroom.handler.tablemsg",
+      "type": "route",
+      "name": "pkroom.handler.tableMsg"
+    },
+    {
+      "line": 6,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "all",
+          "app",
+          "e",
+          "e:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "handler",
+          "handler.notifyall",
+          "notify",
+          "notifyall",
+          "pinus",
+          "pkroom",
+          "review",
+          "servers",
+          "skills",
+          "tmp",
+          "ts",
+          "app.rpc.pkroom.handler.notifyall",
+          "handler.pkroom.handler.notifyall",
+          "pkroom.handler.notifyall",
+          "rpc"
+        ],
+        "methodName": "NotifyAll",
+        "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+        "summary": "handler",
+        "synthetic": false
+      },
+      "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "method",
+      "name": "handler.NotifyAll"
+    },
+    {
+      "line": 6,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "all",
+          "app",
+          "app.rpc.pkroom.handler.notifyall",
+          "handler",
+          "notify",
+          "notifyall",
+          "pinus",
+          "pinus-handler",
+          "pkroom",
+          "route",
+          "rpc"
+        ],
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "app.rpc.pkroom.handler.NotifyAll",
+        "handler": "NotifyAll"
+      },
+      "id": "route:pinus-handler:app.rpc.pkroom.handler.notifyall",
+      "type": "route",
+      "name": "app.rpc.pkroom.handler.NotifyAll"
+    },
+    {
+      "line": 6,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "all",
+          "handler",
+          "handler.pkroom.handler.notifyall",
+          "notify",
+          "notifyall",
+          "pinus",
+          "pinus-handler",
+          "pkroom",
+          "route"
+        ],
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "handler.pkroom.handler.NotifyAll",
+        "handler": "NotifyAll"
+      },
+      "id": "route:pinus-handler:handler.pkroom.handler.notifyall",
+      "type": "route",
+      "name": "handler.pkroom.handler.NotifyAll"
+    },
+    {
+      "line": 6,
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "area": "backend",
+      "stack": [
+        "node",
+        "pinus"
+      ],
+      "meta": {
+        "tags": [
+          "all",
+          "handler",
+          "notify",
+          "notifyall",
+          "pinus",
+          "pinus-handler",
+          "pkroom",
+          "pkroom.handler.notifyall",
+          "route"
+        ],
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "pkroom.handler.NotifyAll",
+        "handler": "NotifyAll"
+      },
+      "id": "route:pinus-handler:pkroom.handler.notifyall",
+      "type": "route",
+      "name": "pkroom.handler.NotifyAll"
+    },
+    {
+      "id": "message:pinus-rpc:app.rpc.pkplayer.rpc.notify",
+      "type": "message",
+      "name": "app.rpc.pkplayer.Rpc.notify",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus-rpc",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+        ],
+        "tags": [
+          "app.rpc.pkplayer.Rpc.notify",
+          "pinus-rpc",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus-rpc:app.rpc.pkplayer.rpc.updateuserasset",
+      "type": "message",
+      "name": "app.rpc.pkplayer.Rpc.updateUserAsset",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus-rpc",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+        ],
+        "tags": [
+          "app.rpc.pkplayer.Rpc.updateUserAsset",
+          "pinus-rpc",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus:app.rpc.pkroom.handler.notifyall",
+      "type": "message",
+      "name": "app.rpc.pkroom.handler.NotifyAll",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+        ],
+        "tags": [
+          "app.rpc.pkroom.handler.NotifyAll",
+          "pinus",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus:app.rpc.pkroom.handler.tablemsg",
+      "type": "message",
+      "name": "app.rpc.pkroom.handler.tableMsg",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+        ],
+        "tags": [
+          "app.rpc.pkroom.handler.tableMsg",
+          "pinus",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus:handler.pkroom.handler.notifyall",
+      "type": "message",
+      "name": "handler.pkroom.handler.NotifyAll",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+        ],
+        "tags": [
+          "handler.pkroom.handler.NotifyAll",
+          "pinus",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus:handler.pkroom.handler.tablemsg",
+      "type": "message",
+      "name": "handler.pkroom.handler.tableMsg",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+        ],
+        "tags": [
+          "handler.pkroom.handler.tableMsg",
+          "pinus",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus-rpc:pkplayer.rpc.notify",
+      "type": "message",
+      "name": "pkplayer.Rpc.notify",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus-rpc",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+        ],
+        "tags": [
+          "pkplayer.Rpc.notify",
+          "pinus-rpc",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus-rpc:pkplayer.rpc.updateuserasset",
+      "type": "message",
+      "name": "pkplayer.Rpc.updateUserAsset",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus-rpc",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+        ],
+        "tags": [
+          "pkplayer.Rpc.updateUserAsset",
+          "pinus-rpc",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus:pkroom.handler.notifyall",
+      "type": "message",
+      "name": "pkroom.handler.NotifyAll",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+        ],
+        "tags": [
+          "pkroom.handler.NotifyAll",
+          "pinus",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus:pkroom.handler.tablemsg",
+      "type": "message",
+      "name": "pkroom.handler.tableMsg",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+        ],
+        "tags": [
+          "pkroom.handler.tableMsg",
+          "pinus",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus-rpc:remote.pkplayer.rpc.notify",
+      "type": "message",
+      "name": "remote.pkplayer.Rpc.notify",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus-rpc",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+        ],
+        "tags": [
+          "remote.pkplayer.Rpc.notify",
+          "pinus-rpc",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:pinus-rpc:remote.pkplayer.rpc.updateuserasset",
+      "type": "message",
+      "name": "remote.pkplayer.Rpc.updateUserAsset",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "pinus-rpc",
+        "confidence": 0.65,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+        ],
+        "tags": [
+          "remote.pkplayer.Rpc.updateUserAsset",
+          "pinus-rpc",
+          "message"
+        ]
+      }
+    },
+    {
+      "id": "message:table-msg:reqsynctable",
+      "type": "message",
+      "name": "reqSyncTable",
+      "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "line": null,
+      "area": "backend",
+      "stack": [],
+      "meta": {
+        "protocol": "table-msg",
+        "confidence": 0.75,
+        "learned": true,
+        "evidenceFiles": [
+          "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+        ],
+        "tags": [
+          "reqSyncTable",
+          "table-msg",
+          "message"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-common-utils.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-common-utils.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-common-utils.ts:pkplayerdispatch",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "data",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-db-schema-activity-goldenegglotteryrecordschema.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "data",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-db-schema-activity-goldenegguserinfoschema.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "data",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-db-schema-users.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "importSpecifier": "../../../modules/activity/goldenEgg"
+      },
+      "from": "script:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts",
+      "to": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "type": "depends_on",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts:http_get_activity_goldenegg_getgoldeneggreward",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts",
+      "to": "endpoint:get:activity-goldenegg-getgoldeneggreward",
+      "type": "contains",
+      "sourceKind": "endpoint"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "method": "GET",
+        "path": "/activity/goldenEgg/getGoldenEggReward",
+        "handlerName": "router.get"
+      },
+      "from": "endpoint:get:activity-goldenegg-getgoldeneggreward",
+      "to": "method:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts:http_get_activity_goldenegg_getgoldeneggreward",
+      "type": "binds",
+      "sourceKind": "endpoint"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "identifier": "GoldenEggEvent",
+        "isApi": false,
+        "callKind": "static-method",
+        "memberPath": "",
+        "resolvedVia": "generic"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-http-routes-activity-goldenegg.ts:http_get_activity_goldenegg_getgoldeneggreward",
+      "to": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "type": "calls",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "importSpecifier": "../../db/schema/activity/goldenEggLotteryRecordSchema"
+      },
+      "from": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "to": "script:e-skills-.tmp-review-pinus-app-db-schema-activity-goldenegglotteryrecordschema.ts",
+      "type": "depends_on",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "importSpecifier": "../../db/schema/activity/goldenEggUserInfoSchema"
+      },
+      "from": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "to": "script:e-skills-.tmp-review-pinus-app-db-schema-activity-goldenegguserinfoschema.ts",
+      "type": "depends_on",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "importSpecifier": "../../db/schema/users"
+      },
+      "from": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "to": "script:e-skills-.tmp-review-pinus-app-db-schema-users.ts",
+      "type": "depends_on",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "importSpecifier": "../../common/utils"
+      },
+      "from": "script:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts",
+      "to": "script:e-skills-.tmp-review-pinus-app-common-utils.ts",
+      "type": "depends_on",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "identifier": "Utils",
+        "isApi": false,
+        "callKind": "static-method",
+        "memberPath": "",
+        "resolvedVia": "generic"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "to": "method:e-skills-.tmp-review-pinus-app-common-utils.ts:pkplayerdispatch",
+      "type": "calls",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "callee": "pinus.rpc",
+        "target": "pkplayer.Rpc.updateUserAsset",
+        "viaMethod": "",
+        "protocol": "pinus-rpc",
+        "httpMethod": "",
+        "transport": "pinus-rpc"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "to": "request:pinus-rpc::pinus-rpc:pinus.rpc:pkplayer.rpc.updateuserasset",
+      "type": "requests",
+      "sourceKind": "network"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:pinus-remote:pkplayer.rpc.updateuserasset",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "route": "pkplayer.Rpc.updateUserAsset"
+      },
+      "from": "request:pinus-rpc::pinus-rpc:pinus.rpc:pkplayer.rpc.updateuserasset",
+      "to": "route:pinus-remote:pkplayer.rpc.updateuserasset",
+      "type": "depends_on",
+      "sourceKind": "network"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset"
+      },
+      "from": "route:pinus-remote:pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "tableName": "goldenEggUserInfoTable",
+        "importPath": "../../db/schema/activity/goldenEggUserInfoSchema",
+        "operation": "from"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "to": "table:..-..-db-schema-activity-goldenegguserinfoschema:goldenegguserinfotable",
+      "type": "reads",
+      "sourceKind": "table"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "tableName": "goldenEggUserInfoTable",
+        "importPath": "../../db/schema/activity/goldenEggUserInfoSchema",
+        "operation": "update"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "to": "table:..-..-db-schema-activity-goldenegguserinfoschema:goldenegguserinfotable",
+      "type": "writes",
+      "sourceKind": "table"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "tableName": "goldenEggLotteryRecordTable",
+        "importPath": "../../db/schema/activity/goldenEggLotteryRecordSchema",
+        "operation": "insert"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "to": "table:..-..-db-schema-activity-goldenegglotteryrecordschema:goldenegglotteryrecordtable",
+      "type": "writes",
+      "sourceKind": "table"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "tableName": "tbUserAccount",
+        "importPath": "../../db/schema/users",
+        "operation": "update"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-modules-activity-goldenegg.ts:getgoldeneggreward",
+      "to": "table:..-..-db-schema-users:tbuseraccount",
+      "type": "writes",
+      "sourceKind": "table"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:pinus-remote:app.rpc.pkplayer.rpc.updateuserasset",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "app.rpc.pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset",
+        "role": "handler"
+      },
+      "from": "route:pinus-remote:app.rpc.pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset",
+        "role": "handler"
+      },
+      "from": "route:pinus-remote:pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:pinus-remote:remote.pkplayer.rpc.updateuserasset",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "remote.pkplayer.Rpc.updateUserAsset",
+        "handler": "updateUserAsset",
+        "role": "handler"
+      },
+      "from": "route:pinus-remote:remote.pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "calls",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:player-notify:updateuserasset",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "player-notify",
+        "protocol": "socket",
+        "route": "updateUserAsset",
+        "callee": "pl.notify"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "to": "route:player-notify:updateuserasset",
+      "type": "emits",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:pinus-remote:app.rpc.pkplayer.rpc.notify",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "app.rpc.pkplayer.Rpc.notify",
+        "handler": "notify",
+        "role": "handler"
+      },
+      "from": "route:pinus-remote:app.rpc.pkplayer.rpc.notify",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:pinus-remote:pkplayer.rpc.notify",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "pkplayer.Rpc.notify",
+        "handler": "notify",
+        "role": "handler"
+      },
+      "from": "route:pinus-remote:pkplayer.rpc.notify",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts",
+      "to": "route:pinus-remote:remote.pkplayer.rpc.notify",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "route": "remote.pkplayer.Rpc.notify",
+        "handler": "notify",
+        "role": "handler"
+      },
+      "from": "route:pinus-remote:remote.pkplayer.rpc.notify",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reghandler",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlers",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "statePath": "handlers"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reghandler",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlers",
+      "type": "reads",
+      "sourceKind": "state"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "statePath": "handlers"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reghandler",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlers",
+      "type": "writes",
+      "sourceKind": "state"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "route:table-msg:reqsynctable",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "table-msg",
+        "protocol": "table-msg",
+        "route": "reqSyncTable",
+        "handler": "reqSyncTable",
+        "role": "dispatcher"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+      "to": "route:table-msg:reqsynctable",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "statePath": "handlers"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlers",
+      "type": "reads",
+      "sourceKind": "state"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:init",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:init",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reghandler",
+      "type": "calls",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "mode": "on",
+        "via": "direct",
+        "inlineActions": null
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:init",
+      "to": "event:eventbus:tablesynced",
+      "type": "subscribes",
+      "sourceKind": "event"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "table-msg",
+        "protocol": "table-msg",
+        "route": "reqSyncTable",
+        "handler": "reqSyncTable",
+        "role": "handler"
+      },
+      "from": "route:table-msg:reqsynctable",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "mode": "emit"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "to": "event:eventbus:tablesynced",
+      "type": "emits",
+      "sourceKind": "event"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "route:room-notify-all:synctable",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "room-notify-all",
+        "protocol": "socket",
+        "route": "syncTable",
+        "callee": "tb.NotifyAll"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "to": "route:room-notify-all:synctable",
+      "type": "emits",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:syncstate",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "statePath": "syncState"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:syncstate",
+      "type": "reads",
+      "sourceKind": "state"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "statePath": "syncState"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:syncstate",
+      "type": "writes",
+      "sourceKind": "state"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handletablesynced",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "statePath": "syncState"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handletablesynced",
+      "to": "state:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:syncstate",
+      "type": "reads",
+      "sourceKind": "state"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "module:project-global",
+      "to": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "importSpecifier": "../games/modules/TableMsg"
+      },
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts",
+      "type": "depends_on",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "route:pinus-handler:app.rpc.pkroom.handler.tablemsg",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "app.rpc.pkroom.handler.tableMsg",
+        "handler": "tableMsg",
+        "role": "handler"
+      },
+      "from": "route:pinus-handler:app.rpc.pkroom.handler.tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "route:pinus-handler:handler.pkroom.handler.tablemsg",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "handler.pkroom.handler.tableMsg",
+        "handler": "tableMsg",
+        "role": "handler"
+      },
+      "from": "route:pinus-handler:handler.pkroom.handler.tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "route:pinus-handler:pkroom.handler.tablemsg",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "pkroom.handler.tableMsg",
+        "handler": "tableMsg",
+        "role": "handler"
+      },
+      "from": "route:pinus-handler:pkroom.handler.tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "contains",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "calls",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "identifier": "TableMsg",
+        "isApi": false,
+        "callKind": "static-method",
+        "memberPath": "inst",
+        "resolvedVia": "generic"
+      },
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+      "type": "calls",
+      "sourceKind": "script"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "route:pinus-handler:app.rpc.pkroom.handler.notifyall",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "app.rpc.pkroom.handler.NotifyAll",
+        "handler": "NotifyAll",
+        "role": "handler"
+      },
+      "from": "route:pinus-handler:app.rpc.pkroom.handler.notifyall",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "route:pinus-handler:handler.pkroom.handler.notifyall",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "handler.pkroom.handler.NotifyAll",
+        "handler": "NotifyAll",
+        "role": "handler"
+      },
+      "from": "route:pinus-handler:handler.pkroom.handler.notifyall",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {},
+      "from": "script:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts",
+      "to": "route:pinus-handler:pkroom.handler.notifyall",
+      "type": "contains",
+      "sourceKind": "route"
+    },
+    {
+      "area": "backend",
+      "meta": {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "route": "pkroom.handler.NotifyAll",
+        "handler": "NotifyAll",
+        "role": "handler"
+      },
+      "from": "route:pinus-handler:pkroom.handler.notifyall",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "binds",
+      "sourceKind": "route"
+    },
+    {
+      "from": "message:pinus-rpc:app.rpc.pkplayer.rpc.notify",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "message": "app.rpc.pkplayer.Rpc.notify",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus-rpc:app.rpc.pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "message": "app.rpc.pkplayer.Rpc.updateUserAsset",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus:app.rpc.pkroom.handler.notifyall",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus",
+        "message": "app.rpc.pkroom.handler.NotifyAll",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus:app.rpc.pkroom.handler.tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus",
+        "message": "app.rpc.pkroom.handler.tableMsg",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus:handler.pkroom.handler.notifyall",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus",
+        "message": "handler.pkroom.handler.NotifyAll",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus:handler.pkroom.handler.tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus",
+        "message": "handler.pkroom.handler.tableMsg",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus-rpc:pkplayer.rpc.notify",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "message": "pkplayer.Rpc.notify",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus-rpc:pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "message": "pkplayer.Rpc.updateUserAsset",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus:pkroom.handler.notifyall",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus",
+        "message": "pkroom.handler.NotifyAll",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus:pkroom.handler.tablemsg",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus",
+        "message": "pkroom.handler.tableMsg",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus-rpc:remote.pkplayer.rpc.notify",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "message": "remote.pkplayer.Rpc.notify",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:pinus-rpc:remote.pkplayer.rpc.updateuserasset",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "pinus-rpc",
+        "message": "remote.pkplayer.Rpc.updateUserAsset",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+      "to": "message:table-msg:reqsynctable",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "table-msg",
+        "message": "reqSyncTable",
+        "role": "dispatcher",
+        "via": "protocol-learning"
+      }
+    },
+    {
+      "from": "message:table-msg:reqsynctable",
+      "to": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+      "type": "binds",
+      "sourceKind": "message",
+      "area": "backend",
+      "meta": {
+        "protocol": "table-msg",
+        "message": "reqSyncTable",
+        "role": "handler",
+        "via": "protocol-learning"
+      }
+    }
+  ],
+  "projectProtocolsSummary": {
+    "messages": 13,
+    "dispatchers": 1,
+    "statePatterns": 1,
+    "timingPatterns": 0,
+    "phasePatterns": 11,
+    "transitionPatterns": 2,
+    "routeKinds": 3,
+    "requestProtocols": 1
+  }
+}

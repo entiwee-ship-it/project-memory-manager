@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { hasOwn, readJson, resolveProjectRoot } = require('./lib/common');
+const { hasOwn, readJson, readJsonSafe, resolveProjectRoot } = require('./lib/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
@@ -142,11 +142,44 @@ function collectTypedSelectors(args) {
 
 function loadFeatureLookup(root, featureKey) {
     const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
-    const registry = readJson(registryPath);
+    
+    // 使用安全读取
+    let registry;
+    try {
+        registry = readJsonSafe(registryPath, { required: true });
+    } catch (err) {
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 无法加载 Feature Registry\n` +
+            `文件: ${registryPath}\n` +
+            `错误: ${err.message}\n\n` +
+            `可能原因:\n` +
+            `  1. 项目记忆尚未初始化\n` +
+            `  2. 当前目录不是项目根目录\n\n` +
+            `修复命令:\n` +
+            `  node scripts/init_project_memory.js --root <project-root>\n` +
+            `  或切换到正确的项目目录`
+        );
+    }
+    
     const normalizedFeatures = (registry.features || []).map(item => normalizeFeatureRecord(item));
     const feature = normalizedFeatures.find(item => item.featureKey === featureKey);
+    
     if (!feature) {
-        throw new Error(`注册表中未找到功能: ${featureKey}`);
+        const availableFeatures = normalizedFeatures.map(f => f.featureKey).slice(0, 10);
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 未找到 Feature: ${featureKey}\n\n` +
+            `可能原因:\n` +
+            `  1. Feature 名称拼写错误\n` +
+            `  2. Feature 尚未注册（需要构建 KB）\n` +
+            `  3. 使用了错误的项目根目录\n\n` +
+            `可用的 Features (${Math.min(availableFeatures.length, 10)} 个):\n` +
+            availableFeatures.map(f => `  • ${f}`).join('\n') +
+            (normalizedFeatures.length > 10 ? `\n  ... 还有 ${normalizedFeatures.length - 10} 个` : '') +
+            `\n\n修复命令:\n` +
+            `  1. 检查 feature 名称是否正确\n` +
+            `  2. 构建该 feature: node scripts/build_chain_kb.js --config project-memory/kb/configs/${featureKey}.json\n` +
+            `  3. 或重建全部: node scripts/rebuild_kbs.js --root <project-root>`
+        );
     }
 
     return loadFeatureLookupArtifacts(root, feature);

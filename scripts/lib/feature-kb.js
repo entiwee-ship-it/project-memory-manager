@@ -1,5 +1,5 @@
 const path = require('path');
-const { pathExists, readJson, slugify } = require('./common');
+const { pathExists, readJson, readJsonSafe, slugify } = require('./common');
 
 function toPosixPath(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -173,15 +173,72 @@ function resolveExistingKbArtifacts(root, record = {}) {
     };
 }
 
-function loadFeatureLookupArtifacts(root, record = {}) {
+/**
+ * 加载 Feature KB 产物，提供诊断信息
+ * @param {string} root - 项目根目录
+ * @param {Object} record - Feature 记录
+ * @param {Object} options - 选项
+ * @returns {Object} 加载的 artifacts
+ * @throws {Error} 带有诊断信息的错误
+ */
+function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
     const normalized = normalizeFeatureRecord(record);
     const { graphPath, lookupPath } = resolveExistingKbArtifacts(root, normalized);
+    
+    // 检查文件是否存在，提供诊断
+    if (!pathExists(graphPath)) {
+        const error = new Error(
+            `[SKILL-DIAGNOSIS] KB graph 文件不存在\n` +
+            `文件: ${graphPath}\n` +
+            `Feature: ${normalized.featureKey}\n\n` +
+            `可能原因:\n` +
+            `  1. 该 feature 尚未构建\n` +
+            `  2. 构建后文件被移动或删除\n\n` +
+            `修复命令:\n` +
+            `  node scripts/build_chain_kb.js --config ${normalized.configPath || `project-memory/kb/configs/${normalized.featureKey}.json`}\n` +
+            `  或重建全部:\n` +
+            `  node scripts/rebuild_kbs.js --root ${root}`
+        );
+        error.code = 'KB_NOT_FOUND';
+        error.featureKey = normalized.featureKey;
+        throw error;
+    }
+    
+    if (!pathExists(lookupPath)) {
+        const error = new Error(
+            `[SKILL-DIAGNOSIS] KB lookup 文件不存在\n` +
+            `文件: ${lookupPath}\n` +
+            `Feature: ${normalized.featureKey}\n\n` +
+            `可能原因:\n` +
+            `  1. 该 feature 尚未构建\n` +
+            `  2. 构建后文件被移动或删除\n\n` +
+            `修复命令:\n` +
+            `  node scripts/build_chain_kb.js --config ${normalized.configPath || `project-memory/kb/configs/${normalized.featureKey}.json`}\n` +
+            `  或重建全部:\n` +
+            `  node scripts/rebuild_kbs.js --root ${root}`
+        );
+        error.code = 'KB_NOT_FOUND';
+        error.featureKey = normalized.featureKey;
+        throw error;
+    }
+    
+    // 使用安全读取
+    const graph = readJsonSafe(graphPath, { 
+        suggestRebuild: true, 
+        featureKey: normalized.featureKey 
+    });
+    
+    const lookup = readJsonSafe(lookupPath, { 
+        suggestRebuild: true, 
+        featureKey: normalized.featureKey 
+    });
+    
     return {
         feature: normalized,
         graphPath,
         lookupPath,
-        graph: readJson(graphPath),
-        lookup: readJson(lookupPath),
+        graph,
+        lookup,
     };
 }
 

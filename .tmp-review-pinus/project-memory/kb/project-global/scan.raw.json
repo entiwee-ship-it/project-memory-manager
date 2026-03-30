@@ -1,0 +1,1784 @@
+{
+  "generatedAt": "2026-03-30T03:28:58.348Z",
+  "scanConfig": {
+    "componentRoots": [],
+    "assetRoots": [],
+    "methodRoots": [
+      "E:/skills/.tmp-review-pinus/app",
+      "E:/skills/.tmp-review-pinus/app/db/schema",
+      "E:/skills/.tmp-review-pinus/app/http/routes",
+      "E:/skills/.tmp-review-pinus/app/modules",
+      "E:/skills/.tmp-review-pinus/app/servers"
+    ],
+    "prefabInputs": []
+  },
+  "prefabs": [],
+  "scripts": [
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+      "summary": "utils",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "Utils",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "pkplayerDispatch",
+          "access": "public",
+          "static": true,
+          "async": false,
+          "params": "userId: number",
+          "returnType": "",
+          "paramNames": [
+            "userId"
+          ],
+          "line": 2,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+      "summary": "goldenEggLotteryRecordSchema",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "const",
+          "name": "goldenEggLotteryRecordTable",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+      "summary": "goldenEggUserInfoSchema",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "const",
+          "name": "goldenEggUserInfoTable",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+      "summary": "users",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "const",
+          "name": "tbUserAccount",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+      "summary": "goldenEgg",
+      "imports": [
+        {
+          "clause": "{ Router }",
+          "specifier": "express",
+          "identifiers": [
+            "Router"
+          ],
+          "resolvedPath": null,
+          "resolvedVia": "",
+          "isLocal": false,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ GoldenEggEvent }",
+          "specifier": "../../../modules/activity/goldenEgg",
+          "identifiers": [
+            "GoldenEggEvent"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        }
+      ],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [],
+      "methods": [
+        {
+          "name": "http_get_activity_goldenegg_getgoldeneggreward",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "req, res",
+          "returnType": "",
+          "paramNames": [
+            "req",
+            "res"
+          ],
+          "line": 6,
+          "summary": "HTTP GET /activity/goldenEgg/getGoldenEggReward",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [
+            {
+              "identifier": "GoldenEggEvent",
+              "method": "getGoldenEggReward",
+              "sourcePath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+              "sourceSpecifier": "../../../modules/activity/goldenEgg",
+              "isApi": false,
+              "callKind": "static-method",
+              "memberPath": "",
+              "resolvedVia": "generic"
+            }
+          ],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "httpEndpoints": [
+            {
+              "method": "GET",
+              "path": "/activity/goldenEgg/getGoldenEggReward",
+              "handlerName": "router.get",
+              "localCalls": [],
+              "importedCalls": [
+                {
+                  "identifier": "GoldenEggEvent",
+                  "method": "getGoldenEggReward",
+                  "sourcePath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+                  "sourceSpecifier": "../../../modules/activity/goldenEgg",
+                  "isApi": false,
+                  "callKind": "static-method",
+                  "memberPath": "",
+                  "resolvedVia": "generic"
+                }
+              ],
+              "fieldCalls": []
+            }
+          ],
+          "messageRoutes": [],
+          "syntheticKind": "http-endpoint"
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+      "summary": "goldenEgg",
+      "imports": [
+        {
+          "clause": "{ goldenEggLotteryRecordTable }",
+          "specifier": "../../db/schema/activity/goldenEggLotteryRecordSchema",
+          "identifiers": [
+            "goldenEggLotteryRecordTable"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ goldenEggUserInfoTable }",
+          "specifier": "../../db/schema/activity/goldenEggUserInfoSchema",
+          "identifiers": [
+            "goldenEggUserInfoTable"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ tbUserAccount }",
+          "specifier": "../../db/schema/users",
+          "identifiers": [
+            "tbUserAccount"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ Utils }",
+          "specifier": "../../common/utils",
+          "identifiers": [
+            "Utils"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        }
+      ],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [],
+      "methods": [
+        {
+          "name": "getGoldenEggReward",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "userId: number",
+          "returnType": "",
+          "paramNames": [
+            "userId"
+          ],
+          "line": 10,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [
+            {
+              "identifier": "Utils",
+              "method": "pkplayerDispatch",
+              "sourcePath": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+              "sourceSpecifier": "../../common/utils",
+              "isApi": false,
+              "callKind": "static-method",
+              "memberPath": "",
+              "resolvedVia": "generic"
+            }
+          ],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [
+            {
+              "callee": "pinus.rpc",
+              "target": "pkplayer.Rpc.updateUserAsset",
+              "route": "pkplayer.Rpc.updateUserAsset",
+              "protocol": "pinus-rpc",
+              "transport": "pinus-rpc",
+              "callbackKind": "none",
+              "callbackRef": "",
+              "callbackLocalCalls": [],
+              "callbackImportedCalls": [],
+              "callbackFieldCalls": [],
+              "callbackEventDispatches": [],
+              "callbackInvocations": []
+            }
+          ],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [
+            {
+              "tableName": "goldenEggUserInfoTable",
+              "importPath": "../../db/schema/activity/goldenEggUserInfoSchema",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+              "operation": "from"
+            }
+          ],
+          "dbWrites": [
+            {
+              "tableName": "goldenEggUserInfoTable",
+              "importPath": "../../db/schema/activity/goldenEggUserInfoSchema",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+              "operation": "update"
+            },
+            {
+              "tableName": "goldenEggLotteryRecordTable",
+              "importPath": "../../db/schema/activity/goldenEggLotteryRecordSchema",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+              "operation": "insert"
+            },
+            {
+              "tableName": "tbUserAccount",
+              "importPath": "../../db/schema/users",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+              "operation": "update"
+            }
+          ],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "summary": "Rpc",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "Rpc",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "updateUserAsset",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "uid: number, payload: any",
+          "returnType": "",
+          "paramNames": [
+            "uid",
+            "payload"
+          ],
+          "line": 2,
+          "summary": "",
+          "localCalls": [
+            "notify"
+          ],
+          "localCallSites": [
+            {
+              "method": "notify",
+              "args": [
+                "route: string",
+                "message: any"
+              ]
+            },
+            {
+              "method": "notify",
+              "args": [
+                "'updateUserAsset'",
+                "payload"
+              ]
+            }
+          ],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "app.rpc.pkplayer.Rpc.updateUserAsset",
+              "handler": "updateUserAsset",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "pkplayer.Rpc.updateUserAsset",
+              "handler": "updateUserAsset",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "remote.pkplayer.Rpc.updateUserAsset",
+              "handler": "updateUserAsset",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [
+            {
+              "kind": "player-notify",
+              "route": "updateUserAsset",
+              "protocol": "socket",
+              "callee": "pl.notify"
+            }
+          ],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "notify",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "route: string, message: any",
+          "returnType": "",
+          "paramNames": [
+            "route",
+            "message"
+          ],
+          "line": 4,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "app.rpc.pkplayer.Rpc.notify",
+              "handler": "notify",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "pkplayer.Rpc.notify",
+              "handler": "notify",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "remote.pkplayer.Rpc.notify",
+              "handler": "notify",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "summary": "TableMsg",
+      "imports": [],
+      "fieldTypes": [
+        {
+          "fieldName": "handlers",
+          "rawType": "Map<string, MsgHandler>",
+          "baseType": "Map",
+          "sourcePath": null,
+          "sourceSpecifier": "",
+          "declaredVia": "regex"
+        },
+        {
+          "fieldName": "syncState",
+          "rawType": "any",
+          "baseType": "any",
+          "sourcePath": null,
+          "sourceSpecifier": "",
+          "declaredVia": "regex"
+        }
+      ],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "TableMsg",
+          "line": 4,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "regHandler",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "msgName: string, handler: MsgHandler",
+          "returnType": "",
+          "paramNames": [
+            "msgName",
+            "handler"
+          ],
+          "line": 13,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "handlers"
+          ],
+          "stateWrites": [
+            "handlers"
+          ],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "handleMsg",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "msgName: string, tb: any, pl: any, msg: any",
+          "returnType": "",
+          "paramNames": [
+            "msgName",
+            "tb",
+            "pl",
+            "msg"
+          ],
+          "line": 17,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "handlers"
+          ],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "route": "reqSyncTable",
+              "handler": "reqSyncTable",
+              "kind": "table-msg",
+              "protocol": "table-msg",
+              "role": "dispatcher"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "init",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "",
+          "returnType": "",
+          "paramNames": [],
+          "line": 25,
+          "summary": "",
+          "localCalls": [
+            "regHandler"
+          ],
+          "localCallSites": [
+            {
+              "method": "regHandler",
+              "args": [
+                "'reqSyncTable'",
+                "this.reqSyncTable"
+              ]
+            }
+          ],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [
+            {
+              "bus": "eventBus",
+              "mode": "on",
+              "event": "tableSynced",
+              "handler": "handleTableSynced",
+              "via": "direct"
+            }
+          ],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "reqSyncTable",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "tb: any, pl: any, msg: any",
+          "returnType": "",
+          "paramNames": [
+            "tb",
+            "pl",
+            "msg"
+          ],
+          "line": 30,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [
+            {
+              "bus": "eventBus",
+              "mode": "emit",
+              "event": "tableSynced"
+            }
+          ],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "syncState"
+          ],
+          "stateWrites": [
+            "syncState"
+          ],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "route": "reqSyncTable",
+              "handler": "reqSyncTable",
+              "kind": "table-msg",
+              "protocol": "table-msg",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [
+            {
+              "kind": "room-notify-all",
+              "route": "syncTable",
+              "protocol": "socket",
+              "callee": "tb.NotifyAll"
+            }
+          ],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "handleTableSynced",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "",
+          "returnType": "",
+          "paramNames": [],
+          "line": 39,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "syncState"
+          ],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "summary": "handler",
+      "imports": [
+        {
+          "clause": "{ TableMsg }",
+          "specifier": "../games/modules/TableMsg",
+          "identifiers": [
+            "TableMsg"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        }
+      ],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "handler",
+          "line": 3,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "tableMsg",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "msg: any",
+          "returnType": "",
+          "paramNames": [
+            "msg"
+          ],
+          "line": 4,
+          "summary": "",
+          "localCalls": [
+            "NotifyAll"
+          ],
+          "localCallSites": [
+            {
+              "method": "NotifyAll",
+              "args": [
+                "route: string",
+                "payload: any"
+              ]
+            }
+          ],
+          "importedCalls": [
+            {
+              "identifier": "TableMsg",
+              "method": "handleMsg",
+              "sourcePath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+              "sourceSpecifier": "../games/modules/TableMsg",
+              "isApi": false,
+              "callKind": "static-method",
+              "memberPath": "inst",
+              "resolvedVia": "generic"
+            }
+          ],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "app.rpc.pkroom.handler.tableMsg",
+              "handler": "tableMsg",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "handler.pkroom.handler.tableMsg",
+              "handler": "tableMsg",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "pkroom.handler.tableMsg",
+              "handler": "tableMsg",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "NotifyAll",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "route: string, payload: any",
+          "returnType": "",
+          "paramNames": [
+            "route",
+            "payload"
+          ],
+          "line": 6,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "app.rpc.pkroom.handler.NotifyAll",
+              "handler": "NotifyAll",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "handler.pkroom.handler.NotifyAll",
+              "handler": "NotifyAll",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "pkroom.handler.NotifyAll",
+              "handler": "NotifyAll",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+      "summary": "goldenEggLotteryRecordSchema",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "const",
+          "name": "goldenEggLotteryRecordTable",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+      "summary": "goldenEggUserInfoSchema",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "const",
+          "name": "goldenEggUserInfoTable",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+      "summary": "users",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "const",
+          "name": "tbUserAccount",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+      "summary": "goldenEgg",
+      "imports": [
+        {
+          "clause": "{ Router }",
+          "specifier": "express",
+          "identifiers": [
+            "Router"
+          ],
+          "resolvedPath": null,
+          "resolvedVia": "",
+          "isLocal": false,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ GoldenEggEvent }",
+          "specifier": "../../../modules/activity/goldenEgg",
+          "identifiers": [
+            "GoldenEggEvent"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        }
+      ],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [],
+      "methods": [
+        {
+          "name": "http_get_activity_goldenegg_getgoldeneggreward",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "req, res",
+          "returnType": "",
+          "paramNames": [
+            "req",
+            "res"
+          ],
+          "line": 6,
+          "summary": "HTTP GET /activity/goldenEgg/getGoldenEggReward",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [
+            {
+              "identifier": "GoldenEggEvent",
+              "method": "getGoldenEggReward",
+              "sourcePath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+              "sourceSpecifier": "../../../modules/activity/goldenEgg",
+              "isApi": false,
+              "callKind": "static-method",
+              "memberPath": "",
+              "resolvedVia": "generic"
+            }
+          ],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "httpEndpoints": [
+            {
+              "method": "GET",
+              "path": "/activity/goldenEgg/getGoldenEggReward",
+              "handlerName": "router.get",
+              "localCalls": [],
+              "importedCalls": [
+                {
+                  "identifier": "GoldenEggEvent",
+                  "method": "getGoldenEggReward",
+                  "sourcePath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+                  "sourceSpecifier": "../../../modules/activity/goldenEgg",
+                  "isApi": false,
+                  "callKind": "static-method",
+                  "memberPath": "",
+                  "resolvedVia": "generic"
+                }
+              ],
+              "fieldCalls": []
+            }
+          ],
+          "messageRoutes": [],
+          "syntheticKind": "http-endpoint"
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+      "summary": "goldenEgg",
+      "imports": [
+        {
+          "clause": "{ goldenEggLotteryRecordTable }",
+          "specifier": "../../db/schema/activity/goldenEggLotteryRecordSchema",
+          "identifiers": [
+            "goldenEggLotteryRecordTable"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ goldenEggUserInfoTable }",
+          "specifier": "../../db/schema/activity/goldenEggUserInfoSchema",
+          "identifiers": [
+            "goldenEggUserInfoTable"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ tbUserAccount }",
+          "specifier": "../../db/schema/users",
+          "identifiers": [
+            "tbUserAccount"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        },
+        {
+          "clause": "{ Utils }",
+          "specifier": "../../common/utils",
+          "identifiers": [
+            "Utils"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        }
+      ],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [],
+      "methods": [
+        {
+          "name": "getGoldenEggReward",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "userId: number",
+          "returnType": "",
+          "paramNames": [
+            "userId"
+          ],
+          "line": 10,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [
+            {
+              "identifier": "Utils",
+              "method": "pkplayerDispatch",
+              "sourcePath": "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+              "sourceSpecifier": "../../common/utils",
+              "isApi": false,
+              "callKind": "static-method",
+              "memberPath": "",
+              "resolvedVia": "generic"
+            }
+          ],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [
+            {
+              "callee": "pinus.rpc",
+              "target": "pkplayer.Rpc.updateUserAsset",
+              "route": "pkplayer.Rpc.updateUserAsset",
+              "protocol": "pinus-rpc",
+              "transport": "pinus-rpc",
+              "callbackKind": "none",
+              "callbackRef": "",
+              "callbackLocalCalls": [],
+              "callbackImportedCalls": [],
+              "callbackFieldCalls": [],
+              "callbackEventDispatches": [],
+              "callbackInvocations": []
+            }
+          ],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [
+            {
+              "tableName": "goldenEggUserInfoTable",
+              "importPath": "../../db/schema/activity/goldenEggUserInfoSchema",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+              "operation": "from"
+            }
+          ],
+          "dbWrites": [
+            {
+              "tableName": "goldenEggUserInfoTable",
+              "importPath": "../../db/schema/activity/goldenEggUserInfoSchema",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+              "operation": "update"
+            },
+            {
+              "tableName": "goldenEggLotteryRecordTable",
+              "importPath": "../../db/schema/activity/goldenEggLotteryRecordSchema",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+              "operation": "insert"
+            },
+            {
+              "tableName": "tbUserAccount",
+              "importPath": "../../db/schema/users",
+              "resolvedPath": "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+              "operation": "update"
+            }
+          ],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+      "summary": "Rpc",
+      "imports": [],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "Rpc",
+          "line": 1,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "updateUserAsset",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "uid: number, payload: any",
+          "returnType": "",
+          "paramNames": [
+            "uid",
+            "payload"
+          ],
+          "line": 2,
+          "summary": "",
+          "localCalls": [
+            "notify"
+          ],
+          "localCallSites": [
+            {
+              "method": "notify",
+              "args": [
+                "route: string",
+                "message: any"
+              ]
+            },
+            {
+              "method": "notify",
+              "args": [
+                "'updateUserAsset'",
+                "payload"
+              ]
+            }
+          ],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "app.rpc.pkplayer.Rpc.updateUserAsset",
+              "handler": "updateUserAsset",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "pkplayer.Rpc.updateUserAsset",
+              "handler": "updateUserAsset",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "remote.pkplayer.Rpc.updateUserAsset",
+              "handler": "updateUserAsset",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [
+            {
+              "kind": "player-notify",
+              "route": "updateUserAsset",
+              "protocol": "socket",
+              "callee": "pl.notify"
+            }
+          ],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "notify",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "route: string, message: any",
+          "returnType": "",
+          "paramNames": [
+            "route",
+            "message"
+          ],
+          "line": 4,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "app.rpc.pkplayer.Rpc.notify",
+              "handler": "notify",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "pkplayer.Rpc.notify",
+              "handler": "notify",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-remote",
+              "protocol": "pinus-rpc",
+              "route": "remote.pkplayer.Rpc.notify",
+              "handler": "notify",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "summary": "TableMsg",
+      "imports": [],
+      "fieldTypes": [
+        {
+          "fieldName": "handlers",
+          "rawType": "Map<string, MsgHandler>",
+          "baseType": "Map",
+          "sourcePath": null,
+          "sourceSpecifier": "",
+          "declaredVia": "regex"
+        },
+        {
+          "fieldName": "syncState",
+          "rawType": "any",
+          "baseType": "any",
+          "sourcePath": null,
+          "sourceSpecifier": "",
+          "declaredVia": "regex"
+        }
+      ],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "TableMsg",
+          "line": 4,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "regHandler",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "msgName: string, handler: MsgHandler",
+          "returnType": "",
+          "paramNames": [
+            "msgName",
+            "handler"
+          ],
+          "line": 13,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "handlers"
+          ],
+          "stateWrites": [
+            "handlers"
+          ],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "handleMsg",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "msgName: string, tb: any, pl: any, msg: any",
+          "returnType": "",
+          "paramNames": [
+            "msgName",
+            "tb",
+            "pl",
+            "msg"
+          ],
+          "line": 17,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "handlers"
+          ],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "route": "reqSyncTable",
+              "handler": "reqSyncTable",
+              "kind": "table-msg",
+              "protocol": "table-msg",
+              "role": "dispatcher"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "init",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "",
+          "returnType": "",
+          "paramNames": [],
+          "line": 25,
+          "summary": "",
+          "localCalls": [
+            "regHandler"
+          ],
+          "localCallSites": [
+            {
+              "method": "regHandler",
+              "args": [
+                "'reqSyncTable'",
+                "this.reqSyncTable"
+              ]
+            }
+          ],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [
+            {
+              "bus": "eventBus",
+              "mode": "on",
+              "event": "tableSynced",
+              "handler": "handleTableSynced",
+              "via": "direct"
+            }
+          ],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "reqSyncTable",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "tb: any, pl: any, msg: any",
+          "returnType": "",
+          "paramNames": [
+            "tb",
+            "pl",
+            "msg"
+          ],
+          "line": 30,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [
+            {
+              "bus": "eventBus",
+              "mode": "emit",
+              "event": "tableSynced"
+            }
+          ],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "syncState"
+          ],
+          "stateWrites": [
+            "syncState"
+          ],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "route": "reqSyncTable",
+              "handler": "reqSyncTable",
+              "kind": "table-msg",
+              "protocol": "table-msg",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [
+            {
+              "kind": "room-notify-all",
+              "route": "syncTable",
+              "protocol": "socket",
+              "callee": "tb.NotifyAll"
+            }
+          ],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "handleTableSynced",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "",
+          "returnType": "",
+          "paramNames": [],
+          "line": 39,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [
+            "syncState"
+          ],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    },
+    {
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+      "summary": "handler",
+      "imports": [
+        {
+          "clause": "{ TableMsg }",
+          "specifier": "../games/modules/TableMsg",
+          "identifiers": [
+            "TableMsg"
+          ],
+          "resolvedPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+          "resolvedVia": "generic",
+          "isLocal": true,
+          "isApi": false,
+          "isResponse": false
+        }
+      ],
+      "fieldTypes": [],
+      "handlerMaps": [],
+      "exports": [
+        {
+          "kind": "class",
+          "name": "handler",
+          "line": 3,
+          "summary": ""
+        }
+      ],
+      "methods": [
+        {
+          "name": "tableMsg",
+          "access": "public",
+          "static": false,
+          "async": true,
+          "params": "msg: any",
+          "returnType": "",
+          "paramNames": [
+            "msg"
+          ],
+          "line": 4,
+          "summary": "",
+          "localCalls": [
+            "NotifyAll"
+          ],
+          "localCallSites": [
+            {
+              "method": "NotifyAll",
+              "args": [
+                "route: string",
+                "payload: any"
+              ]
+            }
+          ],
+          "importedCalls": [
+            {
+              "identifier": "TableMsg",
+              "method": "handleMsg",
+              "sourcePath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+              "sourceSpecifier": "../games/modules/TableMsg",
+              "isApi": false,
+              "callKind": "static-method",
+              "memberPath": "inst",
+              "resolvedVia": "generic"
+            }
+          ],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "app.rpc.pkroom.handler.tableMsg",
+              "handler": "tableMsg",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "handler.pkroom.handler.tableMsg",
+              "handler": "tableMsg",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "pkroom.handler.tableMsg",
+              "handler": "tableMsg",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        },
+        {
+          "name": "NotifyAll",
+          "access": "public",
+          "static": false,
+          "async": false,
+          "params": "route: string, payload: any",
+          "returnType": "",
+          "paramNames": [
+            "route",
+            "payload"
+          ],
+          "line": 6,
+          "summary": "",
+          "localCalls": [],
+          "localCallSites": [],
+          "importedCalls": [],
+          "apiCalls": [],
+          "fieldCalls": [],
+          "eventSubscriptions": [],
+          "eventDispatches": [],
+          "networkRequests": [],
+          "callbackInvocations": [],
+          "stateReads": [],
+          "stateWrites": [],
+          "timingSignals": [],
+          "httpEndpoints": [],
+          "messageRoutes": [
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "app.rpc.pkroom.handler.NotifyAll",
+              "handler": "NotifyAll",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "handler.pkroom.handler.NotifyAll",
+              "handler": "NotifyAll",
+              "role": "handler"
+            },
+            {
+              "kind": "pinus-handler",
+              "protocol": "pinus",
+              "route": "pkroom.handler.NotifyAll",
+              "handler": "NotifyAll",
+              "role": "handler"
+            }
+          ],
+          "notifyRoutes": [],
+          "dbReads": [],
+          "dbWrites": [],
+          "syntheticKind": ""
+        }
+      ],
+      "analysisMode": "regex"
+    }
+  ],
+  "trackedFiles": [
+    "E:/skills/.tmp-review-pinus/app/common/utils.ts",
+    "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggLotteryRecordSchema.ts",
+    "E:/skills/.tmp-review-pinus/app/db/schema/activity/goldenEggUserInfoSchema.ts",
+    "E:/skills/.tmp-review-pinus/app/db/schema/users.ts",
+    "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts",
+    "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts",
+    "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+    "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+    "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "kind": "kb-build-report",
+  "generatedAt": "2026-03-30T03:28:58.362Z",
+  "featureKey": "project-global",
+  "featureName": "Project Global KB",
+  "builtWithSkill": {
+    "name": "project-memory-manager",
+    "version": "0.11.0",
+    "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
+    "capabilities": [
+      "pinus-backend-kb",
+      "cocos-static-call-kb",
+      "cocos-prefab-binding-kb",
+      "cocos-prefab-profile-audit",
+      "cocos-authoring-plan",
+      "cocos-authoring-apply",
+      "frontend-http-request-kb",
+      "kb-query-entrypoint",
+      "kb-version-stamp",
+      "kb-post-update-rebuild",
+      "project-global-kb",
+      "project-protocol-learning",
+      "project-kb-query",
+      "project-timing-learning",
+      "project-phase-transition-query",
+      "auto-feature-registry-sync",
+      "endpoint-route-table-graph",
+      "upstream-downstream-query",
+      "skills-cli-install"
+    ]
+  },
+  "purpose": "功能知识库构建汇总与使用说明。优先用它确认 KB 覆盖范围、推荐查询入口和产物用途。",
+  "useWhen": "当你刚构建完 KB，或升级后不确定该查哪个文件、该先跑什么命令，尤其是 prefab/meta 绑定问题该怎么查时。",
+  "configPath": "project-memory/kb/configs/project-global.json",
+  "outputs": {
+    "scan": "project-memory/kb/project-global/scan.raw.json",
+    "graph": "project-memory/kb/project-global/chain.graph.json",
+    "lookup": "project-memory/kb/project-global/chain.lookup.json",
+    "report": "project-memory/kb/project-global/build.report.json"
+  },
+  "counts": {
+    "nodes": 58,
+    "edges": 97,
+    "scripts": 17,
+    "prefabs": 0,
+    "nodesByType": {
+      "module": 1,
+      "script": 9,
+      "method": 12,
+      "endpoint": 1,
+      "request": 1,
+      "route": 15,
+      "table": 3,
+      "state": 2,
+      "event": 1,
+      "message": 13
+    }
+  },
+  "defaultWorkflow": [
+    "先运行 node scripts/query_kb.js --feature <feature-key> 查看 feature 摘要。",
+    "再用 --downstream / --upstream 或 --method / --event / --request / --state / --type binding 做精确查询。",
+    "只有 KB 结果不足以回答问题时，再读 docs；最后才用 rg/grep 回源码确认。"
+  ],
+  "queryExamples": [
+    "node scripts/query_kb.js --feature project-global",
+    "node scripts/query_kb.js --feature project-global --downstream <query>",
+    "node scripts/query_kb.js --feature project-global --method <name> --downstream",
+    "node scripts/query_kb.js --feature project-global --type method --name <keyword>",
+    "node scripts/query_project_kb.js --root <project-root>",
+    "node scripts/query_project_kb.js --root <project-root> --message <message> --downstream",
+    "node scripts/query_project_kb.js --root <project-root> --state <state> --upstream",
+    "node scripts/query_project_kb.js --root <project-root> --timing <query>",
+    "node scripts/query_project_kb.js --root <project-root> --phase <query>",
+    "node scripts/query_project_kb.js --root <project-root> --transition <query>"
+  ],
+  "postSkillUpdateAction": "node scripts/rebuild_kbs.js --root <project-root>",
+  "artifacts": [
+    {
+      "key": "entrypoint",
+      "file": "scripts/query_kb.js",
+      "purpose": "统一知识库查询入口，优先用于 feature 摘要、链路遍历和节点检索。",
+      "useWhen": "遇到入口、关闭窗口链路、prefab 事件绑定、节点/资源引用、request、状态流转时先运行。",
+      "priority": 1
+    },
+    {
+      "key": "report",
+      "file": "project-memory/kb/project-global/build.report.json",
+      "purpose": "给人看的构建汇总与使用指引。",
+      "useWhen": "先想知道这个 feature 有哪些 KB 产物、该从哪里开始查时优先看。",
+      "priority": 2
+    },
+    {
+      "key": "lookup",
+      "file": "project-memory/kb/project-global/chain.lookup.json",
+      "purpose": "查询索引，供 query_kb.js / query_chain_kb.js 读取。",
+      "useWhen": "通常不要手读；只有调试查询脚本或排查索引异常时才打开。",
+      "priority": 3
+    },
+    {
+      "key": "graph",
+      "file": "project-memory/kb/project-global/chain.graph.json",
+      "purpose": "图节点与边的底层事实数据。",
+      "useWhen": "通常不要手读；只有确认边类型、节点 meta 或导出图时才打开。",
+      "priority": 4
+    },
+    {
+      "key": "scan",
+      "file": "project-memory/kb/project-global/scan.raw.json",
+      "purpose": "extractor 的原始扫描产物。",
+      "useWhen": "通常不要手读；只有怀疑抽取阶段漏抓时才回看。",
+      "priority": 5
+    }
+  ],
+  "legacyCompatibility": {
+    "oldOutputNamesSupported": [
+      "graph.json",
+      "lookup.json",
+      "scan.json",
+      "report.json"
+    ],
+    "note": "旧文件名仍可兼容，但长期规范只推荐 chain.graph.json / chain.lookup.json / scan.raw.json / build.report.json。"
+  },
+  "protocolLearning": {
+    "messages": 13,
+    "dispatchers": 1,
+    "statePatterns": 1,
+    "timingPatterns": 0,
+    "phasePatterns": 11,
+    "transitionPatterns": 2,
+    "routeKinds": 3,
+    "requestProtocols": 1
+  }
+}

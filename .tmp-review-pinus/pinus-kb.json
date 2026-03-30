@@ -1,0 +1,24 @@
+{
+  "featureName": "Pinus Sample",
+  "featureKey": "pinus-sample",
+  "summary": "constructor sample for pinus backend extraction",
+  "extractorAdapter": "pinus",
+  "areas": ["backend", "data"],
+  "scanTargets": {
+    "handlers": ["app/servers/*/handler/*.ts"],
+    "remotes": ["app/servers/*/remote/*.ts"],
+    "modules": ["app/modules/**/*.ts", "app/servers/pkroom/games/modules/TableMsg.ts"],
+    "routes": ["app/http/routes/**/*.ts"],
+    "schemas": ["app/db/schema/**/*.ts"]
+  },
+  "outputs": {
+    "scan": "project-memory/kb/features/pinus-sample/scan.raw.json",
+    "graph": "project-memory/kb/features/pinus-sample/chain.graph.json",
+    "lookup": "project-memory/kb/features/pinus-sample/chain.lookup.json",
+    "report": "project-memory/kb/features/pinus-sample/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/pinus-sample",
+    "featureIndex": "project-memory/docs/features/pinus-sample/FEATURE.md"
+  }
+}

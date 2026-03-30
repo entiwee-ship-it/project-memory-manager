@@ -1,0 +1,916 @@
+{
+  "kind": "project-protocols",
+  "generatedAt": "2026-03-30T03:28:58.372Z",
+  "projectRoot": "E:/skills/.tmp-review-pinus",
+  "builtWithSkill": {
+    "name": "project-memory-manager",
+    "version": "0.11.0",
+    "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
+    "capabilities": [
+      "pinus-backend-kb",
+      "cocos-static-call-kb",
+      "cocos-prefab-binding-kb",
+      "cocos-prefab-profile-audit",
+      "cocos-authoring-plan",
+      "cocos-authoring-apply",
+      "frontend-http-request-kb",
+      "kb-query-entrypoint",
+      "kb-version-stamp",
+      "kb-post-update-rebuild",
+      "project-global-kb",
+      "project-protocol-learning",
+      "project-kb-query",
+      "project-timing-learning",
+      "project-phase-transition-query",
+      "auto-feature-registry-sync",
+      "endpoint-route-table-graph",
+      "upstream-downstream-query",
+      "skills-cli-install"
+    ]
+  },
+  "messagePatterns": [
+    {
+      "kind": "message-route",
+      "name": "app.rpc.pkplayer.Rpc.notify",
+      "protocol": "pinus-rpc",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+          "name": "Rpc.notify",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "line": 4,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-remote",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "method": "Rpc.notify",
+          "route": "app.rpc.pkplayer.Rpc.notify",
+          "role": "handler",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "app.rpc.pkplayer.Rpc.updateUserAsset",
+      "protocol": "pinus-rpc",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+          "name": "Rpc.updateUserAsset",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "line": 2,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-remote",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "method": "Rpc.updateUserAsset",
+          "route": "app.rpc.pkplayer.Rpc.updateUserAsset",
+          "role": "handler",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "app.rpc.pkroom.handler.NotifyAll",
+      "protocol": "pinus",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+          "name": "handler.NotifyAll",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "line": 6,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-handler",
+          "protocol": "pinus"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "method": "handler.NotifyAll",
+          "route": "app.rpc.pkroom.handler.NotifyAll",
+          "role": "handler",
+          "protocol": "pinus"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "app.rpc.pkroom.handler.tableMsg",
+      "protocol": "pinus",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+          "name": "handler.tableMsg",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "line": 4,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-handler",
+          "protocol": "pinus"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "method": "handler.tableMsg",
+          "route": "app.rpc.pkroom.handler.tableMsg",
+          "role": "handler",
+          "protocol": "pinus"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "handler.pkroom.handler.NotifyAll",
+      "protocol": "pinus",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+          "name": "handler.NotifyAll",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "line": 6,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-handler",
+          "protocol": "pinus"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "method": "handler.NotifyAll",
+          "route": "handler.pkroom.handler.NotifyAll",
+          "role": "handler",
+          "protocol": "pinus"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "handler.pkroom.handler.tableMsg",
+      "protocol": "pinus",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+          "name": "handler.tableMsg",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "line": 4,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-handler",
+          "protocol": "pinus"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "method": "handler.tableMsg",
+          "route": "handler.pkroom.handler.tableMsg",
+          "role": "handler",
+          "protocol": "pinus"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "pkplayer.Rpc.notify",
+      "protocol": "pinus-rpc",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+          "name": "Rpc.notify",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "line": 4,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-remote",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "method": "Rpc.notify",
+          "route": "pkplayer.Rpc.notify",
+          "role": "handler",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "pkplayer.Rpc.updateUserAsset",
+      "protocol": "pinus-rpc",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+          "name": "Rpc.updateUserAsset",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "line": 2,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-remote",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "method": "Rpc.updateUserAsset",
+          "route": "pkplayer.Rpc.updateUserAsset",
+          "role": "handler",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "pkroom.handler.NotifyAll",
+      "protocol": "pinus",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:notifyall",
+          "name": "handler.NotifyAll",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "line": 6,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-handler",
+          "protocol": "pinus"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "method": "handler.NotifyAll",
+          "route": "pkroom.handler.NotifyAll",
+          "role": "handler",
+          "protocol": "pinus"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "pkroom.handler.tableMsg",
+      "protocol": "pinus",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-handler-handler.ts:tablemsg",
+          "name": "handler.tableMsg",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "line": 4,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-handler",
+          "protocol": "pinus"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts",
+          "method": "handler.tableMsg",
+          "route": "pkroom.handler.tableMsg",
+          "role": "handler",
+          "protocol": "pinus"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "remote.pkplayer.Rpc.notify",
+      "protocol": "pinus-rpc",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:notify",
+          "name": "Rpc.notify",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "line": 4,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-remote",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "method": "Rpc.notify",
+          "route": "remote.pkplayer.Rpc.notify",
+          "role": "handler",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "remote.pkplayer.Rpc.updateUserAsset",
+      "protocol": "pinus-rpc",
+      "confidence": 0.65,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkplayer-remote-rpc.ts:updateuserasset",
+          "name": "Rpc.updateUserAsset",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "line": 2,
+          "area": "backend",
+          "role": "handler",
+          "kind": "pinus-remote",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "dispatchers": [],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts",
+          "method": "Rpc.updateUserAsset",
+          "route": "remote.pkplayer.Rpc.updateUserAsset",
+          "role": "handler",
+          "protocol": "pinus-rpc"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "message-route",
+      "name": "reqSyncTable",
+      "protocol": "table-msg",
+      "confidence": 0.75,
+      "handlers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:reqsynctable",
+          "name": "TableMsg.reqSyncTable",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+          "line": 30,
+          "area": "backend",
+          "role": "handler",
+          "kind": "table-msg",
+          "protocol": "table-msg"
+        }
+      ],
+      "dispatchers": [
+        {
+          "id": "method:e-skills-.tmp-review-pinus-app-servers-pkroom-games-modules-tablemsg.ts:handlemsg",
+          "name": "TableMsg.handleMsg",
+          "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+          "line": 17,
+          "area": "backend",
+          "role": "dispatcher",
+          "kind": "table-msg",
+          "protocol": "table-msg"
+        }
+      ],
+      "senders": [],
+      "evidence": [
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+          "method": "TableMsg.handleMsg",
+          "route": "reqSyncTable",
+          "role": "dispatcher",
+          "protocol": "table-msg"
+        },
+        {
+          "type": "message-route",
+          "file": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+          "method": "TableMsg.reqSyncTable",
+          "route": "reqSyncTable",
+          "role": "handler",
+          "protocol": "table-msg"
+        }
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    }
+  ],
+  "dispatcherPatterns": [
+    {
+      "kind": "dispatcher",
+      "name": "TableMsg.handleMsg",
+      "scriptPath": "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts",
+      "area": "backend",
+      "protocol": "table-msg",
+      "messages": [
+        "reqSyncTable"
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ],
+      "confidence": 0.6
+    }
+  ],
+  "stateMachinePatterns": [
+    {
+      "kind": "message-state-pattern",
+      "message": "reqSyncTable",
+      "state": "syncState",
+      "protocol": "table-msg",
+      "readers": [
+        "TableMsg.reqSyncTable"
+      ],
+      "writers": [
+        "TableMsg.reqSyncTable"
+      ],
+      "handlers": [
+        "TableMsg.reqSyncTable"
+      ],
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ],
+      "transitionKind": "cycle",
+      "confidence": 0.9
+    }
+  ],
+  "timingPatterns": [],
+  "phasePatterns": [
+    {
+      "kind": "phase-sequence",
+      "name": "goldenEgg.getGoldenEggReward",
+      "entryMethod": "goldenEgg.getGoldenEggReward",
+      "handledMessages": [],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [
+        "utils.pkplayerDispatch"
+      ],
+      "asyncNextMethods": [],
+      "nextMethods": [
+        "utils.pkplayerDispatch"
+      ],
+      "timingKinds": [],
+      "confidence": 0.58,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/modules/activity/goldenEgg.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "goldenEgg.http_get_activity_goldenegg_getgoldeneggreward",
+      "entryMethod": "goldenEgg.http_get_activity_goldenegg_getgoldeneggreward",
+      "handledMessages": [],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [
+        "goldenEgg.getGoldenEggReward"
+      ],
+      "asyncNextMethods": [],
+      "nextMethods": [
+        "goldenEgg.getGoldenEggReward"
+      ],
+      "timingKinds": [],
+      "confidence": 0.58,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/http/routes/activity/goldenEgg.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "handler.NotifyAll",
+      "entryMethod": "handler.NotifyAll",
+      "handledMessages": [
+        "app.rpc.pkroom.handler.NotifyAll",
+        "handler.pkroom.handler.NotifyAll",
+        "pkroom.handler.NotifyAll"
+      ],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [],
+      "asyncNextMethods": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "confidence": 0.5,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "handler.tableMsg",
+      "entryMethod": "handler.tableMsg",
+      "handledMessages": [
+        "app.rpc.pkroom.handler.tableMsg",
+        "handler.pkroom.handler.tableMsg",
+        "pkroom.handler.tableMsg"
+      ],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [
+        "handler.NotifyAll",
+        "TableMsg.handleMsg"
+      ],
+      "asyncNextMethods": [],
+      "nextMethods": [
+        "handler.NotifyAll",
+        "TableMsg.handleMsg"
+      ],
+      "timingKinds": [],
+      "confidence": 0.7,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/handler/handler.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "Rpc.notify",
+      "entryMethod": "Rpc.notify",
+      "handledMessages": [
+        "app.rpc.pkplayer.Rpc.notify",
+        "pkplayer.Rpc.notify",
+        "remote.pkplayer.Rpc.notify"
+      ],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [],
+      "asyncNextMethods": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "confidence": 0.5,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "Rpc.updateUserAsset",
+      "entryMethod": "Rpc.updateUserAsset",
+      "handledMessages": [
+        "app.rpc.pkplayer.Rpc.updateUserAsset",
+        "pkplayer.Rpc.updateUserAsset",
+        "remote.pkplayer.Rpc.updateUserAsset"
+      ],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [
+        "Rpc.notify"
+      ],
+      "asyncNextMethods": [],
+      "nextMethods": [
+        "Rpc.notify"
+      ],
+      "timingKinds": [],
+      "confidence": 0.7,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkplayer/remote/Rpc.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "TableMsg.handleMsg",
+      "entryMethod": "TableMsg.handleMsg",
+      "handledMessages": [
+        "reqSyncTable"
+      ],
+      "emittedMessages": [],
+      "stateReads": [
+        "handlers"
+      ],
+      "stateWrites": [],
+      "directNextMethods": [],
+      "asyncNextMethods": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "confidence": 0.5,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "TableMsg.handleTableSynced",
+      "entryMethod": "TableMsg.handleTableSynced",
+      "handledMessages": [],
+      "emittedMessages": [],
+      "stateReads": [
+        "syncState"
+      ],
+      "stateWrites": [],
+      "directNextMethods": [],
+      "asyncNextMethods": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "confidence": 0.38,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "TableMsg.init",
+      "entryMethod": "TableMsg.init",
+      "handledMessages": [],
+      "emittedMessages": [],
+      "stateReads": [],
+      "stateWrites": [],
+      "directNextMethods": [
+        "TableMsg.regHandler"
+      ],
+      "asyncNextMethods": [],
+      "nextMethods": [
+        "TableMsg.regHandler"
+      ],
+      "timingKinds": [],
+      "confidence": 0.58,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "TableMsg.regHandler",
+      "entryMethod": "TableMsg.regHandler",
+      "handledMessages": [],
+      "emittedMessages": [],
+      "stateReads": [
+        "handlers"
+      ],
+      "stateWrites": [
+        "handlers"
+      ],
+      "directNextMethods": [],
+      "asyncNextMethods": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "confidence": 0.54,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    },
+    {
+      "kind": "phase-sequence",
+      "name": "TableMsg.reqSyncTable",
+      "entryMethod": "TableMsg.reqSyncTable",
+      "handledMessages": [
+        "reqSyncTable"
+      ],
+      "emittedMessages": [],
+      "stateReads": [
+        "syncState"
+      ],
+      "stateWrites": [
+        "syncState"
+      ],
+      "directNextMethods": [],
+      "asyncNextMethods": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "confidence": 0.66,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    }
+  ],
+  "transitionPatterns": [
+    {
+      "kind": "state-transition",
+      "name": "TableMsg.regHandler -> handlers",
+      "state": "handlers",
+      "driverMethod": "TableMsg.regHandler",
+      "handledMessages": [],
+      "emittedMessages": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "transitionKind": "state-cycle",
+      "delayKinds": [],
+      "confidence": 0.51,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    },
+    {
+      "kind": "state-transition",
+      "name": "TableMsg.reqSyncTable -> syncState",
+      "state": "syncState",
+      "driverMethod": "TableMsg.reqSyncTable",
+      "handledMessages": [
+        "reqSyncTable"
+      ],
+      "emittedMessages": [],
+      "nextMethods": [],
+      "timingKinds": [],
+      "transitionKind": "state-cycle",
+      "delayKinds": [],
+      "confidence": 0.63,
+      "evidenceFiles": [
+        "E:/skills/.tmp-review-pinus/app/servers/pkroom/games/modules/TableMsg.ts"
+      ]
+    }
+  ],
+  "routingPatterns": {
+    "messageProtocols": [
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus-rpc",
+        "message": "app.rpc.pkplayer.Rpc.notify",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus-rpc",
+        "message": "app.rpc.pkplayer.Rpc.updateUserAsset",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus",
+        "message": "app.rpc.pkroom.handler.NotifyAll",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus",
+        "message": "app.rpc.pkroom.handler.tableMsg",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus",
+        "message": "handler.pkroom.handler.NotifyAll",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus",
+        "message": "handler.pkroom.handler.tableMsg",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus-rpc",
+        "message": "pkplayer.Rpc.notify",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus-rpc",
+        "message": "pkplayer.Rpc.updateUserAsset",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus",
+        "message": "pkroom.handler.NotifyAll",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus",
+        "message": "pkroom.handler.tableMsg",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus-rpc",
+        "message": "remote.pkplayer.Rpc.notify",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "pinus-rpc",
+        "message": "remote.pkplayer.Rpc.updateUserAsset",
+        "confidence": 0.65
+      },
+      {
+        "kind": "message-protocol",
+        "protocol": "table-msg",
+        "message": "reqSyncTable",
+        "confidence": 0.75
+      }
+    ],
+    "routeKinds": [
+      {
+        "kind": "pinus-remote",
+        "protocol": "pinus-rpc",
+        "count": 12
+      },
+      {
+        "kind": "table-msg",
+        "protocol": "table-msg",
+        "count": 4
+      },
+      {
+        "kind": "pinus-handler",
+        "protocol": "pinus",
+        "count": 12
+      }
+    ],
+    "requestProtocols": [
+      {
+        "protocol": "pinus-rpc",
+        "transport": "pinus-rpc",
+        "callee": "pinus.rpc",
+        "count": 2
+      }
+    ]
+  },
+  "summary": {
+    "messages": 13,
+    "dispatchers": 1,
+    "statePatterns": 1,
+    "timingPatterns": 0,
+    "phasePatterns": 11,
+    "transitionPatterns": 2,
+    "routeKinds": 3,
+    "requestProtocols": 1
+  }
+}

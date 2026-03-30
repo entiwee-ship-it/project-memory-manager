@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { buildLookup, run: buildChainKb } = require('./build_chain_kb');
-const { ensureDir, loadProjectProfile, normalize, pathExists, readJson, repoRelative, resolveProjectRoot, slugify, writeJson } = require('./lib/common');
+const { ensureDir, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, writeJson, writeJsonAtomic } = require('./lib/common');
 const { learnProjectProtocols } = require('./learn_project_protocols');
 
 function parseArgs(argv) {
@@ -85,7 +85,23 @@ function collectProjectScanRoots(projectProfile, root) {
 function buildProjectGlobalConfig(root, projectProfile) {
     const scanRoots = collectProjectScanRoots(projectProfile, root);
     if (scanRoots.methodRoots.length <= 0) {
-        throw new Error('无法从 project-profile.json 推导全局扫描根；请先运行 detect_project_topology.js 或手工补全 project-profile.json');
+        const areas = Object.keys(projectProfile?.areas || {});
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 无法推导全局扫描根\n\n` +
+            `可能原因:\n` +
+            `  1. project-profile.json 中的 areas 配置为空\n` +
+            `  2. 配置的扫描目录不存在\n` +
+            `  3. 项目结构不符合预期（无 assets/app/src/lib/server 目录）\n\n` +
+            `当前配置:\n` +
+            `  areas: ${areas.length > 0 ? areas.join(', ') : '(空)'}\n\n` +
+            `修复命令:\n` +
+            `  1. 运行拓扑检测: node scripts/detect_project_topology.js --root ${root}\n` +
+            `  2. 或手动编辑: project-memory/state/project-profile.json\n\n` +
+            `项目结构示例:\n` +
+            `  Cocos项目: assets/ 目录包含场景和资源\n` +
+            `  Pinus项目: app/servers/ 或 app/http/routes/ 目录\n` +
+            `  通用项目: src/ 或 lib/ 目录`
+        );
     }
 
     return {
@@ -270,13 +286,26 @@ function run(argv = process.argv.slice(2)) {
     const root = resolveProjectRoot(args.root || process.cwd());
     const projectProfile = loadProjectProfile(root);
     if (!projectProfile) {
-        throw new Error('未找到 project-profile.json；请先初始化项目记忆并运行 detect_project_topology.js');
+        const profilePath = path.join(root, 'project-memory', 'state', 'project-profile.json');
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 未找到项目配置文件\n` +
+            `文件: ${profilePath}\n\n` +
+            `可能原因:\n` +
+            `  1. 项目记忆尚未初始化\n` +
+            `  2. 当前目录不是项目根目录\n` +
+            `  3. 初始化后未运行拓扑检测\n\n` +
+            `修复命令:\n` +
+            `  1. 初始化项目: node scripts/init_project_memory.js --root ${root}\n` +
+            `  2. 检测拓扑: node scripts/detect_project_topology.js --root ${root}\n\n` +
+            `验证项目根目录:\n` +
+            `  ls ${path.join(root, 'project-memory')}`
+        );
     }
 
     const config = buildProjectGlobalConfig(root, projectProfile);
     const configPath = path.join(root, 'project-memory', 'kb', 'configs', 'project-global.json');
     ensureDir(path.dirname(configPath));
-    writeJson(configPath, config);
+    writeJsonAtomic(configPath, config);
 
     buildChainKb(['--root', root, '--config', configPath]);
 
@@ -286,20 +315,22 @@ function run(argv = process.argv.slice(2)) {
     const reportPath = path.join(root, config.outputs.report);
     const protocolsPath = path.join(root, 'project-memory', 'state', 'project-protocols.json');
 
-    const raw = readJson(scanPath);
-    const graph = readJson(graphPath);
-    const lookup = readJson(lookupPath);
-    const report = readJson(reportPath);
+    // 使用安全读取
+    const raw = readJsonSafe(scanPath, { required: true });
+    const graph = readJsonSafe(graphPath, { required: true });
+    const lookup = readJsonSafe(lookupPath, { required: true });
+    const report = readJsonSafe(reportPath, { required: true });
     const protocols = learnProjectProtocols(raw, graph, lookup, root);
-    writeJson(protocolsPath, protocols);
+    writeJsonAtomic(protocolsPath, protocols);
 
     const augmentedGraph = augmentGraphWithProtocols(graph, protocols);
     const augmentedLookup = buildLookup(augmentedGraph);
     const augmentedReport = updateProjectGlobalReport(report, augmentedGraph, augmentedLookup, protocols);
 
-    writeJson(graphPath, augmentedGraph);
-    writeJson(lookupPath, augmentedLookup);
-    writeJson(reportPath, augmentedReport);
+    // 使用原子写入
+    writeJsonAtomic(graphPath, augmentedGraph);
+    writeJsonAtomic(lookupPath, augmentedLookup);
+    writeJsonAtomic(reportPath, augmentedReport);
 
     const result = {
         kind: 'project-global-build',

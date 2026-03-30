@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-03-30T03:28:58.366Z",
+  "features": [
+    {
+      "featureKey": "project-global",
+      "featureName": "Project Global KB",
+      "summary": "Full-project global knowledge graph",
+      "areas": [
+        "backend",
+        "data"
+      ],
+      "configPath": "project-memory/kb/configs/project-global.json",
+      "docsDir": "project-memory/docs/project",
+      "kbDir": "project-memory/kb/project-global",
+      "outputs": {
+        "scan": "project-memory/kb/project-global/scan.raw.json",
+        "graph": "project-memory/kb/project-global/chain.graph.json",
+        "lookup": "project-memory/kb/project-global/chain.lookup.json",
+        "report": "project-memory/kb/project-global/build.report.json"
+      },
+      "type": "project-global"
+    }
+  ]
+}

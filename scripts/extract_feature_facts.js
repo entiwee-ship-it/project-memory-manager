@@ -69,7 +69,21 @@ function parseArgs(argv) {
     }
 
     if (!args.output || (args.prefabs.length <= 0 && args.methodRoots.length <= 0)) {
-        throw new Error('用法: node extract_feature_facts.js [--adapter <auto|cocos|pinus|generic>] [--component-root <dir>] [--asset-root <dir>] [--method-root <dir>] --output <file> [<prefab...>]');
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 参数错误\n\n` +
+            `用法: node extract_feature_facts.js [选项] --output <file> [<prefab...>]\n\n` +
+            `必需参数:\n` +
+            `  --output <file>              输出文件路径\n` +
+            `  至少一个扫描目标: --method-root 或 prefab 文件\n\n` +
+            `示例:\n` +
+            `  node extract_feature_facts.js --method-root ./src --output ./scan.json\n` +
+            `  node extract_feature_facts.js --component-root ./assets --output ./scan.json\n` +
+            `  node extract_feature_facts.js --adapter cocos --output ./scan.json ./assets/scenes/*.prefab\n\n` +
+            `当前参数:\n` +
+            `  output: ${args.output || '(未指定)'}\n` +
+            `  methodRoots: ${args.methodRoots.length} 个\n` +
+            `  prefabs: ${args.prefabs.length} 个`
+        );
     }
     if (args.assetRoots.length <= 0) {
         args.assetRoots = [...args.componentRoots];
@@ -91,8 +105,36 @@ function ensureArray(value) {
 }
 
 function readJson(filePath) {
-    const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-    return JSON.parse(raw);
+    try {
+        const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+        return JSON.parse(raw);
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            throw new Error(
+                `[SKILL-DIAGNOSIS] 文件不存在\n` +
+                `文件: ${filePath}\n\n` +
+                `可能原因:\n` +
+                `  1. 文件被移动或删除\n` +
+                `  2. 路径拼写错误\n` +
+                `  3. 相对路径基准错误`
+            );
+        }
+        if (err instanceof SyntaxError) {
+            throw new Error(
+                `[SKILL-DIAGNOSIS] JSON 解析错误\n` +
+                `文件: ${filePath}\n` +
+                `错误: ${err.message}\n\n` +
+                `可能原因:\n` +
+                `  1. JSON 格式错误（多余的逗号、缺少引号等）\n` +
+                `  2. 文件写入过程中断导致损坏\n` +
+                `  3. 文件编码问题\n\n` +
+                `修复建议:\n` +
+                `  1. 使用 JSON 验证工具检查文件格式\n` +
+                `  2. 删除损坏文件后重新生成`
+            );
+        }
+        throw err;
+    }
 }
 
 function hasModifier(node, modifierName, ts = TYPESCRIPT_RUNTIME) {
@@ -209,12 +251,41 @@ function extractDirectBodyTextFromAst(functionNode, sourceFile, ts = TYPESCRIPT_
     return maskTextRanges(fullBodyText, nestedRanges);
 }
 
-function listFilesRecursive(rootPath, matcher, acc = []) {
+function listFilesRecursive(rootPath, matcher, acc = [], options = {}) {
+    const { maxDepth = 100, currentDepth = 0, visited = new Set() } = options;
+    
+    // 深度限制，防止栈溢出
+    if (currentDepth > maxDepth) {
+        console.warn(`[SKILL-WARN] 达到最大递归深度 (${maxDepth})，跳过后续目录: ${rootPath}`);
+        return acc;
+    }
+    
     if (!fs.existsSync(rootPath)) {
         return acc;
     }
 
-    const stat = fs.statSync(rootPath);
+    // 获取真实路径，检测符号链接循环
+    let realPath;
+    try {
+        realPath = fs.realpathSync(rootPath);
+    } catch {
+        return acc;
+    }
+    
+    // 检测循环链接
+    if (visited.has(realPath)) {
+        console.warn(`[SKILL-WARN] 检测到目录循环链接，跳过: ${rootPath}`);
+        return acc;
+    }
+    visited.add(realPath);
+
+    let stat;
+    try {
+        stat = fs.statSync(rootPath);
+    } catch {
+        return acc;
+    }
+    
     if (stat.isFile()) {
         if (matcher(rootPath)) {
             acc.push(rootPath);
@@ -222,11 +293,23 @@ function listFilesRecursive(rootPath, matcher, acc = []) {
         return acc;
     }
 
-    const entries = fs.readdirSync(rootPath, { withFileTypes: true });
+    let entries;
+    try {
+        entries = fs.readdirSync(rootPath, { withFileTypes: true });
+    } catch {
+        return acc;
+    }
+    
     for (const entry of entries) {
         const fullPath = path.join(rootPath, entry.name);
+        
+        // 跳过符号链接（防止循环和意外行为）
+        if (entry.isSymbolicLink()) {
+            continue;
+        }
+        
         if (entry.isDirectory()) {
-            listFilesRecursive(fullPath, matcher, acc);
+            listFilesRecursive(fullPath, matcher, acc, { ...options, currentDepth: currentDepth + 1, visited });
             continue;
         }
         if (matcher(fullPath)) {
@@ -2895,7 +2978,14 @@ function extractScriptInsights(methodRoots, context) {
         const scriptFiles = listFilesRecursive(root, filePath => /\.tsx?$/.test(filePath) && !filePath.endsWith('.d.ts'));
         for (const scriptFile of scriptFiles) {
             const normalizedScript = normalize(scriptFile);
-            const source = fs.readFileSync(scriptFile, 'utf8');
+            let source;
+            try {
+                source = fs.readFileSync(scriptFile, 'utf8');
+            } catch (err) {
+                console.warn(`[SKILL-WARN] 无法读取脚本文件，将跳过: ${scriptFile}`);
+                console.warn(`  错误: ${err.message}`);
+                continue;
+            }
             const astContext = extractMethodDefinitionsFromAst(source, scriptFile);
             const imports = extractImports(source, scriptFile, context);
             const fieldTypes = extractFieldTypes(source, scriptFile, imports);
@@ -3705,8 +3795,23 @@ function runScan(rawArgs = process.argv.slice(2)) {
         trackedFiles: collectTrackedFiles(prefabs, scripts),
     };
 
-    fs.mkdirSync(path.dirname(args.output), { recursive: true });
-    fs.writeFileSync(args.output, JSON.stringify(output, null, 2), 'utf8');
+    try {
+        fs.mkdirSync(path.dirname(args.output), { recursive: true });
+        fs.writeFileSync(args.output, JSON.stringify(output, null, 2), 'utf8');
+    } catch (err) {
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 写入扫描结果失败\n` +
+            `文件: ${args.output}\n` +
+            `错误: ${err.message}\n\n` +
+            `可能原因:\n` +
+            `  1. 输出目录无写入权限\n` +
+            `  2. 磁盘空间不足\n` +
+            `  3. 输出路径是目录而非文件\n\n` +
+            `修复建议:\n` +
+            `  1. 检查目录权限: ${path.dirname(args.output)}\n` +
+            `  2. 确保路径正确且可写`
+        );
+    }
 }
 
 module.exports = {

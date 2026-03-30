@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runExtract } = require('./extract_feature_facts');
-const { hasOwn, inferArea, inferStacks, loadProjectProfile, normalize, pathExists, readJson, repoRelative, resolveProjectRoot, slugify, timestamp, writeJson } = require('./lib/common');
+const { hasOwn, inferArea, inferStacks, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, timestamp, writeJson, writeJsonAtomic } = require('./lib/common');
 const { normalizeConfig, normalizeFeatureRecord } = require('./lib/feature-kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
@@ -523,21 +523,113 @@ function ensureCanonicalOutputCompat(root, outputs = {}) {
 
 function writeJsonWithCompat(root, key, value, outputs = {}) {
     const compatibility = ensureCanonicalOutputCompat(root, outputs)[key];
-    writeJson(compatibility.canonicalPath, value);
+    
+    // 使用原子写入，避免部分写入导致的文件损坏
+    writeJsonAtomic(compatibility.canonicalPath, value);
 
     if (compatibility.configuredPath !== compatibility.canonicalPath) {
-        writeJson(compatibility.configuredPath, value);
+        writeJsonAtomic(compatibility.configuredPath, value);
     }
 
     const isLegacyConfigured = compatibility.configuredPath === compatibility.legacyPath;
     if (isLegacyConfigured && compatibility.legacyPath !== compatibility.canonicalPath) {
-        writeJson(compatibility.legacyPath, value);
+        writeJsonAtomic(compatibility.legacyPath, value);
     }
 
     return {
         canonicalPath: compatibility.canonicalPath,
         configuredPath: compatibility.configuredPath,
         legacyPath: compatibility.legacyPath,
+    };
+}
+
+/**
+ * 创建 KB 构建事务管理器
+ * 确保所有文件一致写入，失败时可回滚
+ */
+function createKbBuildTransaction(root, outputPaths) {
+    const backupSuffix = `.backup-${Date.now()}`;
+    const filesToRestore = [];
+    const filesCreated = [];
+    
+    /**
+     * 备份现有文件
+     */
+    function backupExistingFiles() {
+        const paths = [
+            outputPaths.scan.canonicalPath,
+            outputPaths.graph.canonicalPath,
+            outputPaths.lookup.canonicalPath,
+            outputPaths.report.canonicalPath,
+        ];
+        
+        for (const filePath of paths) {
+            if (pathExists(filePath)) {
+                const backupPath = filePath + backupSuffix;
+                try {
+                    fs.copyFileSync(filePath, backupPath);
+                    filesToRestore.push({ original: filePath, backup: backupPath });
+                } catch (err) {
+                    console.warn(`[SKILL-WARN] 无法备份文件: ${filePath}`);
+                }
+            } else {
+                filesCreated.push(filePath);
+            }
+        }
+    }
+    
+    /**
+     * 提交事务（清理备份）
+     */
+    function commit() {
+        // 清理备份文件
+        for (const { backup } of filesToRestore) {
+            try {
+                if (pathExists(backup)) {
+                    fs.unlinkSync(backup);
+                }
+            } catch {
+                // 忽略清理错误
+            }
+        }
+    }
+    
+    /**
+     * 回滚事务（恢复备份）
+     */
+    function rollback() {
+        console.error('[SKILL-ERROR] KB 构建失败，正在回滚...');
+        
+        // 恢复备份的文件
+        for (const { original, backup } of filesToRestore) {
+            try {
+                if (pathExists(backup)) {
+                    fs.copyFileSync(backup, original);
+                    fs.unlinkSync(backup);
+                }
+            } catch (err) {
+                console.error(`[SKILL-ERROR] 回滚文件失败: ${original}`);
+            }
+        }
+        
+        // 删除新创建的文件
+        for (const filePath of filesCreated) {
+            try {
+                if (pathExists(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch {
+                // 忽略删除错误
+            }
+        }
+        
+        console.error('[SKILL-ERROR] 回滚完成');
+    }
+    
+    return {
+        backupExistingFiles,
+        commit,
+        rollback,
     };
 }
 
@@ -559,9 +651,16 @@ function upsertFeatureRegistry(root, featureRecord) {
     const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
     const indexPath = path.join(root, 'project-memory', 'kb', 'indexes', 'features.json');
     const generatedAt = timestamp();
-    const registry = pathExists(registryPath)
-        ? readJson(registryPath)
-        : { generatedAt: null, features: [] };
+    
+    // 使用安全读取，提供默认值
+    let registry;
+    try {
+        registry = readJsonSafe(registryPath, { required: false, defaultValue: { generatedAt: null, features: [] } });
+    } catch (err) {
+        console.warn(`[SKILL-WARN] 读取 registry 失败，将创建新的: ${err.message}`);
+        registry = { generatedAt: null, features: [] };
+    }
+    
     const features = Array.isArray(registry.features) ? [...registry.features] : [];
     const existingIndex = features.findIndex(item => item.featureKey === featureRecord.featureKey);
 
@@ -576,14 +675,11 @@ function upsertFeatureRegistry(root, featureRecord) {
 
     features.sort((left, right) => String(left.featureKey || '').localeCompare(String(right.featureKey || '')));
 
-    writeJson(registryPath, {
-        generatedAt,
-        features,
-    });
-    writeJson(indexPath, {
-        generatedAt,
-        features,
-    });
+    const data = { generatedAt, features };
+    
+    // 使用原子写入
+    writeJsonAtomic(registryPath, data);
+    writeJsonAtomic(indexPath, data);
 }
 
 function buildGraph(raw, config, projectProfile, root) {
@@ -1788,25 +1884,48 @@ function run(argv = process.argv.slice(2)) {
         extractArgs.push(prefabPath);
     }
 
+    // 创建事务管理器
+    const transaction = createKbBuildTransaction(root, outputPaths);
+    
     const originalCwd = process.cwd();
     try {
+        // 备份现有文件
+        transaction.backupExistingFiles();
+        
         process.chdir(root);
         runExtract(extractArgs);
+        
+        const raw = readJson(scanPath);
+        const graph = buildGraph(raw, config, profile, root);
+        const lookup = buildLookup(graph);
+        const report = buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup);
+
+        // 写入所有文件（原子写入已在 writeJsonWithCompat 中实现）
+        writeJsonWithCompat(root, 'graph', graph, outputs);
+        writeJsonWithCompat(root, 'lookup', lookup, outputs);
+        writeJsonWithCompat(root, 'report', report, outputs);
+        
+        // 提交事务
+        transaction.commit();
+        
+        // 更新 registry（registry 更新失败不影响 KB 文件）
+        if (config.registerFeature !== false) {
+            try {
+                upsertFeatureRegistry(root, buildFeatureRecord(config, repoRelative(configPath, root)));
+            } catch (registryErr) {
+                console.warn(`[SKILL-WARN] KB 构建成功，但 registry 更新失败: ${registryErr.message}`);
+                console.warn(`[SKILL-WARN] 可手动运行重建: node scripts/rebuild_kbs.js --root ${root}`);
+            }
+        }
+        
+        console.log(`链路知识库已构建: ${config.featureKey}`);
+    } catch (error) {
+        // 回滚事务
+        transaction.rollback();
+        throw error;
     } finally {
         process.chdir(originalCwd);
     }
-    const raw = readJson(scanPath);
-    const graph = buildGraph(raw, config, profile, root);
-    const lookup = buildLookup(graph);
-    const report = buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup);
-
-    writeJsonWithCompat(root, 'graph', graph, outputs);
-    writeJsonWithCompat(root, 'lookup', lookup, outputs);
-    writeJsonWithCompat(root, 'report', report, outputs);
-    if (config.registerFeature !== false) {
-        upsertFeatureRegistry(root, buildFeatureRecord(config, repoRelative(configPath, root)));
-    }
-    console.log(`链路知识库已构建: ${config.featureKey}`);
 }
 
 module.exports = {
