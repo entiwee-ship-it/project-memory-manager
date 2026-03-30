@@ -32,7 +32,9 @@ function resolveImportPath(specifier, scriptFile, context) {
         return genericResolved;
     }
 
-    if (/^(app|config|types)\//.test(specifier)) {
+    // 统一使用正斜杠进行匹配（兼容 Windows 反斜杠）
+    const normalized = String(specifier || '').replace(/\\/g, '/');
+    if (/^(app|config|types)\//.test(normalized)) {
         return resolveFromProjectRoot(specifier, context);
     }
 
