@@ -26,6 +26,20 @@ node scripts/show_skill_version.js --text
 python scripts/validate_skill_runtime.py . --mode auto
 ```
 
+**可选：清理非必需文件（推荐）**
+
+安装后如果仅供 AI 使用，可清理开发/维护类文件减小体积：
+
+```powershell
+# 预览清理内容
+node scripts/clean_for_production.js --dry-run
+
+# 执行清理（保留 README 和示例）
+node scripts/clean_for_production.js
+```
+
+这不会影响技能功能，AI 仍通过 `SKILL.md` 获取使用说明。
+
 后续升级可使用：
 
 ```powershell
@@ -230,14 +244,32 @@ README.md     仓库级技能说明
 
 ## 建议先读这些文件
 
-- [SKILL.md](./SKILL.md)
-- [references/core/onboarding-playbook.md](./references/core/onboarding-playbook.md)
-- [references/core/work-protocols.md](./references/core/work-protocols.md)
-- [references/core/kb-schema.md](./references/core/kb-schema.md)
-- [references/core/document-boundaries.md](./references/core/document-boundaries.md)
+### 快速开始
+- [SKILL.md](./SKILL.md) - 技能主说明（AI 使用）
+- [examples/complete-workflow.md](./examples/complete-workflow.md) - 完整工作流示例
+- [references/core/onboarding-playbook.md](./references/core/onboarding-playbook.md) - 接管手册
+
+### 核心概念
+- [references/core/work-protocols.md](./references/core/work-protocols.md) - 工作协议
+- [references/core/kb-schema.md](./references/core/kb-schema.md) - KB 结构与查询面
+- [references/core/document-boundaries.md](./references/core/document-boundaries.md) - 文档边界
+
+### 参考文档
+- [references/api-reference.md](./references/api-reference.md) - API 参考
+- [CHANGELOG.md](./CHANGELOG.md) - 版本历史
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - 贡献指南
+
+## 相关目录
+
+- [agents/](./agents/) - Agent 接口配置
+- [assets/](./assets/) - 模板文件
+- [examples/](./examples/) - 使用示例
+- [references/](./references/) - 协议、规范、适配器说明
+- [scripts/](./scripts/) - 功能脚本
+- [tests/](./tests/) - 测试文件
 
 ## 说明
 
 - 这个仓库是技能仓库，不是通用应用仓库
 - `.runtime/`、`node_modules/`、`__pycache__/` 已被忽略，不应提交
-- 如果要公开分发，建议补充 `LICENSE`
+- 采用 MIT 许可证，详见 [LICENSE](./LICENSE)

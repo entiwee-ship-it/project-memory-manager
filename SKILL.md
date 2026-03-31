@@ -193,6 +193,20 @@ node scripts/query_cocos_profile.js --prefab-detail goldenEgg --json
 - 技能升级完成后，必须在技能根目录执行 `node scripts/rebuild_kbs.js --root <project-root>` 重建现有 KB
 - 如果当前查询脚本提示 `[stale-kb]`，说明 KB 还是旧技能版本构建的，先重建再继续分析
 
+### 生产环境优化
+
+在纯 AI 使用环境中，可清理非必需文件减小技能包体积：
+
+```bash
+# 预览可清理的文件
+node scripts/clean_for_production.js --level=standard --dry-run
+
+# 执行清理
+node scripts/clean_for_production.js --level=standard
+```
+
+清理后核心功能不受影响，如需恢复可重新安装技能包。
+
 ## 环境依赖
 
 技能自带 TypeScript 运行时（位于 `node_modules/typescript`），不依赖目标项目的 TypeScript 安装：
@@ -220,14 +234,25 @@ npm install
 
 ## 按需读取这些 references
 
+### 核心文档
 - 接管与首次落地：`references/core/onboarding-playbook.md`
 - 日常协作顺序：`references/core/work-protocols.md`
 - docs 与 KB 边界：`references/core/document-boundaries.md`
 - KB schema 与查询面：`references/core/kb-schema.md`
+
+### 进阶主题
 - 项目协议学习：`references/core/project-protocol-learning.md`
 - 全栈协同：`references/core/fullstack-coordination.md`
 - 适配器扩展规则：`references/core/adapter-protocol.md`
 - 校验与环境自举：`references/core/validation.md`
+- 故障排除：`references/core/troubleshooting.md`
+
+### 其他参考
+- API 参考：`references/api-reference.md`
+- 生产清理：`references/core/production-cleanup.md`
+- 版本历史：`CHANGELOG.md`
+- 贡献指南：`CONTRIBUTING.md`
+- 使用示例：`examples/complete-workflow.md`
 
 ## 核心规则
 
