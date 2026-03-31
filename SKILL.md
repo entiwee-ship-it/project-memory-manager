@@ -193,6 +193,20 @@ node scripts/query_cocos_profile.js --prefab-detail goldenEgg --json
 - 技能升级完成后，必须在技能根目录执行 `node scripts/rebuild_kbs.js --root <project-root>` 重建现有 KB
 - 如果当前查询脚本提示 `[stale-kb]`，说明 KB 还是旧技能版本构建的，先重建再继续分析
 
+## 环境依赖
+
+技能自带 TypeScript 运行时（位于 `node_modules/typescript`），不依赖目标项目的 TypeScript 安装：
+- **AST 解析**: 使用技能自己的 TS 解析器分析代码结构
+- **版本兼容性**: 技能使用 TypeScript 6.x，支持最新 TS/JS 语法
+- **无需项目安装**: 目标项目即使没有安装 typescript，技能也能正常工作
+
+如遇到 TypeScript 相关问题：
+```bash
+# 重新安装技能依赖
+cd <skill-install-path>
+npm install
+```
+
 ## 故障排除
 
 常见问题及解决方案见 `references/core/troubleshooting.md`：

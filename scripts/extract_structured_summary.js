@@ -9,16 +9,42 @@
 const fs = require('fs');
 const path = require('path');
 
-// TypeScript 运行时将由调用方传入
+// TypeScript 运行时 - 优先使用技能自带的
 let ts = null;
+
+function loadSkillTypeScript() {
+    const path = require('path');
+    const candidates = [
+        // 1. 技能自己的 node_modules
+        path.resolve(__dirname, '..', 'node_modules', 'typescript'),
+        // 2. 环境变量指定
+        process.env.PMM_TYPESCRIPT_PATH,
+        // 3. 全局 typescript
+        'typescript',
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        try {
+            const runtime = require(candidate);
+            if (runtime && typeof runtime.createSourceFile === 'function') {
+                return runtime;
+            }
+        } catch {
+            continue;
+        }
+    }
+    return null;
+}
 
 function ensureTsRuntime() {
     if (!ts) {
-        // 尝试加载
-        try {
-            ts = require('typescript');
-        } catch {
-            throw new Error('TypeScript runtime not available. Pass ts instance to extractStructuredSummary()');
+        ts = loadSkillTypeScript();
+        if (!ts) {
+            throw new Error(
+                'TypeScript runtime not found.\n' +
+                'Please install typescript in skill directory:\n' +
+                '  cd <skill-path> && npm install typescript'
+            );
         }
     }
     return ts;
@@ -483,6 +509,9 @@ function main() {
         console.log('       node extract_structured_summary.js --file <path> --method <name>');
         process.exit(1);
     }
+    
+    // 确保 TypeScript 运行时已加载
+    ensureTsRuntime();
     
     const code = args.file 
         ? fs.readFileSync(args.file, 'utf8')

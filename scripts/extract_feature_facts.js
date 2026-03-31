@@ -12,8 +12,13 @@ const DRIZZLE_WRITE_METHODS = new Set(['insert', 'update', 'delete']);
 
 function loadTypeScriptRuntime() {
     const candidates = [
+        // 1. 技能自己的 node_modules (优先)
+        path.resolve(__dirname, '..', 'node_modules', 'typescript'),
+        // 2. 环境变量指定
         process.env.PMM_TYPESCRIPT_PATH || '',
+        // 3. 全局 typescript (fallback)
         'typescript',
+        // 4. 运行时目录
         path.resolve(__dirname, '..', '.runtime', 'ts-runtime', 'node_modules', 'typescript'),
     ].filter(Boolean);
 

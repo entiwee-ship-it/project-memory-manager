@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node tests/pinus-backend.test.js"
   },
-  "devDependencies": {
+  "dependencies": {
     "typescript": "^6.0.2"
   }
 }
