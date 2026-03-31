@@ -48,6 +48,13 @@ description: 'KB-first AI project memory manager for full-stack repositories. Us
 - 运行 `node scripts/build_chain_kb.js --config <config-path>`
 - 构建后会自动同步 `feature-registry.json` 与 `kb/indexes/features.json`
 - 用 `references/core/kb-schema.md` 校验节点类型、边类型与查询面是否覆盖任务需求
+
+### 查询调用链
+
+- **节点 ID 格式**: 节点 ID 使用 `slugify` 标准化（全小写、路径分隔符转为 `-`），例如 `method:e-xile-xy-client-assets-script-game-poker-liuyangsanshierzhangviewcomp.ts:onroundend`
+- **查询方式**: 使用 `scripts/query_chain_kb.js` 或 `scripts/query_project_kb.js` 时，**直接使用原始驼峰命名**（如 `onOpenSmallSettlement`、`LiuYangSanShiErZhangViewComp.onRoundEnd`），工具会自动匹配
+- **诊断工具**: 使用 `scripts/analyze_call_chain.js` 验证特定调用链是否存在
+- 不要手动构造 slugified ID 去查询，使用自然的方法名即可
 - 若拓扑或抽取结果不稳定，只补适配器规则，不要手改 KB 产物
 - 后端仓库可直接使用 `serverRoots`、`moduleRoots`、`dbRoots` 或 `scanTargets.handlers/remotes/modules/routes/schemas`
 - Pinus 后端优先参考 `assets/templates/KB_CONFIG_PINUS_BACKEND_EXAMPLE.json`

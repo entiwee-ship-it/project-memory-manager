@@ -3,10 +3,10 @@
  * 查看方法完整代码
  * 
  * 使用方法:
- *   node scripts/view_method_body.js --feature <key> --method <name> [--file <script.ts>]
+ *   node scripts/view_method_body.js --feature <key> --method <name> [--root <path>] [--file <script.ts>]
  * 
  * 示例:
- *   node scripts/view_method_body.js --feature game --method onOpenSmallSettlement
+ *   node scripts/view_method_body.js --feature game --method onOpenSmallSettlement --root E:\xile
  *   node scripts/view_method_body.js --feature game --method onRoundEnd --file xy-client/assets/script/game/Controller.ts
  */
 
@@ -14,12 +14,14 @@ const fs = require('fs');
 const path = require('path');
 
 function parseArgs(argv) {
-    const args = { feature: '', method: '', file: '' };
+    const args = { feature: '', method: '', file: '', root: process.cwd() };
     for (let i = 0; i < argv.length; i++) {
         if (argv[i] === '--feature' && i + 1 < argv.length) {
             args.feature = argv[++i];
         } else if (argv[i] === '--method' && i + 1 < argv.length) {
             args.method = argv[++i];
+        } else if (argv[i] === '--root' && i + 1 < argv.length) {
+            args.root = argv[++i];
         } else if (argv[i] === '--file' && i + 1 < argv.length) {
             args.file = argv[++i];
         }
@@ -27,12 +29,25 @@ function parseArgs(argv) {
     return args;
 }
 
-function loadScanData(featureKey) {
-    const scanPath = path.join('project-memory', 'kb', 'features', featureKey, 'scan.raw.json');
-    if (!fs.existsSync(scanPath)) {
-        return null;
+function loadScanData(root, featureKey) {
+    // Load config to get correct paths
+    const configPath = path.join(root, 'project-memory', 'kb', 'configs', `${featureKey}-config.json`);
+    if (!fs.existsSync(configPath)) {
+        return { config: null, scan: null };
     }
-    return JSON.parse(fs.readFileSync(scanPath, 'utf8'));
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    
+    // Resolve scan path from config
+    let scanPath = config.outputs?.scan || `project-memory/kb/features/${featureKey}/scan.raw.json`;
+    scanPath = scanPath.replace('<feature-key>', featureKey);
+    if (!path.isAbsolute(scanPath)) {
+        scanPath = path.join(root, scanPath);
+    }
+    
+    if (!fs.existsSync(scanPath)) {
+        return { config, scan: null };
+    }
+    return { config, scan: JSON.parse(fs.readFileSync(scanPath, 'utf8')) };
 }
 
 function extractMethodFromSource(filePath, methodName) {
@@ -86,17 +101,22 @@ function main() {
     const args = parseArgs(process.argv.slice(2));
     
     if (!args.feature || !args.method) {
-        console.log('Usage: node view_method_body.js --feature <key> --method <name> [--file <script.ts>]');
+        console.log('Usage: node view_method_body.js --feature <key> --method <name> [--root <path>] [--file <script.ts>]');
         process.exit(1);
     }
     
     console.log(`=== Method Body: ${args.method} ===\n`);
     
     // 从 scan 数据查找
-    const scanData = loadScanData(args.feature);
+    const { config, scan: scanData } = loadScanData(args.root, args.feature);
+    
+    if (!config) {
+        console.log(`Feature config "${args.feature}" not found in ${args.root}.`);
+        process.exit(1);
+    }
     
     if (!scanData) {
-        console.log(`Feature "${args.feature}" not found.`);
+        console.log(`Scan data for "${args.feature}" not found.`);
         process.exit(1);
     }
     
@@ -131,6 +151,18 @@ function main() {
     }
     console.log();
     
+    // 显示调用信息
+    if (foundMethod.localCalls?.length) {
+        console.log('Local calls:', foundMethod.localCalls.join(', '));
+    }
+    if (foundMethod.fieldCalls?.length) {
+        console.log('Field calls:', foundMethod.fieldCalls.map(c => c.method).join(', '));
+    }
+    if (foundMethod.importedCalls?.length) {
+        console.log('Imported calls:', foundMethod.importedCalls.map(c => `${c.module}.${c.method}`).join(', '));
+    }
+    console.log();
+    
     // 显示 bodySnippet（如果存在）
     if (foundMethod.bodySnippet) {
         console.log('--- Extracted Snippet ---');
@@ -139,7 +171,9 @@ function main() {
     }
     
     // 提取完整方法体
-    const scriptFile = args.file || foundScript.scriptPath;
+    const scriptFile = args.file ? path.join(args.root, args.file) : 
+                      path.isAbsolute(foundScript.scriptPath) ? foundScript.scriptPath : 
+                      path.join(args.root, foundScript.scriptPath);
     const fullMethod = extractMethodFromSource(scriptFile, args.method);
     
     if (fullMethod) {
@@ -191,6 +225,7 @@ function main() {
         }
     } else {
         console.log('Could not extract full method body from source file.');
+        console.log('Tried path:', scriptFile);
         console.log('Try specifying --file <path> explicitly.');
     }
     

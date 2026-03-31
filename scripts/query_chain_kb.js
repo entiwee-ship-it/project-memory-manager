@@ -120,7 +120,16 @@ function parseArgs(argv) {
     }
 
     if (!args.feature) {
-        throw new Error('用法: node query_kb.js --feature <key> [--event|--message|--method|--request|--state|--type|--from --direction <upstream|downstream>|--upstream [query]|--downstream [query]] ... [--json]');
+        throw new Error(
+            '用法: node query_chain_kb.js --feature <key> [查询选项] [--json]\n\n' +
+            '查询选项:\n' +
+            '  --method <name> [--upstream|--downstream]  查询方法上下游链路\n' +
+            '  --event <name>                              查询事件订阅关系\n' +
+            '  --request <name>                            查询请求处理链路\n' +
+            '  --state <name>                              查询状态读写关系\n' +
+            '  --from <node-id> --direction <upstream|downstream>  从指定节点遍历\n\n' +
+            '注意: <name> 使用原始驼峰命名即可（如 onOpenSmallSettlement），工具会自动匹配节点。'
+        );
     }
 
     if (args.from && args.direction && !['upstream', 'downstream'].includes(args.direction)) {

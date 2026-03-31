@@ -55,6 +55,18 @@
 - 推荐单入口 `query_kb.js`，`query_chain_kb.js` 作为兼容入口保留
 - `query_project_kb.js --timing/--phase/--transition` 的项目协议查询
 
+## 节点 ID 格式说明
+
+**重要**: 节点 ID 使用 `slugify` 函数标准化处理：
+- 全小写 (`toLowerCase`)
+- 特殊字符替换为连字符 (`-`)
+- 例如: `method:e-xile-xy-client-assets-script-game-poker-liuyangsanshierzhangviewcomp.ts:onroundend`
+
+**查询方式**: 
+- 使用 `query_chain_kb.js` 或 `query_project_kb.js` 时，**直接使用原始驼峰命名**即可
+- 例如: `--method onOpenSmallSettlement` 或 `--method LiuYangSanShiErZhangViewComp.onRoundEnd`
+- 工具会自动匹配 `node.name` 或 `node.meta.methodName`，无需手动构造 slugified ID
+
 ## 配置与注册表规范
 
 ### KB 配置规范

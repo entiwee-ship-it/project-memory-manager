@@ -32,7 +32,21 @@ function registerUuidVariants(map, uuid, info) {
 }
 
 function findAssetBases(context) {
-    return Array.from(new Set([...(context.assetRootsAbs || []), ...(context.componentRootsAbs || [])]));
+    const bases = new Set([...(context.assetRootsAbs || [])]);
+    
+    // 从 componentRootsAbs 中提取 assets 根目录
+    // 例如: E:/xile/xy-client/assets/script/game/... -> E:/xile/xy-client/assets
+    for (const root of context.componentRootsAbs || []) {
+        const normalized = normalize(root);
+        const assetsIndex = normalized.indexOf('/assets/');
+        if (assetsIndex !== -1) {
+            bases.add(normalized.slice(0, assetsIndex + '/assets/'.length - 1));
+        } else if (normalized.endsWith('/assets')) {
+            bases.add(normalized);
+        }
+    }
+    
+    return Array.from(bases);
 }
 
 function findOopsBases(context) {
