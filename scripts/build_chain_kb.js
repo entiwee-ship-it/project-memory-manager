@@ -806,6 +806,7 @@ function buildGraph(raw, config, projectProfile, root) {
         const returnType = options.returnType || methodInfo?.returnType || '';
         const paramNames = options.paramNames || methodInfo?.paramNames || [];
         const bodySnippet = options.bodySnippet || methodInfo?.bodySnippet || '';
+        const bodySummary = options.bodySummary || methodInfo?.bodySummary || null;
         
         const methodNode = addNode({
             id: makeNodeId('method', scriptPath, methodName),
@@ -831,6 +832,8 @@ function buildGraph(raw, config, projectProfile, root) {
                 static: options.isStatic || methodInfo?.static || false,
                 // JSDoc 信息
                 jsdoc: methodInfo?.jsdoc || null,
+                // 结构化摘要
+                bodySummary,
             },
         });
         appendNodeTags(methodNode, methodName, methodNode.name, scriptPath, options.summary || methodInfo?.summary || '');
@@ -1329,6 +1332,7 @@ function buildGraph(raw, config, projectProfile, root) {
                 returnType: method.returnType || '',
                 paramNames: method.paramNames || [],
                 bodySnippet: method.bodySnippet || '',
+                bodySummary: method.bodySummary || null,
                 access: method.access || 'public',
                 isAsync: method.async || false,
                 isStatic: method.static || false,
@@ -1969,6 +1973,15 @@ function run(argv = process.argv.slice(2)) {
         }
         if (config.extractOptions.extractFullBody) {
             extractArgs.push('--extract-full-body');
+        }
+        if (config.extractOptions.enableStructuredSummary) {
+            extractArgs.push('--enable-structured-summary');
+        }
+    }
+    // 命令行参数也支持直接传递
+    if (process.argv.includes('--enable-structured-summary')) {
+        if (!extractArgs.includes('--enable-structured-summary')) {
+            extractArgs.push('--enable-structured-summary');
         }
     }
     

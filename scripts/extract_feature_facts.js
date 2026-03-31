@@ -43,6 +43,7 @@ function parseArgs(argv) {
         adapter: 'auto',
         bodySnippetMaxLength: 500,
         extractFullBody: false,
+        enableStructuredSummary: false,
     };
 
     for (let i = 0; i < argv.length; i++) {
@@ -73,6 +74,10 @@ function parseArgs(argv) {
         }
         if (token === '--extract-full-body') {
             args.extractFullBody = true;
+            continue;
+        }
+        if (token === '--enable-structured-summary') {
+            args.enableStructuredSummary = true;
             continue;
         }
         args.prefabs.push(token);
@@ -3125,8 +3130,15 @@ function extractScriptSummary(source, scriptFile, exports) {
     return basenameWithoutExt(scriptFile);
 }
 
+const { extractStructuredSummary, setTypeScriptRuntime } = require('./extract_structured_summary');
+
+// 初始化结构化摘要提取器的 TypeScript 运行时
+if (TYPESCRIPT_RUNTIME) {
+    setTypeScriptRuntime(TYPESCRIPT_RUNTIME);
+}
+
 function extractScriptInsights(methodRoots, context, options = {}) {
-    const { bodySnippetMaxLength = 500, extractFullBody = false } = options;
+    const { bodySnippetMaxLength = 500, extractFullBody = false, enableStructuredSummary = false } = options;
     const result = [];
 
     for (const root of methodRoots) {
@@ -3168,6 +3180,25 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                 const maxLength = extractFullBody ? methodBody.length : bodySnippetMaxLength;
                 const bodySnippet = extractMethodBodySnippet(methodBody, maxLength);
                 
+                // 提取结构化语义摘要
+                let bodySummary = null;
+                if (enableStructuredSummary && methodBody && TYPESCRIPT_RUNTIME) {
+                    try {
+                        const methodAst = TYPESCRIPT_RUNTIME.createSourceFile(
+                            `${methodDef.name}.ts`,
+                            methodBody,
+                            TYPESCRIPT_RUNTIME.ScriptTarget.Latest,
+                            true
+                        );
+                        bodySummary = extractStructuredSummary(methodBody, methodDef.name, methodAst, TYPESCRIPT_RUNTIME);
+                    } catch (e) {
+                        // 结构化摘要提取失败时静默降级
+                        if (process.env.DEBUG) {
+                            console.warn(`[DEBUG] Structured summary extraction failed for ${methodDef.name}: ${e.message}`);
+                        }
+                    }
+                }
+                
                 // 解析 JSDoc 获取详细文档
                 const jsdoc = parseJSDoc(docBlock);
                 
@@ -3182,6 +3213,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                     line,
                     summary: jsdoc.description || summarizeDocBlock(docBlock),
                     bodySnippet,  // 方法体内容片段
+                    bodySummary,  // 结构化语义摘要
                     // JSDoc 详细信息
                     jsdoc: {
                         description: jsdoc.description,
@@ -3944,7 +3976,7 @@ function runScan(rawArgs = process.argv.slice(2)) {
     const scripts = extractScriptInsights(
         args.methodRoots.map(root => path.resolve(root)), 
         extractContext,
-        { bodySnippetMaxLength: args.bodySnippetMaxLength, extractFullBody: args.extractFullBody }
+        { bodySnippetMaxLength: args.bodySnippetMaxLength, extractFullBody: args.extractFullBody, enableStructuredSummary: args.enableStructuredSummary }
     );
     const prefabCache = new Map();
 

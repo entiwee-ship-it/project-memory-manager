@@ -28,6 +28,12 @@ function parseArgs(argv) {
         depth: 2,
         limit: 20,
         json: false,
+        // 语义查询参数
+        hasOperation: '',
+        operationType: '',
+        dataFlowFrom: '',
+        dataFlowTo: '',
+        minComplexity: '',
     };
 
     for (let index = 0; index < argv.length; index++) {
@@ -116,18 +122,47 @@ function parseArgs(argv) {
         }
         if (token === '--json') {
             args.json = true;
+            continue;
+        }
+        // 语义查询参数
+        if (token === '--has-operation') {
+            args.hasOperation = argv[++index];
+            continue;
+        }
+        if (token === '--operation-type') {
+            args.operationType = argv[++index];
+            continue;
+        }
+        if (token === '--data-flow-from') {
+            args.dataFlowFrom = argv[++index];
+            continue;
+        }
+        if (token === '--data-flow-to') {
+            args.dataFlowTo = argv[++index];
+            continue;
+        }
+        if (token === '--min-complexity') {
+            args.minComplexity = argv[++index];
+            continue;
         }
     }
 
     if (!args.feature) {
         throw new Error(
             '用法: node query_chain_kb.js --feature <key> [查询选项] [--json]\n\n' +
-            '查询选项:\n' +
+            '基本查询:\n' +
             '  --method <name> [--upstream|--downstream]  查询方法上下游链路\n' +
             '  --event <name>                              查询事件订阅关系\n' +
             '  --request <name>                            查询请求处理链路\n' +
             '  --state <name>                              查询状态读写关系\n' +
             '  --from <node-id> --direction <upstream|downstream>  从指定节点遍历\n\n' +
+            '语义查询（需启用结构化摘要）:\n' +
+            '  --has-operation <type>                      查询包含特定操作的方法\n' +
+            '       类型: filter, map, condition, loop, assignment, method_call\n' +
+            '  --operation-type <type>                     按操作类型筛选结果\n' +
+            '  --data-flow-from <var>                      查询从指定变量出发的数据流\n' +
+            '  --data-flow-to <var>                        查询流向指定变量的数据流\n' +
+            '  --min-complexity <low|medium|high>          按最小复杂度筛选\n\n' +
             '注意: <name> 使用原始驼峰命名即可（如 onOpenSmallSettlement），工具会自动匹配节点。'
         );
     }
@@ -278,6 +313,140 @@ function resolveState(lookup, query) {
         return state;
     }
     return null;
+}
+
+// ==================== 语义查询函数 ====================
+
+/**
+ * 执行语义查询
+ */
+function performSemanticQuery(graph, lookup, args) {
+    const results = [];
+    const complexityOrder = { low: 1, medium: 2, high: 3 };
+    const minComplexityLevel = args.minComplexity ? complexityOrder[args.minComplexity] : 0;
+
+    for (const node of graph.nodes || []) {
+        if (node.type !== 'method') continue;
+
+        const bodySummary = node.meta?.bodySummary;
+        if (!bodySummary) continue;
+
+        let matches = true;
+        const matchedOperations = [];
+
+        // 检查操作类型
+        if (args.hasOperation || args.operationType) {
+            const targetType = args.hasOperation || args.operationType;
+            const found = bodySummary.operations?.some(op => {
+                const match = op.type === targetType || 
+                    (targetType === 'filter' && op.type === 'filter') ||
+                    (targetType === 'map' && op.type === 'map') ||
+                    (targetType === 'condition' && op.type === 'condition') ||
+                    (targetType === 'loop' && op.type === 'loop');
+                if (match) matchedOperations.push(op);
+                return match;
+            });
+            if (!found) matches = false;
+        }
+
+        // 检查数据流
+        if (args.dataFlowFrom && matches) {
+            const found = bodySummary.data_flow?.some(df => 
+                matchContains(df.from, args.dataFlowFrom)
+            );
+            if (!found) matches = false;
+        }
+
+        if (args.dataFlowTo && matches) {
+            const found = bodySummary.data_flow?.some(df => 
+                matchContains(df.to, args.dataFlowTo)
+            );
+            if (!found) matches = false;
+        }
+
+        // 检查复杂度
+        if (minComplexityLevel > 0 && matches) {
+            const nodeComplexity = complexityOrder[bodySummary.complexity] || 1;
+            if (nodeComplexity < minComplexityLevel) matches = false;
+        }
+
+        if (matches) {
+            results.push({
+                node,
+                bodySummary,
+                matchedOperations: matchedOperations.slice(0, 5),
+            });
+        }
+    }
+
+    // 按复杂度排序
+    results.sort((a, b) => {
+        return (complexityOrder[b.bodySummary.complexity] || 1) - 
+               (complexityOrder[a.bodySummary.complexity] || 1);
+    });
+
+    return {
+        query: {
+            hasOperation: args.hasOperation,
+            operationType: args.operationType,
+            dataFlowFrom: args.dataFlowFrom,
+            dataFlowTo: args.dataFlowTo,
+            minComplexity: args.minComplexity,
+        },
+        total: results.length,
+        results: results.slice(0, args.limit || 20),
+    };
+}
+
+/**
+ * 打印语义查询结果
+ */
+function printSemanticResults(results, args) {
+    if (args.json) {
+        console.log(JSON.stringify(results, null, 2));
+        return;
+    }
+
+    console.log(`=== 语义查询结果 (${results.total} 个匹配) ===\n`);
+    
+    if (results.results.length === 0) {
+        console.log('未找到匹配的方法。');
+        console.log('提示: 确保 KB 使用 --enable-structured-summary 构建。');
+        return;
+    }
+
+    console.log(`查询条件:`);
+    if (results.query.hasOperation) console.log(`  - 包含操作: ${results.query.hasOperation}`);
+    if (results.query.operationType) console.log(`  - 操作类型: ${results.query.operationType}`);
+    if (results.query.dataFlowFrom) console.log(`  - 数据流来源: ${results.query.dataFlowFrom}`);
+    if (results.query.dataFlowTo) console.log(`  - 数据流去向: ${results.query.dataFlowTo}`);
+    if (results.query.minComplexity) console.log(`  - 最小复杂度: ${results.query.minComplexity}`);
+    console.log();
+
+    results.results.forEach((item, index) => {
+        const node = item.node;
+        const summary = item.bodySummary;
+        
+        console.log(`${index + 1}. ${node.name}`);
+        console.log(`   文件: ${node.file}:${node.line}`);
+        console.log(`   复杂度: ${summary.complexity} | 操作数: ${summary.operations?.length || 0}`);
+        
+        if (item.matchedOperations.length > 0) {
+            console.log(`   匹配操作:`);
+            item.matchedOperations.forEach(op => {
+                let detail = `     - ${op.type}`;
+                if (op.method) detail += ` | ${op.method}`;
+                if (op.target) detail += ` | target: ${op.target}`;
+                if (op.condition) detail += ` | condition: ${op.condition.substring(0, 40)}`;
+                console.log(detail);
+            });
+        }
+        console.log();
+    });
+
+    if (results.total > results.results.length) {
+        console.log(`... 还有 ${results.total - results.results.length} 个结果未显示 (使用 --limit 增加显示数量)`);
+    }
 }
 
 function findMatchingNodes(graph, query) {
@@ -974,6 +1143,13 @@ function run(argv = process.argv.slice(2)) {
             },
             args.json
         );
+        return;
+    }
+
+    // 语义查询处理
+    if (args.hasOperation || args.operationType || args.dataFlowFrom || args.dataFlowTo || args.minComplexity) {
+        const results = performSemanticQuery(graph, lookup, args);
+        printSemanticResults(results, args);
         return;
     }
 
