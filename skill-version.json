@@ -1,7 +1,7 @@
 {
   "name": "project-memory-manager",
-  "version": "0.16.1",
-  "releaseDate": "2026-03-31",
+  "version": "0.17.0",
+  "releaseDate": "2026-04-01",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
   "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
@@ -30,6 +30,7 @@
     "auto-feature-registry-sync",
     "endpoint-route-table-graph",
     "upstream-downstream-query",
+    "kimi-cli-install",
     "skills-cli-install",
     "fullstack-adapter",
     "auto-prefab-scan",

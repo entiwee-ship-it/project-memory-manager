@@ -7,8 +7,18 @@
 
 ## [未发布]
 
+## [0.17.0] - 2026-04-01
+
 ### 新增
+- Kimi CLI 自动安装脚本 `scripts/install_to_kimi_cli.js`
+- Kimi CLI 安装指南文档
 - 文档全面完善，新增 LICENSE、CHANGELOG、CONTRIBUTING 等文件
+- 生产环境清理脚本 `scripts/clean_for_production.js`
+- API 参考文档
+
+### 改进
+- 同时支持 OpenAI Codex CLI 和 Kimi Code CLI 两种安装方式
+- README 和 SKILL.md 添加双平台安装说明
 
 ## [0.16.1] - 2026-03-31
 
