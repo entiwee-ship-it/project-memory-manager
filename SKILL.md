@@ -1,6 +1,6 @@
 ---
 name: project-memory-manager
-description: 'KB-first AI project memory manager for full-stack repositories. Use when initializing project memory, building knowledge bases, querying call chains, or working with Cocos/Pinus/Vue/React/Node.js projects.'
+description: 'KB-first AI project memory manager for full-stack repositories with structured semantic summary extraction and intelligent querying. Use when: (1) initializing project memory, (2) building knowledge bases with call chain analysis, (3) querying method relationships using natural language (e.g., "find methods that filter data"), (4) analyzing code semantics without reading source, or (5) working with Cocos/Pinus/Vue/React/Node.js projects.'
 ---
 
 # 项目记忆管理器
@@ -45,16 +45,60 @@ description: 'KB-first AI project memory manager for full-stack repositories. Us
 ### 构建或刷新功能 KB
 
 - 先准备 KB 配置 JSON，明确 `featureKey`、入口文件、关注目录与语义标签
-- 运行 `node scripts/build_chain_kb.js --config <config-path>`
+- **标准构建**: `node scripts/build_chain_kb.js --config <config-path>`
+- **启用结构化摘要**（推荐，支持语义查询）: `node scripts/build_chain_kb.js --config <config-path> --enable-structured-summary`
 - 构建后会自动同步 `feature-registry.json` 与 `kb/indexes/features.json`
 - 用 `references/core/kb-schema.md` 校验节点类型、边类型与查询面是否覆盖任务需求
 
+#### 结构化语义摘要
+
+启用 `--enable-structured-summary` 后，提取器会分析方法体 AST，生成语义操作序列：
+- **操作类型**: filter, map, condition, loop, assignment, method_call, return
+- **数据流**: 追踪变量从输入到输出的流转路径
+- **复杂度**: 自动评估为 low/medium/high
+
+**优势**:
+- AI 不读源码即可理解方法语义（80%场景）
+- 支持自然语言查询："找到过滤数据的方法"
+- 精确匹配代码模式而非文本搜索
+
 ### 查询调用链
 
-- **节点 ID 格式**: 节点 ID 使用 `slugify` 标准化（全小写、路径分隔符转为 `-`），例如 `method:e-xile-xy-client-assets-script-game-poker-liuyangsanshierzhangviewcomp.ts:onroundend`
-- **查询方式**: 使用 `scripts/query_chain_kb.js` 或 `scripts/query_project_kb.js` 时，**直接使用原始驼峰命名**（如 `onOpenSmallSettlement`、`LiuYangSanShiErZhangViewComp.onRoundEnd`），工具会自动匹配
-- **诊断工具**: 使用 `scripts/analyze_call_chain.js` 验证特定调用链是否存在
-- 不要手动构造 slugified ID 去查询，使用自然的方法名即可
+**节点 ID 格式说明**:
+- 节点 ID 使用 `slugify` 标准化（全小写、路径分隔符转为 `-`），例如 `method:e-xile-xy-client-assets-script-game-poker-liuyangsanshierzhangviewcomp.ts:onroundend`
+- **查询时使用原始驼峰命名**（如 `onOpenSmallSettlement`），工具自动匹配
+
+**基础查询**:
+```bash
+# 方法上下游链路
+node scripts/query_chain_kb.js --feature <key> --method <name> --downstream
+
+# 事件订阅关系
+node scripts/query_chain_kb.js --feature <key> --event <name>
+
+# 诊断调用链
+node scripts/analyze_call_chain.js --feature <key> --caller <method> --callee <method>
+```
+
+**语义查询（需启用结构化摘要）**:
+```bash
+# 查询包含 filter 操作的方法
+node scripts/query_chain_kb.js --feature <key> --has-operation filter
+
+# 查询包含条件判断且复杂度>=medium的方法
+node scripts/query_chain_kb.js --feature <key> --has-operation condition --min-complexity medium
+
+# 查询数据流向特定变量的方法
+node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
+
+# 支持的操作类型: filter, map, condition, loop, assignment, method_call
+# 复杂度级别: low, medium, high
+```
+
+**使用语义查询的场景**:
+- "找到所有过滤无效数据的方法" → `--has-operation filter`
+- "找到有复杂业务逻辑的方法" → `--min-complexity high`
+- "找到处理 historyData 的方法" → `--data-flow-to historyData`
 - 若拓扑或抽取结果不稳定，只补适配器规则，不要手改 KB 产物
 - 后端仓库可直接使用 `serverRoots`、`moduleRoots`、`dbRoots` 或 `scanTargets.handlers/remotes/modules/routes/schemas`
 - Pinus 后端优先参考 `assets/templates/KB_CONFIG_PINUS_BACKEND_EXAMPLE.json`
