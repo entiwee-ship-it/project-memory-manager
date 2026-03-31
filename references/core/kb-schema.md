@@ -67,6 +67,61 @@
 - 例如: `--method onOpenSmallSettlement` 或 `--method LiuYangSanShiErZhangViewComp.onRoundEnd`
 - 工具会自动匹配 `node.name` 或 `node.meta.methodName`，无需手动构造 slugified ID
 
+## 节点属性说明
+
+### method 节点
+
+```typescript
+{
+  id: string;           // slugified ID
+  type: 'method';
+  name: string;         // 可读名称，如 "ClassName.methodName"
+  file: string;         // 绝对路径
+  line: number;         // 行号
+  area: string;         // frontend/backend/shared/...
+  stack: string[];      // 技术栈标签
+  meta: {
+    methodName: string; // 原始方法名
+    scriptPath: string; // 相对路径
+    summary: string;    // JSDoc 描述
+    params: string;     // 参数签名
+    returnType: string; // 返回类型
+    bodySnippet: string;// 方法体截断文本
+    
+    // v0.16.0+ 结构化摘要
+    bodySummary?: {
+      complexity: 'low' | 'medium' | 'high';
+      branch_count: number;
+      loop_count: number;
+      call_count: number;
+      operations: Operation[];
+      data_flow: DataFlowNode[];
+    };
+    
+    // JSDoc 信息
+    jsdoc?: {
+      description?: string;
+      params?: Array<{name, type, description}>;
+      returns?: {type, description};
+      examples?: string[];
+    };
+  }
+}
+```
+
+### Operation 类型
+
+```typescript
+type Operation = 
+  | { type: 'filter'; target: string; condition: string; }
+  | { type: 'map'; target: string; condition: string; }
+  | { type: 'condition'; condition: string; is_early_return: boolean; }
+  | { type: 'loop'; loop_type: 'for'|'for_of'|'for_in'|'while'; target?: string; }
+  | { type: 'assignment'; target: string; source: string; has_fallback?: boolean; }
+  | { type: 'method_call'; target: string; method: string; args: string[]; }
+  | { type: 'return'; value?: string; };
+```
+
 ## 配置与注册表规范
 
 ### KB 配置规范

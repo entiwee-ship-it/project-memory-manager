@@ -349,18 +349,27 @@ function performSemanticQuery(graph, lookup, args) {
             if (!found) matches = false;
         }
 
-        // 检查数据流
+        // 检查数据流 - 支持多种匹配模式
         if (args.dataFlowFrom && matches) {
-            const found = bodySummary.data_flow?.some(df => 
-                matchContains(df.from, args.dataFlowFrom)
-            );
+            const searchTerm = args.dataFlowFrom.toLowerCase();
+            const found = bodySummary.data_flow?.some(df => {
+                const from = (df.from || '').toLowerCase();
+                // 支持: 完全匹配、包含匹配、路径后缀匹配
+                return from === searchTerm || 
+                       from.includes(searchTerm) ||
+                       from.endsWith('.' + searchTerm);
+            });
             if (!found) matches = false;
         }
 
         if (args.dataFlowTo && matches) {
-            const found = bodySummary.data_flow?.some(df => 
-                matchContains(df.to, args.dataFlowTo)
-            );
+            const searchTerm = args.dataFlowTo.toLowerCase();
+            const found = bodySummary.data_flow?.some(df => {
+                const to = (df.to || '').toLowerCase();
+                return to === searchTerm || 
+                       to.includes(searchTerm) ||
+                       to.endsWith('.' + searchTerm);
+            });
             if (!found) matches = false;
         }
 
@@ -446,6 +455,14 @@ function printSemanticResults(results, args) {
 
     if (results.total > results.results.length) {
         console.log(`... 还有 ${results.total - results.results.length} 个结果未显示 (使用 --limit 增加显示数量)`);
+    }
+    
+    // 打印查询建议
+    if (results.total === 0) {
+        console.log('\n💡 查询建议:');
+        console.log('  - 尝试更通用的操作类型: filter, map, condition, loop, assignment, method_call');
+        console.log('  - 尝试不加 --min-complexity 查看所有复杂度');
+        console.log('  - 使用 --data-flow-from/to 时尝试变量名的部分匹配');
     }
 }
 

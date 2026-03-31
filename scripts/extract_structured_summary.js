@@ -221,8 +221,18 @@ function extractConditionOperation(node, sourceFile) {
     
     // 检测是否是卫语句提前返回
     let isEarlyReturn = false;
-    if (node.thenStatement && ts.isReturnStatement(node.thenStatement)) {
-        isEarlyReturn = true;
+    if (node.thenStatement) {
+        // 直接返回: if (x) return;
+        if (ts.isReturnStatement(node.thenStatement)) {
+            isEarlyReturn = true;
+        }
+        // 块中返回: if (x) { return; }
+        else if (ts.isBlock(node.thenStatement)) {
+            const statements = node.thenStatement.statements;
+            if (statements.length === 1 && ts.isReturnStatement(statements[0])) {
+                isEarlyReturn = true;
+            }
+        }
     }
 
     return {

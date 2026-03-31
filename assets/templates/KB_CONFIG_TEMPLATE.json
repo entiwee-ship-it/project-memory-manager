@@ -32,9 +32,10 @@
   "_comment_prefabs": "预制体路径列表。如果为空，会自动从 assetRoots 递归扫描 .prefab 文件",
   "extractOptions": {
     "bodySnippetMaxLength": 500,
-    "extractFullBody": false
+    "extractFullBody": false,
+    "enableStructuredSummary": false
   },
-  "_comment_extractOptions": "方法体提取选项。bodySnippetMaxLength: 截断长度(默认500); extractFullBody: 是否提取完整方法体(默认false，KB会很大)",
+  "_comment_extractOptions": "方法体提取选项。bodySnippetMaxLength: 截断长度(默认500); extractFullBody: 是否提取完整方法体(默认false，KB会很大); enableStructuredSummary: 是否启用结构化语义摘要(默认false，启用后支持语义查询但会增加KB大小)",
   "outputs": {
     "scan": "project-memory/kb/features/<feature-key>/scan.raw.json",
     "graph": "project-memory/kb/features/<feature-key>/chain.graph.json",

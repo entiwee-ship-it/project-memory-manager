@@ -40,6 +40,37 @@
   - nested prefab override：字段绑定其实落在嵌套预制体的哪个组件上
   - 事件绑定：按钮 / Toggle / 列表事件最终绑到哪个脚本方法
 
+### 结构化语义摘要（v0.16.0+）
+
+启用 `--enable-structured-summary` 后，Cocos 适配器会分析 TypeScript 方法体，提取：
+
+- **操作序列**: filter, map, condition, loop, assignment, method_call, return
+- **数据流**: 变量从输入到输出的流转路径
+- **复杂度**: 自动评估为 low/medium/high
+
+**使用场景**:
+- 不读源码理解方法做什么："这个方法过滤了无效数据并渲染到列表"
+- 语义查询："找到所有处理玩家数据并更新UI的方法"
+- 快速定位业务逻辑："找到有复杂条件判断的方法"
+
+**启用方式**:
+```json
+{
+  "extractOptions": {
+    "enableStructuredSummary": true
+  }
+}
+```
+
+**查询示例**:
+```bash
+# 查找使用 filter 的方法
+node scripts/query_chain_kb.js --feature <key> --has-operation filter
+
+# 查找数据流向 directionList 的方法
+node scripts/query_chain_kb.js --feature <key> --data-flow-to "this.directionList"
+```
+
 ## 绑定语义
 
 这层最容易被 AI 搞混，所以现在的知识库会显式区分：
