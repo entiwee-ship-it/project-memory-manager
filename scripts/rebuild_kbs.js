@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { resolveProjectRoot, readJsonSafe, writeJsonAtomic } = require('./lib/common');
+const { resolveProjectRoot, readJsonSafe, validateProjectRoot, writeJsonAtomic } = require('./lib/common');
 const { normalizeFeatureRecord } = require('./lib/feature-kb');
 const { run: buildChainKb } = require('./build_chain_kb');
 const { withLock, getProjectLockPath } = require('./lib/lock');
@@ -206,6 +206,9 @@ function run(argv = process.argv.slice(2)) {
 }
 
 function doRebuild(args, root) {
+    // 验证 root 是否有效
+    validateProjectRoot(root, { scriptName: 'rebuild_kbs' });
+    
     // 结果收集
     const results = [];
     

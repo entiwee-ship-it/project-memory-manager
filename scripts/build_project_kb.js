@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { buildLookup, run: buildChainKb } = require('./build_chain_kb');
-const { ensureDir, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, writeJson, writeJsonAtomic } = require('./lib/common');
+const { ensureDir, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('./lib/common');
 const { learnProjectProtocols } = require('./learn_project_protocols');
 
 function parseArgs(argv) {
@@ -284,6 +284,23 @@ function updateProjectGlobalReport(report, graph, lookup, protocols) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
+    
+    // 验证 root 是否有效（但 build_project_kb 可能用于初始化阶段，所以不强制要求 registry）
+    if (!pathExists(path.join(root, 'project-memory'))) {
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 未找到有效的项目根目录: ${root}\n` +
+            `提示: 该目录下没有 project-memory 文件夹。\n\n` +
+            `可能原因:\n` +
+            `  1. 未指定 --root 参数，且当前目录不是项目根目录\n` +
+            `  2. 项目尚未初始化（缺少 project-memory 目录）\n\n` +
+            `修复方法:\n` +
+            `  1. 指定 --root 参数: node scripts/build_project_kb.js --root <项目路径>\n` +
+            `  2. 或切换到项目目录后运行\n` +
+            `  3. 或设置环境变量: set PMM_PROJECT_ROOT=<项目路径>\n` +
+            `  4. 初始化新项目: node scripts/init_project_memory.js --root <项目路径>`
+        );
+    }
+    
     const projectProfile = loadProjectProfile(root);
     if (!projectProfile) {
         const profilePath = path.join(root, 'project-memory', 'state', 'project-profile.json');

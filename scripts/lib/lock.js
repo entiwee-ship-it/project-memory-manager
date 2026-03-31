@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 简单的文件锁机制，防止并发操作冲突
  */
 
@@ -7,21 +7,24 @@ const path = require('path');
 
 const LOCK_TIMEOUT = 60000; // 60秒超时
 
-/**
- * 获取锁
- * @param {string} lockFilePath - 锁文件路径
- * @param {Object} options - 选项
- * @returns {{release: Function, info: Object}} 锁对象
- * @throws {Error} 如果无法获取锁
- */
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
 function acquireLock(lockFilePath, options = {}) {
     const { timeout = LOCK_TIMEOUT, wait = false } = options;
     const startTime = Date.now();
     
+    // 确保锁目录存在
+    ensureDir(path.dirname(lockFilePath));
+    
     while (true) {
         try {
             // 尝试创建锁文件（原子操作）
-            const fd = fs.openSync(lockFilePath, 'wx');
+            // 确保锁目录存在
+ensureDir(path.dirname(lockFilePath));
+const fd = fs.openSync(lockFilePath, 'wx');
             const lockInfo = {
                 pid: process.pid,
                 startTime: new Date().toISOString(),
@@ -146,3 +149,5 @@ module.exports = {
     withLock,
     LOCK_TIMEOUT,
 };
+
+

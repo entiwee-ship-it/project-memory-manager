@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { resolveProjectRoot, readJson } = require('./lib/common');
+const { resolveProjectRoot, readJson, validateProjectRoot } = require('./lib/common');
 const { normalizeFeatureRecord } = require('./lib/feature-kb');
 const {
     buildAuthoringProfile,
@@ -450,6 +450,10 @@ function applyIntent(args, root, artifacts, result) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
+    
+    // 验证 root 是否有效
+    validateProjectRoot(root, { scriptName: 'cocos_authoring' });
+    
     const autoActions = [];
     try {
         ensureFeatureFresh(root, args.feature, autoActions);

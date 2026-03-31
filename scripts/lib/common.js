@@ -273,7 +273,9 @@ function findProjectRoot(startDir = process.cwd()) {
     }
 }
 
-function resolveProjectRoot(startDir = process.cwd()) {
+function resolveProjectRoot(startDir = process.cwd(), options = {}) {
+    const { strict = false } = options;
+    
     const envRoot = String(process.env.PMM_PROJECT_ROOT || '').trim();
     if (envRoot) {
         const resolvedEnvRoot = path.resolve(envRoot);
@@ -287,11 +289,67 @@ function resolveProjectRoot(startDir = process.cwd()) {
 
     const foundRoot = findProjectRoot(startDir);
     if (!foundRoot) {
+        if (strict) {
+            return null;
+        }
+        // 非严格模式下发出警告并返回当前目录（保持向后兼容）
         console.warn(`[SKILL-WARN] 未找到 project-memory 目录，将使用当前目录: ${path.resolve(startDir)}`);
         console.warn(`[SKILL-WARN] 如需初始化，运行: node scripts/init_project_memory.js --root <path>`);
     }
     
     return foundRoot || path.resolve(startDir);
+}
+
+/**
+ * 验证项目根目录是否有效（包含有效的 project-memory 结构）
+ * @param {string} root - 项目根目录
+ * @param {Object} options - 选项
+ * @param {string} options.scriptName - 脚本名称（用于错误提示）
+ * @param {boolean} options.requireRegistry - 是否要求 feature-registry.json 存在
+ * @throws {Error} 如果项目根目录无效
+ */
+function validateProjectRoot(root, options = {}) {
+    const { scriptName = 'script', requireRegistry = true } = options;
+    const pmDir = path.join(root, 'project-memory');
+    const registryPath = path.join(pmDir, 'state', 'feature-registry.json');
+    
+    if (!pathExists(pmDir)) {
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 未找到有效的项目根目录: ${root}\n` +
+            `提示: 该目录下没有 project-memory 文件夹。\n\n` +
+            `可能原因:\n` +
+            `  1. 未指定 --root 参数，且当前目录不是项目根目录\n` +
+            `  2. 项目尚未初始化（缺少 project-memory 目录）\n\n` +
+            `修复方法:\n` +
+            `  1. 指定 --root 参数: node scripts/${scriptName}.js --root <项目路径> ...\n` +
+            `  2. 或切换到项目目录后运行\n` +
+            `  3. 或设置环境变量: set PMM_PROJECT_ROOT=<项目路径>\n` +
+            `  4. 初始化新项目: node scripts/init_project_memory.js --root <项目路径>`
+        );
+    }
+    
+    if (requireRegistry && !pathExists(registryPath)) {
+        // 检查是否是技能目录本身
+        const skillVersionPath = path.join(root, 'skill-version.json');
+        if (pathExists(skillVersionPath)) {
+            throw new Error(
+                `[SKILL-DIAGNOSIS] 检测到在技能目录运行脚本: ${root}\n` +
+                `技能目录不能作为项目目录使用。\n\n` +
+                `修复方法:\n` +
+                `  1. 指定 --root 参数指向项目目录: node scripts/${scriptName}.js --root E:\\xile ...\n` +
+                `  2. 或切换到项目目录后运行: cd E:\\xile && node <技能路径>\\scripts\\${scriptName}.js ...\n` +
+                `  3. 或设置环境变量: set PMM_PROJECT_ROOT=E:\\xile`
+            );
+        }
+        
+        throw new Error(
+            `[SKILL-DIAGNOSIS] 项目尚未完全初始化: ${root}\n` +
+            `提示: 未找到 feature-registry.json。\n\n` +
+            `修复方法:\n` +
+            `  1. 初始化项目记忆: node scripts/init_project_memory.js --root ${root}\n` +
+            `  2. 或重建 KB: node scripts/rebuild_kbs.js --root ${root}`
+        );
+    }
 }
 
 function slugify(input) {
@@ -371,6 +429,7 @@ module.exports = {
     resolveProjectRoot,
     slugify,
     timestamp,
+    validateProjectRoot,
     writeFileAtomic,
     writeJson,
     writeJsonAtomic,

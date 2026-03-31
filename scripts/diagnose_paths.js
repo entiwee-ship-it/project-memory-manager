@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 诊断路径问题
  * 
@@ -219,3 +219,4 @@ function main() {
 }
 
 main();
+

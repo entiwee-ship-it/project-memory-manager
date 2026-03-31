@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 查看方法完整代码
  * 
@@ -233,3 +233,4 @@ function main() {
 }
 
 main();
+

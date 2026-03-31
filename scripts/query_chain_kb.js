@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { hasOwn, readJson, readJsonSafe, resolveProjectRoot } = require('./lib/common');
+const { hasOwn, readJson, readJsonSafe, resolveProjectRoot, validateProjectRoot } = require('./lib/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
@@ -1132,6 +1132,9 @@ function resolveTraversalSpec(args, graph, lookup) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = resolveProjectRoot(args.root || process.cwd());
+    
+    // 验证 root 是否有效
+    validateProjectRoot(root, { scriptName: 'query_chain_kb' });
     const { feature, graph, lookup } = loadFeatureLookup(root, args.feature);
     const kbVersionStatus = buildKbVersionStatus(graph);
     if (!args.json) {

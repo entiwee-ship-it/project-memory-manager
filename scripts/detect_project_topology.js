@@ -40,8 +40,8 @@ function hasIgnoredSegment(relativePath) {
 
 function parseArgs(argv) {
     const args = {
-        root: process.cwd(),
-        out: path.join(process.cwd(), 'project-memory', 'state', 'project-profile.json'),
+        root: '',
+        out: '',
     };
 
     for (let index = 0; index < argv.length; index++) {
@@ -53,6 +53,16 @@ function parseArgs(argv) {
         if (token === '--out') {
             args.out = path.resolve(argv[++index]);
         }
+    }
+
+    // 如果没有指定 root，使用 cwd
+    if (!args.root) {
+        args.root = process.cwd();
+    }
+    
+    // 如果没有指定 out，基于 root 生成默认路径
+    if (!args.out) {
+        args.out = path.join(args.root, 'project-memory', 'state', 'project-profile.json');
     }
 
     return args;

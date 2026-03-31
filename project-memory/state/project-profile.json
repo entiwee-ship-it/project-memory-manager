@@ -1,0 +1,46 @@
+{
+  "projectName": "xile",
+  "projectType": "full-stack",
+  "areas": {
+    "frontend": [
+      "xy-client"
+    ],
+    "backend": [
+      "qyserver/game-server"
+    ],
+    "shared": [],
+    "contract": [],
+    "data": [],
+    "ops": [
+      "tools"
+    ]
+  },
+  "stacks": {
+    "frontend": [
+      "cocos",
+      "nodejs",
+      "typescript"
+    ],
+    "backend": [
+      "express",
+      "nodejs",
+      "pinus",
+      "typescript"
+    ],
+    "shared": [],
+    "contract": [],
+    "data": [],
+    "ops": [
+      "batch",
+      "powershell"
+    ]
+  },
+  "integration": {
+    "primary": [
+      "websocket"
+    ],
+    "secondary": [
+      "http"
+    ]
+  }
+}
