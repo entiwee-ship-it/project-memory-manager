@@ -188,10 +188,16 @@ node scripts/query_cocos_profile.js --prefab-detail goldenEgg --json
 
 ### 升级这个技能本身
 
+**重要规则**：
 - 永远不要把 `<installed-skill-path>` 或其它已安装副本当作最终修改目标
-- 正确流程是：修改 GitHub 源仓库 -> 校验 -> commit/push -> `npx skills update`
+- 正确流程是：修改 GitHub 源仓库 -> 校验 -> commit/push -> 更新
 - 技能升级完成后，必须在技能根目录执行 `node scripts/rebuild_kbs.js --root <project-root>` 重建现有 KB
 - 如果当前查询脚本提示 `[stale-kb]`，说明 KB 还是旧技能版本构建的，先重建再继续分析
+
+**更新方式**：
+
+- **OpenAI Codex CLI**: `npx skills check && npx skills update`
+- **Kimi CLI**: `node scripts/install_to_kimi_cli.js --update`
 
 ### 生产环境优化
 
@@ -206,6 +212,27 @@ node scripts/clean_for_production.js --level=standard
 ```
 
 清理后核心功能不受影响，如需恢复可重新安装技能包。
+
+### 自主安装指南（供 AI 参考）
+
+当用户需要安装或更新本技能时，AI 可协助执行以下步骤：
+
+**场景1: 用户询问如何安装技能**
+1. 询问用户使用的 AI 客户端（Codex CLI 或 Kimi CLI）
+2. 根据客户端提供对应的安装命令
+3. 指导用户完成校验步骤
+
+**场景2: 用户询问如何更新技能**
+1. 检测当前技能安装方式（检查技能路径是否包含 `.config/agents` 或 `kimi_cli`）
+2. 执行对应的更新命令
+3. 验证更新后的版本
+4. 提醒用户重建项目 KB
+
+**场景3: 技能安装失败**
+1. 检查 Git 是否可用
+2. 检查网络连接
+3. 检查目标目录权限
+4. 提供手动安装方案
 
 ## 环境依赖
 

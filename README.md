@@ -12,13 +12,17 @@ project-memory-manager
 
 ## 安装与升级
 
-公开安装这个技能，推荐使用 `skills` CLI：
+本技能支持两种 AI 客户端：
+
+### 方式一：OpenAI Codex CLI（推荐）
+
+使用 `skills` CLI 安装：
 
 ```powershell
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
 ```
 
-安装完成后，建议运行技能自带校验：
+安装后校验：
 
 ```powershell
 cd "<installed-skill-path>"
@@ -26,7 +30,30 @@ node scripts/show_skill_version.js --text
 python scripts/validate_skill_runtime.py . --mode auto
 ```
 
-**可选：清理非必需文件（推荐）**
+### 方式二：Kimi Code CLI
+
+使用本仓库提供的安装脚本：
+
+```powershell
+# 1. 克隆本仓库
+git clone https://github.com/entiwee-ship-it/project-memory-manager.git
+cd project-memory-manager
+
+# 2. 安装到 Kimi CLI（预览）
+node scripts/install_to_kimi_cli.js --dry-run
+
+# 3. 正式安装
+node scripts/install_to_kimi_cli.js
+```
+
+后续更新：
+
+```powershell
+cd project-memory-manager
+node scripts/install_to_kimi_cli.js --update
+```
+
+### 生产环境优化（可选）
 
 安装后如果仅供 AI 使用，可清理开发/维护类文件减小体积：
 
@@ -40,7 +67,9 @@ node scripts/clean_for_production.js
 
 这不会影响技能功能，AI 仍通过 `SKILL.md` 获取使用说明。
 
-后续升级可使用：
+### 升级说明
+
+**Codex CLI:**
 
 ```powershell
 npx skills check
@@ -48,6 +77,13 @@ npx skills update
 cd "<installed-skill-path>"
 node scripts/show_skill_version.js --text
 python scripts/validate_skill_runtime.py . --mode auto
+```
+
+**Kimi CLI:**
+
+```powershell
+cd project-memory-manager
+node scripts/install_to_kimi_cli.js --update
 ```
 
 技能升级完成后，建议立刻在目标项目重建现有 KB：
