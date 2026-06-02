@@ -3,8 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 const { runExtract } = require('./extract_feature_facts');
-const { hasOwn, inferArea, inferStacks, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, timestamp, writeJson, writeJsonAtomic } = require('./lib/common');
+const { hasOwn, inferArea, inferStacks, normalize, pathExists, readJson, readJsonSafe, repoRelative, slugify, timestamp, writeJson, writeJsonAtomic } = require('./lib/common');
 const { normalizeConfig, normalizeFeatureRecord } = require('./lib/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { loadSkillVersion } = require('./show_skill_version');
 
 function loadCurrentSkillBuildInfo() {
@@ -18,14 +19,28 @@ function loadCurrentSkillBuildInfo() {
 }
 
 function parseArgs(argv) {
-    const args = { config: '', root: '' };
+    const layoutArgs = parseLayoutArgs(argv);
+    const args = {
+        config: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
+    };
     for (let index = 0; index < argv.length; index++) {
         if (argv[index] === '--config') {
             args.config = argv[++index];
             continue;
         }
-        if (argv[index] === '--root') {
+        if (argv[index] === '--root' || argv[index] === '--workspace-root') {
             args.root = argv[++index];
+            continue;
+        }
+        if (argv[index] === '--data-root') {
+            args.dataRoot = argv[++index] || '';
+            continue;
+        }
+        if (argv[index] === '--layout') {
+            args.layout = argv[++index] || '';
         }
     }
     if (!args.config) {
@@ -660,7 +675,7 @@ function buildFeatureRecord(config, configPath) {
         featureName: config.featureName,
         summary: config.summary || '',
         areas: Array.isArray(config.areas) ? config.areas : [],
-        configPath,
+        configPath: normalize(configPath),
         docsDir: config.docs?.featureDir || '',
         kbDir: config.kbDir || `project-memory/kb/features/${config.featureKey}`,
         outputs: config.outputs || {},
@@ -668,9 +683,9 @@ function buildFeatureRecord(config, configPath) {
     });
 }
 
-function upsertFeatureRegistry(root, featureRecord) {
-    const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
-    const indexPath = path.join(root, 'project-memory', 'kb', 'indexes', 'features.json');
+function upsertFeatureRegistry(context, featureRecord) {
+    const registryPath = context.paths.featureRegistry;
+    const indexPath = context.paths.featureIndex;
     const generatedAt = timestamp();
     
     // 使用安全读取，提供默认值
@@ -1933,7 +1948,12 @@ function buildLookup(graph) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const configPath = path.resolve(args.root || process.cwd(), args.config);
-    const root = resolveProjectRoot(args.root || path.dirname(configPath));
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
+    const root = context.workspaceRoot;
     const rawConfig = readJson(configPath);
     const normalizedConfigResult = normalizeConfig(rawConfig);
     const config = normalizedConfigResult.config;
@@ -1942,7 +1962,7 @@ function run(argv = process.argv.slice(2)) {
         throw new Error(`KB 配置缺少必要字段: ${missing.join(', ')}`);
     }
     normalizedConfigResult.warnings.forEach(message => console.warn(`[deprecated] ${message}`));
-    const profile = loadProjectProfile(root);
+    const profile = readJsonSafe(context.paths.projectProfile, { required: false, defaultValue: null });
     const outputs = config.outputs || {};
     const extractInputs = deriveExtractInputs(config, root);
     const outputPaths = ensureCanonicalOutputCompat(root, outputs);
@@ -2017,10 +2037,10 @@ function run(argv = process.argv.slice(2)) {
         // 更新 registry（registry 更新失败不影响 KB 文件）
         if (config.registerFeature !== false) {
             try {
-                upsertFeatureRegistry(root, buildFeatureRecord(config, repoRelative(configPath, root)));
+                upsertFeatureRegistry(context, buildFeatureRecord(config, configPath));
             } catch (registryErr) {
                 console.warn(`[SKILL-WARN] KB 构建成功，但 registry 更新失败: ${registryErr.message}`);
-                console.warn(`[SKILL-WARN] 可手动运行重建: node scripts/rebuild_kbs.js --root ${root}`);
+                console.warn(`[SKILL-WARN] 可手动运行重建: node scripts/rebuild_kbs.js --workspace-root ${root}`);
             }
         }
         

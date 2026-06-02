@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { hasOwn, readJson, readJsonSafe, resolveProjectRoot, validateProjectRoot } = require('./lib/common');
+const { hasOwn, readJson, readJsonSafe } = require('./lib/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { loadSkillVersion } = require('./show_skill_version');
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
         feature: '',
         event: '',
@@ -24,7 +26,9 @@ function parseArgs(argv) {
         tag: '',
         file: '',
         hasHandler: '',
-        root: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
         depth: 2,
         limit: 20,
         json: false,
@@ -112,6 +116,18 @@ function parseArgs(argv) {
             args.root = argv[++index];
             continue;
         }
+        if (token === '--workspace-root') {
+            args.root = argv[++index];
+            continue;
+        }
+        if (token === '--data-root') {
+            args.dataRoot = argv[++index] || '';
+            continue;
+        }
+        if (token === '--layout') {
+            args.layout = argv[++index] || '';
+            continue;
+        }
         if (token === '--depth') {
             args.depth = Number.parseInt(argv[++index], 10) || 2;
             continue;
@@ -184,8 +200,8 @@ function collectTypedSelectors(args) {
     ].filter(([, value]) => Boolean(value));
 }
 
-function loadFeatureLookup(root, featureKey) {
-    const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
+function loadFeatureLookup(context, featureKey) {
+    const registryPath = context.paths.featureRegistry;
     
     // 使用安全读取
     let registry;
@@ -200,7 +216,7 @@ function loadFeatureLookup(root, featureKey) {
             `  1. 项目记忆尚未初始化\n` +
             `  2. 当前目录不是项目根目录\n\n` +
             `修复命令:\n` +
-            `  node scripts/init_project_memory.js --root <project-root>\n` +
+            `  node scripts/init_project_memory.js --workspace-root <project-root>\n` +
             `  或切换到正确的项目目录`
         );
     }
@@ -221,12 +237,12 @@ function loadFeatureLookup(root, featureKey) {
             (normalizedFeatures.length > 10 ? `\n  ... 还有 ${normalizedFeatures.length - 10} 个` : '') +
             `\n\n修复命令:\n` +
             `  1. 检查 feature 名称是否正确\n` +
-            `  2. 构建该 feature: node scripts/build_chain_kb.js --config project-memory/kb/configs/${featureKey}.json\n` +
-            `  3. 或重建全部: node scripts/rebuild_kbs.js --root <project-root>`
+            `  2. 构建该 feature: node scripts/build_chain_kb.js --workspace-root <project-root> --config <config-path>\n` +
+            `  3. 或重建全部: node scripts/rebuild_kbs.js --workspace-root <project-root>`
         );
     }
 
-    return loadFeatureLookupArtifacts(root, feature);
+    return loadFeatureLookupArtifacts(context.workspaceRoot, feature);
 }
 
 function currentSkillVersionInfo() {
@@ -1131,11 +1147,12 @@ function resolveTraversalSpec(args, graph, lookup) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const root = resolveProjectRoot(args.root || process.cwd());
-    
-    // 验证 root 是否有效
-    validateProjectRoot(root, { scriptName: 'query_chain_kb' });
-    const { feature, graph, lookup } = loadFeatureLookup(root, args.feature);
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
+    const { feature, graph, lookup } = loadFeatureLookup(context, args.feature);
     const kbVersionStatus = buildKbVersionStatus(graph);
     if (!args.json) {
         warnIfKbStale(kbVersionStatus);

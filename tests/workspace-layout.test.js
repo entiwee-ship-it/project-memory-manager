@@ -10,7 +10,9 @@ const {
 const { run: initProjectMemory } = require('../scripts/init_project_memory');
 const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
 const { run: buildProjectKb } = require('../scripts/build_project_kb');
+const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
+const { run: queryKb } = require('../scripts/query_kb');
 
 function testWorkspaceId() {
     assert.equal(workspaceIdFromRoot('E:/xile-workspace'), 'e-xile-workspace');
@@ -44,6 +46,21 @@ function testLegacyContext() {
     assert.equal(context.layout, 'legacy-project-memory');
     assert.equal(context.memoryRoot, path.join(path.resolve(workspaceRoot), 'project-memory'));
     assert.equal(context.paths.projectProfile, path.join(path.resolve(workspaceRoot), 'project-memory', 'state', 'project-profile.json'));
+}
+
+function testLegacyContextFindsAncestorProjectMemory() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-legacy-ancestor-'));
+    const nestedRoot = path.join(workspaceRoot, 'app', 'http', 'routes');
+    fs.mkdirSync(path.join(workspaceRoot, 'project-memory', 'state'), { recursive: true });
+    fs.mkdirSync(nestedRoot, { recursive: true });
+
+    const context = createWorkspaceContext({
+        workspaceRoot: nestedRoot,
+        layout: 'legacy-project-memory',
+    });
+
+    assert.equal(context.workspaceRoot, path.resolve(workspaceRoot));
+    assert.equal(context.paths.featureRegistry, path.join(path.resolve(workspaceRoot), 'project-memory', 'state', 'feature-registry.json'));
 }
 
 function testParseArgs() {
@@ -104,10 +121,52 @@ function testProjectKbExternalData() {
     assert.equal(parsed.kind, 'project-summary');
 }
 
+function testFeatureKbExternalData() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-feature-workspace-'));
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-feature-data-'));
+    fs.mkdirSync(path.join(workspaceRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"dependencies":{"typescript":"latest"}}\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'src', 'feature.ts'), 'export class Feature { run(){ return 1; } }\n');
+
+    initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'feature-sample']);
+    detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    const featureDir = path.join(context.paths.featuresDir, 'feature-sample');
+    const configPath = path.join(context.paths.configsDir, 'feature-sample.json');
+    fs.mkdirSync(context.paths.configsDir, { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({
+        featureKey: 'feature-sample',
+        featureName: 'Feature Sample',
+        methodRoots: ['src'],
+        outputs: {
+            scan: path.join(featureDir, 'scan.raw.json'),
+            graph: path.join(featureDir, 'chain.graph.json'),
+            lookup: path.join(featureDir, 'chain.lookup.json'),
+            report: path.join(featureDir, 'build.report.json'),
+        },
+        docs: {
+            featureDir: path.join(context.memoryRoot, 'docs', 'features', 'feature-sample'),
+            featureIndex: path.join(context.memoryRoot, 'docs', 'features', 'feature-sample', 'FEATURE.md'),
+        },
+    }, null, 2));
+
+    buildChainKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--config', configPath]);
+
+    assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
+    assert.equal(fs.existsSync(context.paths.featureRegistry), true);
+    assert.equal(fs.existsSync(path.join(featureDir, 'chain.graph.json')), true);
+
+    const output = captureOutput(queryKb, ['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--feature', 'feature-sample', '--json'], workspaceRoot);
+    const parsed = JSON.parse(output);
+    assert.equal(parsed.kind, 'feature-summary');
+}
+
 testWorkspaceId();
 testExternalDataContext();
 testLegacyContext();
+testLegacyContextFindsAncestorProjectMemory();
 testParseArgs();
 testInitAndTopologyUseExternalData();
 testProjectKbExternalData();
+testFeatureKbExternalData();
 console.log('workspace-layout validation passed');

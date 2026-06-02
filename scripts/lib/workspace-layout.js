@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_LAYOUT = 'external-data';
@@ -60,9 +61,28 @@ function resolveLayout(value = '') {
     return layout;
 }
 
+function findLegacyWorkspaceRoot(startDir = process.cwd()) {
+    let current = path.resolve(startDir);
+
+    while (true) {
+        if (fs.existsSync(path.join(current, 'project-memory'))) {
+            return current;
+        }
+
+        const parent = path.dirname(current);
+        if (parent === current) {
+            return null;
+        }
+        current = parent;
+    }
+}
+
 function createWorkspaceContext(options = {}) {
-    const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
     const layout = resolveLayout(options.layout);
+    const initialWorkspaceRoot = path.resolve(options.workspaceRoot || process.env.PMM_PROJECT_ROOT || process.cwd());
+    const workspaceRoot = layout === LEGACY_LAYOUT
+        ? findLegacyWorkspaceRoot(initialWorkspaceRoot) || initialWorkspaceRoot
+        : initialWorkspaceRoot;
     const dataRoot = path.resolve(options.dataRoot || process.env.PMM_DATA_ROOT || defaultDataRoot());
     const workspaceId = workspaceIdFromRoot(workspaceRoot);
     const memoryRoot = layout === LEGACY_LAYOUT
@@ -110,6 +130,7 @@ module.exports = {
     createWorkspaceContext,
     createWorkspaceContextFromArgv,
     defaultDataRoot,
+    findLegacyWorkspaceRoot,
     parseLayoutArgs,
     resolveLayout,
     toolRoot,

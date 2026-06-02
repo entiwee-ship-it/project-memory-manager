@@ -22,6 +22,8 @@ const { run: refreshMemoryIndexes } = require('../scripts/refresh_memory_indexes
 const { detectInstallContext, loadSkillVersion, run: showSkillVersion } = require('../scripts/show_skill_version');
 const { validateSkillVersion } = require('../scripts/validate_skill_package');
 
+process.env.PMM_LAYOUT = process.env.PMM_LAYOUT || 'legacy-project-memory';
+
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }

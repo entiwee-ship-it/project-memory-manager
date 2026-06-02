@@ -10,25 +10,32 @@
 
 const fs = require('fs');
 const path = require('path');
-const { resolveProjectRoot, readJsonSafe, validateProjectRoot, writeJsonAtomic } = require('./lib/common');
+const { readJsonSafe, writeJsonAtomic } = require('./lib/common');
 const { normalizeFeatureRecord } = require('./lib/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { run: buildChainKb } = require('./build_chain_kb');
-const { withLock, getProjectLockPath } = require('./lib/lock');
+const { withLock } = require('./lib/lock');
 const { run: buildProjectKb } = require('./build_project_kb');
 const { run: buildCocosAuthoringProfile } = require('./build_cocos_authoring_profile');
 const { run: refreshMemoryIndexes } = require('./refresh_memory_indexes');
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
-        root: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
         feature: '',
-        layout: '',
+        layout: layoutArgs.layout || '',
         continueOnError: true, // 默认继续执行
     };
 
     for (let index = 0; index < argv.length; index++) {
-        if (argv[index] === '--root') {
+        if (argv[index] === '--root' || argv[index] === '--workspace-root') {
             args.root = argv[++index] || '';
+            continue;
+        }
+        if (argv[index] === '--data-root') {
+            args.dataRoot = argv[++index] || '';
             continue;
         }
         if (argv[index] === '--feature') {
@@ -48,8 +55,11 @@ function parseArgs(argv) {
     return args;
 }
 
-function collectConfigPaths(root) {
-    const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
+function collectConfigPaths(rootOrContext) {
+    const context = typeof rootOrContext === 'string'
+        ? createWorkspaceContext({ workspaceRoot: rootOrContext })
+        : rootOrContext;
+    const registryPath = context.paths.featureRegistry;
     const results = [];
     const seen = new Set();
 
@@ -64,7 +74,7 @@ function collectConfigPaths(root) {
         if (!feature.configPath) {
             continue;
         }
-        const absoluteConfigPath = path.resolve(root, feature.configPath);
+        const absoluteConfigPath = path.resolve(context.memoryRoot, feature.configPath);
         if (!fs.existsSync(absoluteConfigPath)) {
             console.warn(`[SKILL-WARN] 配置文件不存在: ${absoluteConfigPath}`);
             continue;
@@ -80,7 +90,7 @@ function collectConfigPaths(root) {
     }
 
     // 从 configs 目录读取（补充 registry 中可能缺失的）
-    const configDir = path.join(root, 'project-memory', 'kb', 'configs');
+    const configDir = context.paths.configsDir;
     if (fs.existsSync(configDir)) {
         for (const entry of fs.readdirSync(configDir, { withFileTypes: true })) {
             if (!entry.isFile() || !entry.name.endsWith('.json')) {
@@ -101,8 +111,8 @@ function collectConfigPaths(root) {
     return results;
 }
 
-function resolveTargets(root, featureKey) {
-    const allTargets = collectConfigPaths(root);
+function resolveTargets(rootOrContext, featureKey) {
+    const allTargets = collectConfigPaths(rootOrContext);
     if (!featureKey) {
         return allTargets;
     }
@@ -121,10 +131,13 @@ function resolveTargets(root, featureKey) {
  * 重建单个 feature
  * @returns {Object} { success: boolean, error?: Error, featureKey?: string }
  */
-function rebuildFeature(root, target) {
+function rebuildFeature(rootOrContext, target) {
+    const context = typeof rootOrContext === 'string'
+        ? createWorkspaceContext({ workspaceRoot: rootOrContext })
+        : rootOrContext;
     try {
-        console.log(`\n[REBUILD] ${path.relative(root, target.configPath).replace(/\\/g, '/')}`);
-        buildChainKb(['--root', root, '--config', target.configPath]);
+        console.log(`\n[REBUILD] ${path.relative(context.memoryRoot, target.configPath).replace(/\\/g, '/')}`);
+        buildChainKb(['--workspace-root', context.workspaceRoot, '--data-root', context.dataRoot, '--layout', context.layout, '--config', target.configPath]);
         return { 
             success: true, 
             featureKey: target.featureKey || path.basename(target.configPath, '.json') 
@@ -145,7 +158,10 @@ function rebuildFeature(root, target) {
 /**
  * 打印重建报告
  */
-function printReport(results, root) {
+function printReport(results, rootOrContext) {
+    const context = typeof rootOrContext === 'string'
+        ? createWorkspaceContext({ workspaceRoot: rootOrContext })
+        : rootOrContext;
     const successes = results.filter(r => r.success);
     const failures = results.filter(r => !r.success);
     
@@ -169,12 +185,12 @@ function printReport(results, root) {
             console.log(`    配置: ${r.configPath}`);
             console.log(`    错误: ${r.error?.message?.split('\n')[0] || 'Unknown'}`);
             console.log(`    修复建议: 检查配置格式，运行:`);
-            console.log(`      node scripts/build_chain_kb.js --config ${path.relative(root, r.configPath)}`);
+            console.log(`      node scripts/build_chain_kb.js --workspace-root ${context.workspaceRoot} --config ${path.relative(context.memoryRoot, r.configPath)}`);
         });
     }
     
     // 写入报告文件
-    const reportPath = path.join(root, 'project-memory', 'reports', 'rebuild-report.json');
+    const reportPath = context.paths.rebuildReport;
     try {
         writeJsonAtomic(reportPath, {
             generatedAt: new Date().toISOString(),
@@ -190,7 +206,7 @@ function printReport(results, root) {
                 error: r.error?.message || 'Unknown error',
             })),
         });
-        console.log(`\n📄 详细报告已保存: ${path.relative(root, reportPath)}`);
+        console.log(`\n📄 详细报告已保存: ${path.relative(context.memoryRoot, reportPath)}`);
     } catch (err) {
         console.warn(`[SKILL-WARN] 无法写入报告文件: ${err.message}`);
     }
@@ -200,19 +216,29 @@ function printReport(results, root) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const root = resolveProjectRoot(args.root || process.cwd());
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
     
     // 使用锁防止并发重建
-    const lockPath = getProjectLockPath(root, 'rebuild');
+    const lockPath = path.join(context.paths.locksDir, 'rebuild.lock');
     
     return withLock(lockPath, () => {
-        return doRebuild(args, root);
+        return doRebuild(args, context);
     }, { wait: false });
 }
 
-function doRebuild(args, root) {
+function doRebuild(args, rootOrContext) {
+    const context = typeof rootOrContext === 'string'
+        ? createWorkspaceContext({ workspaceRoot: rootOrContext })
+        : rootOrContext;
+    const root = context.workspaceRoot;
     // 验证 root 是否有效
-    validateProjectRoot(root, { scriptName: 'rebuild_kbs' });
+    if (!fs.existsSync(context.paths.featureRegistry)) {
+        throw new Error(`[SKILL-DIAGNOSIS] 未找到 feature-registry.json: ${context.paths.featureRegistry}`);
+    }
     
     // 结果收集
     const results = [];
@@ -220,7 +246,7 @@ function doRebuild(args, root) {
     // 重建 project-global
     console.log('[REBUILD] project-global');
     try {
-        buildProjectKb(['--root', root, ...(args.layout ? ['--layout', args.layout] : [])]);
+        buildProjectKb(['--workspace-root', context.workspaceRoot, '--data-root', context.dataRoot, '--layout', context.layout]);
     } catch (error) {
         console.error('[REBUILD-FAILED] project-global');
         console.error(`  错误: ${error.message}`);
@@ -255,7 +281,7 @@ function doRebuild(args, root) {
     }
     
     // 收集 targets（排除 project-global）
-    const targets = resolveTargets(root, args.feature)
+    const targets = resolveTargets(context, args.feature)
         .filter(target => {
             const baseName = path.basename(target.configPath, path.extname(target.configPath));
             return target.featureKey !== 'project-global' && baseName !== 'project-global';
@@ -271,7 +297,7 @@ function doRebuild(args, root) {
 
     // 批量重建
     for (const target of targets) {
-        const result = rebuildFeature(root, target);
+        const result = rebuildFeature(context, target);
         results.push(result);
         
         // 如果设置了 --stop-on-error 且失败，立即退出
@@ -299,7 +325,7 @@ function doRebuild(args, root) {
     }
 
     // 打印报告
-    printReport(results, root);
+    printReport(results, context);
     
     // 如果有失败，以非零退出码结束，但报告已生成
     const hasFailures = results.some(r => !r.success);
