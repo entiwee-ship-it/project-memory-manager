@@ -1,19 +1,33 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * 诊断路径问题
  * 
  * 使用方法:
- *   node scripts/diagnose_paths.js [--root <path>]
+ *   node scripts/diagnose_paths.js [--workspace-root <path>]
  */
 
 const fs = require('fs');
 const path = require('path');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 
 function parseArgs(argv) {
-    const args = { root: '' };
+    const layoutArgs = parseLayoutArgs(argv);
+    const args = {
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
+    };
     for (let i = 0; i < argv.length; i++) {
-        if (argv[i] === '--root' && i + 1 < argv.length) {
+        if ((argv[i] === '--root' || argv[i] === '--workspace-root') && i + 1 < argv.length) {
             args.root = path.resolve(argv[++i]);
+            continue;
+        }
+        if (argv[i] === '--data-root' && i + 1 < argv.length) {
+            args.dataRoot = path.resolve(argv[++i]);
+            continue;
+        }
+        if (argv[i] === '--layout' && i + 1 < argv.length) {
+            args.layout = argv[++i] || '';
         }
     }
     return args;
@@ -62,25 +76,28 @@ function testPathResolution(testPath, description) {
     return results;
 }
 
-function findPathIssues(projectRoot) {
+function formatLayoutCommandArgs(context) {
+    return `--workspace-root "${context.workspaceRoot}" --data-root "${context.dataRoot}" --layout ${context.layout}`;
+}
+
+function findPathIssues(context) {
     const issues = [];
+    const projectRoot = context.workspaceRoot;
+    const legacyProjectMemory = path.join(projectRoot, 'project-memory');
+    const layoutCommandArgs = formatLayoutCommandArgs(context);
     
-    // 检查 project-memory 结构
-    const pmDir = path.join(projectRoot, 'project-memory');
-    if (!fs.existsSync(pmDir)) {
+    if (context.layout !== 'legacy-project-memory' && fs.existsSync(legacyProjectMemory)) {
         issues.push({
-            severity: 'error',
-            message: '未找到 project-memory 目录',
-            fix: `node scripts/init_project_memory.js --root "${projectRoot}"`,
+            severity: 'warning',
+            message: `目标仓库存在 legacy project-memory 目录: ${legacyProjectMemory}`,
+            fix: '确认是否需要迁移；默认 external-data 不再写入该目录',
         });
-        return issues;
     }
-    
-    // 检查关键目录
+
     const requiredDirs = [
-        { path: path.join(pmDir, 'docs'), name: '文档目录' },
-        { path: path.join(pmDir, 'state'), name: '状态目录' },
-        { path: path.join(pmDir, 'kb'), name: '知识库目录' },
+        { path: context.paths.stateDir, name: '状态目录' },
+        { path: context.paths.kbDir, name: '知识库目录' },
+        { path: context.paths.reportsDir, name: '报告目录' },
     ];
     
     for (const dir of requiredDirs) {
@@ -88,13 +105,21 @@ function findPathIssues(projectRoot) {
             issues.push({
                 severity: 'warning',
                 message: `${dir.name} 不存在: ${dir.path}`,
-                fix: `mkdir -p "${dir.path}"`,
+                fix: `node scripts/init_project_memory.js ${layoutCommandArgs}`,
             });
         }
     }
+
+    if (!fs.existsSync(context.paths.projectProfile)) {
+        issues.push({
+            severity: 'warning',
+            message: `项目画像不存在: ${context.paths.projectProfile}`,
+            fix: `node scripts/detect_project_topology.js ${layoutCommandArgs}`,
+        });
+    }
     
     // 检查配置文件中的路径问题
-    const configsDir = path.join(pmDir, 'kb', 'configs');
+    const configsDir = context.paths.configsDir;
     if (fs.existsSync(configsDir)) {
         const configs = fs.readdirSync(configsDir).filter(f => f.endsWith('.json'));
         
@@ -150,6 +175,11 @@ function findPathIssues(projectRoot) {
 
 function main() {
     const args = parseArgs(process.argv.slice(2));
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
     
     console.log('=== Path Diagnostics ===\n');
     
@@ -167,7 +197,7 @@ function main() {
         'scripts/build_chain_kb.js',
         './scripts/build_chain_kb.js',
         'scripts\\build_chain_kb.js',
-        'project-memory/kb/configs',
+        context.paths.configsDir,
     ];
     
     for (const testPath of testPaths) {
@@ -182,10 +212,21 @@ function main() {
     console.log();
     
     // 项目路径检查
-    const projectRoot = args.root || process.cwd();
-    console.log(`项目路径检查 (${projectRoot}):`);
+    const layoutDiagnostics = {
+        workspaceRoot: context.workspaceRoot,
+        dataRoot: context.dataRoot,
+        layout: context.layout,
+        memoryRoot: context.memoryRoot,
+        legacyProjectMemoryExists: fs.existsSync(path.join(context.workspaceRoot, 'project-memory')),
+        externalStateExists: fs.existsSync(context.paths.projectProfile),
+    };
+    console.log('PMM 布局:');
+    console.log(JSON.stringify(layoutDiagnostics, null, 2));
+    console.log();
+
+    console.log(`项目路径检查 (${context.workspaceRoot}):`);
     
-    const issues = findPathIssues(projectRoot);
+    const issues = findPathIssues(context);
     
     if (issues.length === 0) {
         console.log('  ✅ 未发现路径问题');

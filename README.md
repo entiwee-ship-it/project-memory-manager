@@ -90,7 +90,7 @@ node scripts/install_to_kimi_cli.js --update
 
 ```powershell
 cd "<installed-skill-path>"
-node scripts/rebuild_kbs.js --root "<project-root>"
+node scripts/rebuild_kbs.js --workspace-root "<project-root>"
 ```
 
 升级这个技能本身时，请遵循这条规则：
@@ -98,6 +98,24 @@ node scripts/rebuild_kbs.js --root "<project-root>"
 - 不要直接修改已安装副本目录
 - 先执行 `npx skills update`
 - 最后执行 `rebuild_kbs.js`
+
+### Codex MCP first
+
+First version recommendation:
+
+```powershell
+npm run mcp
+```
+
+Codex should call the MCP tools first. CLI scripts remain available for manual use:
+
+```powershell
+node scripts/init_project_memory.js --workspace-root E:/xile-workspace
+node scripts/build_project_kb.js --workspace-root E:/xile-workspace
+node scripts/query_project_kb.js --workspace-root E:/xile-workspace
+```
+
+By default these commands write to `.runtime/data`, not to the target workspace.
 
 ## 这个技能解决什么问题
 
@@ -111,7 +129,7 @@ node scripts/rebuild_kbs.js --root "<project-root>"
 它同时补齐项目开发需要的几个入口：
 
 - 轻入口控制台：`AGENTS.md`
-- 项目记忆根目录：`project-memory/`
+- PMM data root：默认位于技能源码或安装包的 `.runtime/data`
 - 工作状态：`active work`
 - feature 级链路知识库
 - 面向前后端协同的工作协议
@@ -144,8 +162,7 @@ node scripts/rebuild_kbs.js --root "<project-root>"
 当技能接管一个仓库后，通常会形成这些结构：
 
 ```text
-AGENTS.md
-project-memory/
+<pmm-data-root>/workspaces/<workspace-id>/
 ├── SYSTEM/
 ├── docs/
 ├── kb/
@@ -156,15 +173,15 @@ project-memory/
 
 其中最重要的是：
 
-- `AGENTS.md`：仓库级轻入口
-- `project-memory/docs/`：长期记忆和工作文档
-- `project-memory/kb/`：feature 级可查询链路知识库
-- `project-memory/state/`：项目画像、active work、feature registry
+- `<memory-root>/docs/`：长期记忆和工作文档
+- `<memory-root>/kb/`：feature 级可查询链路知识库
+- `<memory-root>/state/`：项目画像、active work、feature registry
+- 目标业务仓库默认不创建 `project-memory/`
 
-新版本里，`project-memory/kb/` 不再只有 feature 视角，还会包含：
+新版本里，`<memory-root>/kb/` 不再只有 feature 视角，还会包含：
 
-- `project-memory/kb/project-global/`：全盘扫描后的全局图
-- `project-memory/state/project-protocols.json`：从项目代码里学习出的消息、dispatcher、状态模式
+- `<memory-root>/kb/project-global/`：全盘扫描后的全局图
+- `<memory-root>/state/project-protocols.json`：从项目代码里学习出的消息、dispatcher、状态模式
 
 ## 这个技能如何工作
 
@@ -185,7 +202,7 @@ project-memory/
 
 推荐把 KB 的默认入口记成两条命令：
 
-- `node scripts/query_project_kb.js --root <project-root>`
+- `node scripts/query_project_kb.js --workspace-root <project-root>`
 - `node scripts/query_kb.js --feature <feature-key>`
 
 当你还不知道该读哪个 KB 文件时，不要先手翻 `chain.graph.json` 或 `chain.lookup.json`，先跑上面的命令看 project / feature 摘要。

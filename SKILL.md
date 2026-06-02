@@ -7,12 +7,12 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ## 先判断任务类型
 
-- 初始化新仓库时，先读 `references/core/onboarding-playbook.md` 与 `references/core/work-protocols.md`，再运行 `scripts/init_project_memory.js` 和 `scripts/detect_project_topology.js`
+- 初始化新仓库时，先读 `references/core/onboarding-playbook.md` 与 `references/core/work-protocols.md`，再通过 MCP 或 `scripts/init_project_memory.js --workspace-root <repo-root>` 和 `scripts/detect_project_topology.js --workspace-root <repo-root>` 建立外置记忆
 - 迁移旧体系时，先读 `references/core/document-boundaries.md`，再运行 `scripts/migrate_legacy_memory.js`，把长期结论迁入 docs，把可重建事实迁入 KB 配置和产物
-- 需要全盘扫描整个仓库、学习项目自己的消息/状态协议时，先运行 `scripts/build_project_kb.js --root <repo-root>`，再读 `references/core/project-protocol-learning.md`
+- 需要全盘扫描整个仓库、学习项目自己的消息/状态协议时，优先通过 MCP `build_project_index`，MCP 不可用时运行 `scripts/build_project_kb.js --workspace-root <repo-root>`，再读 `references/core/project-protocol-learning.md`
 - 当问题本质是"为什么这个阶段太早/太晚切换""为什么动画没播完就进下一步"这类业务时序问题时，优先看 `timing / phase / transition` patterns
 - 构建或刷新链路 KB 时，先读 `references/core/kb-schema.md`，再按技术栈读取对应 `references/adapters/*.md`，准备配置后运行 `scripts/build_chain_kb.js --config ...`
-- 查询调用链、事件、request、state 时，优先运行 `scripts/query_project_kb.js --root <repo-root>`；当范围已经缩到 feature 再用 `scripts/query_kb.js --feature ...`
+- 查询调用链、事件、request、state 时，优先通过 MCP `query_project_chain`，MCP 不可用时运行 `scripts/query_project_kb.js --workspace-root <repo-root>`；当范围已经缩到 feature 再用 `scripts/query_kb.js --feature ...`
 - 当任务是"给 Cocos 节点挂脚本、补点击事件、给脚本字段绑节点/组件/资源"时，先读 `references/adapters/cocos.md`，再运行 `scripts/cocos_authoring.js`
 - 校验技能包或在新环境自举依赖时，先读 `references/core/validation.md`，再在技能根目录运行 `python scripts/validate_skill_runtime.py . --mode auto`
 - 需要扩展新技术栈、补拓扑规则或制定前后端协同时，先读 `references/core/adapter-protocol.md` 与 `references/core/fullstack-coordination.md`
@@ -20,18 +20,24 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ## 默认工作流
 
+- 优先通过 MCP server 调用 `inspect_workspace`、`get_current_state`、`build_project_index` 和 `query_project_chain`
+- MCP 不可用时，再调用 CLI 脚本
+- CLI 默认使用 external-data layout，记忆、KB、状态、报告、锁和临时产物写入 PMM data root
+- legacy `project-memory/` 只在显式 `--layout legacy-project-memory` 时使用
+- 业务源码目录默认只读，不创建 `project-memory/`
+
 ### 会话开始
 
 - 先读目标仓库根的 `AGENTS.md`
-- 再读 `project-memory/state/active-work.json` 与 `project-memory/state/project-profile.json`
+- 通过 MCP `get_current_state` 确认 `memoryRoot`、`projectProfile` 和 `featureRegistry` 的实际位置
 - 再读任务相关 docs，优先看 `FAQ.md`、`LOCATE.md`、`CHANGE_GUIDE.md` 和对应 feature 文档
 - 当任务是定位入口、事件绑定、request-callback、状态流转或上下游调用时，先查 `project-global KB`，再决定是否做 feature 级或局部源码搜索
-- 若目标仓库还没有 `project-memory/`，立即切到"初始化或刷新项目记忆"流程
+- 若 PMM data root 尚未初始化，立即切到"初始化或刷新项目记忆"流程
 
 ### 初始化新仓库
 
-- 运行 `node scripts/init_project_memory.js --root <repo-root> --name <project-name>`
-- 运行 `node scripts/detect_project_topology.js --root <repo-root>`
+- 运行 `node scripts/init_project_memory.js --workspace-root <repo-root> --name <project-name>`
+- 运行 `node scripts/detect_project_topology.js --workspace-root <repo-root>`
 - 按 `references/core/onboarding-playbook.md` 的默认顺序补齐 `AGENTS.md`、project overview、active work 与工作协议
 - 只在识别出技术栈后读取对应适配器，避免一次性加载全部技术说明
 
@@ -113,22 +119,22 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
 
 ### 构建 project-global KB
 
-- 运行 `node scripts/build_project_kb.js --root <repo-root>`
+- 运行 `node scripts/build_project_kb.js --workspace-root <repo-root>`
 - 这一步会全盘扫描仓库，产出：
-  - `project-memory/kb/project-global/chain.graph.json`
-  - `project-memory/kb/project-global/chain.lookup.json`
-  - `project-memory/kb/project-global/build.report.json`
-  - `project-memory/state/project-protocols.json`
+  - `<memory-root>/kb/project-global/chain.graph.json`
+  - `<memory-root>/kb/project-global/chain.lookup.json`
+  - `<memory-root>/kb/project-global/build.report.json`
+  - `<memory-root>/state/project-protocols.json`
 - 这一步不是替代 feature KB，而是提供全局入口、消息协议学习和跨区域链路基座
 - 当升级技能版本后，优先重建 `project-global KB`，再重建 feature KB
 
 ### 查询链路
 
-- 全局入口优先：`node scripts/query_project_kb.js --root <repo-root>`
-- 全局消息查询：`node scripts/query_project_kb.js --root <repo-root> --message <message> --downstream`
-- 全局时序查询：`node scripts/query_project_kb.js --root <repo-root> --timing <query>`
-- 全局阶段查询：`node scripts/query_project_kb.js --root <repo-root> --phase <query>`
-- 全局状态转换查询：`node scripts/query_project_kb.js --root <repo-root> --transition <query>`
+- 全局入口优先：`node scripts/query_project_kb.js --workspace-root <repo-root>`
+- 全局消息查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --message <message> --downstream`
+- 全局时序查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --timing <query>`
+- 全局阶段查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --phase <query>`
+- 全局状态转换查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --transition <query>`
 - 当范围已经缩小到单一 feature，再运行 `node scripts/query_kb.js --feature <feature-key> ...`
 - 若已经在技能根目录，可直接运行 `node scripts/query_kb.js --feature <feature-key> ...`
 - 若不在技能根目录，再使用 `node <skill-path>/scripts/query_kb.js --feature <feature-key> ...`
@@ -191,7 +197,7 @@ node scripts/query_cocos_profile.js --prefab-detail goldenEgg --json
 **重要规则**：
 - 永远不要把 `<installed-skill-path>` 或其它已安装副本当作最终修改目标
 - 正确流程是：修改 GitHub 源仓库 -> 校验 -> commit/push -> 更新
-- 技能升级完成后，必须在技能根目录执行 `node scripts/rebuild_kbs.js --root <project-root>` 重建现有 KB
+- 技能升级完成后，必须在技能根目录执行 `node scripts/rebuild_kbs.js --workspace-root <project-root>` 重建现有 KB
 - 如果当前查询脚本提示 `[stale-kb]`，说明 KB 还是旧技能版本构建的，先重建再继续分析
 
 **更新方式**：
@@ -291,5 +297,5 @@ npm install
 - 结构变化后刷新 KB
 - 长期认知变化后更新 docs
 - 优先补脚本、配置或适配器，不要把一次性推理结果写成长期协议
-- 依赖 `process.cwd()` 的脚本要先切到目标仓库根；带 `--root` 的脚本可以从任意目录运行
+- 依赖 `process.cwd()` 的脚本要先切到目标仓库根；带 `--workspace-root` 的脚本可以从任意目录运行
 - **避免使用 `python -c "..."` 内联代码**（PowerShell 转义问题），优先使用 Node.js 脚本或 Python 文件
