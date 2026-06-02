@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { spawn } = require('child_process');
 const { createWorkspaceContext } = require('./lib/workspace-layout');
+const { run: initProjectMemory } = require('./init_project_memory');
+const { run: detectProjectTopology } = require('./detect_project_topology');
 const { run: buildProjectKb } = require('./build_project_kb');
 const { run: queryProjectKb } = require('./query_project_kb');
 const { loadSkillVersion } = require('./show_skill_version');
+
+const jobs = new Map();
+let nextJobId = 1;
 
 const TOOL_DEFINITIONS = [
     {
@@ -46,6 +53,78 @@ const TOOL_DEFINITIONS = [
         },
     },
     {
+        name: 'init_workspace',
+        description: 'Initialize PMM external data for a target workspace without writing memory files into the workspace.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                name: { type: 'string' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'detect_topology',
+        description: 'Detect workspace topology and write project-profile.json into PMM data root.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'diagnose_workspace',
+        description: 'Diagnose PMM external-data state and suggest the next lifecycle action.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'start_build_project_index',
+        description: 'Start an asynchronous project-global KB build job.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                forceTopology: { type: 'boolean' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'get_job_status',
+        description: 'Return current status for an asynchronous PMM job.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                jobId: { type: 'string' },
+            },
+            required: ['jobId'],
+        },
+    },
+    {
+        name: 'get_job_result',
+        description: 'Return final result and workspace state for an asynchronous PMM job.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                jobId: { type: 'string' },
+            },
+            required: ['jobId'],
+        },
+    },
+    {
         name: 'query_project_chain',
         description: 'Query project-global KB from PMM data root.',
         inputSchema: {
@@ -57,6 +136,20 @@ const TOOL_DEFINITIONS = [
                 timing: { type: 'string' },
                 phase: { type: 'string' },
                 transition: { type: 'string' },
+                event: { type: 'string' },
+                method: { type: 'string' },
+                request: { type: 'string' },
+                state: { type: 'string' },
+                type: { type: 'string' },
+                name: { type: 'string' },
+                tag: { type: 'string' },
+                file: { type: 'string' },
+                from: { type: 'string' },
+                direction: { type: 'string' },
+                upstream: { type: 'boolean' },
+                downstream: { type: 'boolean' },
+                limit: { type: 'number' },
+                depth: { type: 'number' },
             },
             required: ['workspaceRoot'],
         },
@@ -86,6 +179,20 @@ function layoutArgv(args = {}) {
     return argv;
 }
 
+function readJsonSafe(filePath, fallback = null) {
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+        return fallback;
+    }
+}
+
+function hasConfiguredAreaRoots(projectProfile) {
+    return Object.values(projectProfile?.areas || {}).some(
+        roots => Array.isArray(roots) && roots.length > 0
+    );
+}
+
 function captureConsoleLog(fn) {
     const output = [];
     const oldLog = console.log;
@@ -96,6 +203,44 @@ function captureConsoleLog(fn) {
     } finally {
         console.log = oldLog;
     }
+}
+
+function buildWorkspaceState(args) {
+    const context = createWorkspaceContext({
+        workspaceRoot: args.workspaceRoot,
+        dataRoot: args.dataRoot,
+        layout: 'external-data',
+    });
+    const projectProfile = readJsonSafe(context.paths.projectProfile, null);
+    const hasProjectProfile = Boolean(projectProfile);
+    const hasAreaRoots = hasConfiguredAreaRoots(projectProfile);
+    const hasProjectGlobalKb = fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'))
+        && fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.lookup.json'));
+    return {
+        workspaceRoot: context.workspaceRoot,
+        dataRoot: context.dataRoot,
+        layout: context.layout,
+        workspaceId: context.workspaceId,
+        memoryRoot: context.memoryRoot,
+        manifest: context.paths.manifest,
+        projectProfile: context.paths.projectProfile,
+        featureRegistry: context.paths.featureRegistry,
+        projectGlobalDir: context.paths.projectGlobalDir,
+        initialized: fs.existsSync(context.paths.manifest),
+        hasProjectProfile,
+        hasConfiguredAreaRoots: hasAreaRoots,
+        hasProjectGlobalKb,
+        legacyProjectMemoryExists: fs.existsSync(path.join(context.workspaceRoot, 'project-memory')),
+        areas: projectProfile?.areas || null,
+        stacks: projectProfile?.stacks || null,
+        suggestedNextAction: !fs.existsSync(context.paths.manifest)
+            ? 'init_workspace'
+            : (!hasProjectProfile || !hasAreaRoots)
+                ? 'detect_topology'
+                : !hasProjectGlobalKb
+                    ? 'build_project_index'
+                    : 'query_project_chain',
+    };
 }
 
 function inspectWorkspace(args) {
@@ -114,19 +259,61 @@ function inspectWorkspace(args) {
 }
 
 function getCurrentState(args) {
-    const context = createWorkspaceContext({
-        workspaceRoot: args.workspaceRoot,
-        dataRoot: args.dataRoot,
-        layout: 'external-data',
-    });
+    return textResult(buildWorkspaceState(args));
+}
+
+function initWorkspace(args) {
+    const argv = [...layoutArgv(args)];
+    if (args.name) {
+        argv.push('--name', args.name);
+    }
+    const captured = captureConsoleLog(() => initProjectMemory(argv));
     return textResult({
-        workspaceRoot: context.workspaceRoot,
-        dataRoot: context.dataRoot,
-        layout: context.layout,
-        manifest: context.paths.manifest,
-        projectProfile: context.paths.projectProfile,
-        featureRegistry: context.paths.featureRegistry,
-        projectGlobalDir: context.paths.projectGlobalDir,
+        ...buildWorkspaceState(args),
+        initialized: true,
+        output: captured.output,
+    });
+}
+
+function detectTopology(args) {
+    const captured = captureConsoleLog(() => detectProjectTopology(layoutArgv(args)));
+    return textResult({
+        ...buildWorkspaceState(args),
+        output: captured.output,
+    });
+}
+
+function ensureWorkspacePrepared(args) {
+    let state = buildWorkspaceState(args);
+    const output = [];
+    if (!state.initialized) {
+        output.push(captureConsoleLog(() => initProjectMemory(layoutArgv(args))).output);
+        state = buildWorkspaceState(args);
+    }
+    if (!state.hasProjectProfile || !state.hasConfiguredAreaRoots) {
+        output.push(captureConsoleLog(() => detectProjectTopology(layoutArgv(args))).output);
+        state = buildWorkspaceState(args);
+    }
+    return {
+        state,
+        output: output.filter(Boolean).join('\n'),
+    };
+}
+
+function diagnoseWorkspace(args) {
+    const state = buildWorkspaceState(args);
+    const missingAreaRoots = [];
+    for (const roots of Object.values(state.areas || {})) {
+        for (const areaRoot of Array.isArray(roots) ? roots : []) {
+            if (!fs.existsSync(path.resolve(state.workspaceRoot, areaRoot))) {
+                missingAreaRoots.push(areaRoot);
+            }
+        }
+    }
+    return textResult({
+        ...state,
+        missingAreaRoots,
+        isHealthy: state.initialized && state.hasProjectProfile && state.hasConfiguredAreaRoots && missingAreaRoots.length === 0,
     });
 }
 
@@ -134,20 +321,137 @@ function buildProjectIndex(args) {
     if (args.dryRun !== false) {
         return inspectWorkspace(args);
     }
+    const prepared = ensureWorkspacePrepared(args);
     const captured = captureConsoleLog(() => buildProjectKb(layoutArgv(args)));
-    const state = JSON.parse(getCurrentState(args).content[0].text);
     return textResult({
-        ...state,
-        output: captured.output,
+        ...buildWorkspaceState(args),
+        output: [prepared.output, captured.output].filter(Boolean).join('\n'),
+    });
+}
+
+function createJob(type, args) {
+    const jobId = `job-${Date.now()}-${nextJobId++}`;
+    const job = {
+        jobId,
+        type,
+        args: { ...args },
+        status: 'queued',
+        phase: 'queued',
+        startedAt: null,
+        endedAt: null,
+        exitCode: null,
+        output: '',
+        error: '',
+    };
+    jobs.set(jobId, job);
+    return job;
+}
+
+function runNodeScript(job, phase, scriptName, args) {
+    return new Promise(resolve => {
+        job.phase = phase;
+        const child = spawn(process.execPath, [path.join(__dirname, scriptName), ...args], {
+            cwd: path.resolve(__dirname, '..'),
+            windowsHide: true,
+        });
+        child.stdout.on('data', chunk => {
+            job.output += chunk.toString();
+        });
+        child.stderr.on('data', chunk => {
+            job.error += chunk.toString();
+        });
+        child.on('close', code => {
+            job.exitCode = code;
+            resolve(code === 0);
+        });
+        child.on('error', error => {
+            job.error += `${error.message}\n`;
+            job.exitCode = 1;
+            resolve(false);
+        });
+    });
+}
+
+async function runBuildJob(job) {
+    job.status = 'running';
+    job.startedAt = new Date().toISOString();
+    const args = layoutArgv(job.args);
+    const initOk = await runNodeScript(job, 'init', 'init_project_memory.js', args);
+    if (!initOk) {
+        job.status = 'failed';
+        job.endedAt = new Date().toISOString();
+        return;
+    }
+    if (job.args.forceTopology !== false) {
+        const topologyOk = await runNodeScript(job, 'topology', 'detect_project_topology.js', args);
+        if (!topologyOk) {
+            job.status = 'failed';
+            job.endedAt = new Date().toISOString();
+            return;
+        }
+    }
+    const buildOk = await runNodeScript(job, 'build', 'build_project_kb.js', args);
+    job.status = buildOk ? 'succeeded' : 'failed';
+    job.phase = buildOk ? 'done' : job.phase;
+    job.endedAt = new Date().toISOString();
+}
+
+function publicJob(job) {
+    return {
+        jobId: job.jobId,
+        type: job.type,
+        status: job.status,
+        phase: job.phase,
+        startedAt: job.startedAt,
+        endedAt: job.endedAt,
+        exitCode: job.exitCode,
+        outputTail: job.output.slice(-4000),
+        errorTail: job.error.slice(-4000),
+    };
+}
+
+function startBuildProjectIndex(args) {
+    const job = createJob('build_project_index', args);
+    setImmediate(() => runBuildJob(job));
+    return textResult(publicJob(job));
+}
+
+function getJobStatus(args) {
+    const job = jobs.get(args.jobId);
+    if (!job) {
+        return textResult({ status: 'missing', jobId: args.jobId, isError: true });
+    }
+    return textResult(publicJob(job));
+}
+
+function getJobResult(args) {
+    const job = jobs.get(args.jobId);
+    if (!job) {
+        return textResult({ status: 'missing', jobId: args.jobId, isError: true });
+    }
+    return textResult({
+        ...publicJob(job),
+        ...buildWorkspaceState(job.args),
     });
 }
 
 function queryProjectChain(args) {
     const argv = [...layoutArgv(args), '--json'];
-    for (const key of ['message', 'timing', 'phase', 'transition']) {
+    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
         if (args[key]) {
             argv.push(`--${key}`, args[key]);
         }
+    }
+    for (const key of ['limit', 'depth']) {
+        if (Number.isFinite(args[key])) {
+            argv.push(`--${key}`, String(args[key]));
+        }
+    }
+    if (args.upstream) {
+        argv.push('--upstream');
+    }
+    if (args.downstream) {
+        argv.push('--downstream');
     }
     const captured = captureConsoleLog(() => queryProjectKb(argv));
     return textResult(captured.output);
@@ -176,11 +480,23 @@ async function handleMcpRequest(request) {
             ? inspectWorkspace(args)
             : name === 'get_current_state'
                 ? getCurrentState(args)
-                : name === 'build_project_index'
-                    ? buildProjectIndex(args)
-                    : name === 'query_project_chain'
-                        ? queryProjectChain(args)
-                        : textResult({ error: `Unknown tool: ${name}` });
+                : name === 'init_workspace'
+                    ? initWorkspace(args)
+                    : name === 'detect_topology'
+                        ? detectTopology(args)
+                        : name === 'diagnose_workspace'
+                            ? diagnoseWorkspace(args)
+                            : name === 'build_project_index'
+                                ? buildProjectIndex(args)
+                                : name === 'start_build_project_index'
+                                    ? startBuildProjectIndex(args)
+                                    : name === 'get_job_status'
+                                        ? getJobStatus(args)
+                                        : name === 'get_job_result'
+                                            ? getJobResult(args)
+                                            : name === 'query_project_chain'
+                                                ? queryProjectChain(args)
+                                                : textResult({ error: `Unknown tool: ${name}` });
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {

@@ -13,6 +13,8 @@ const { run: buildProjectKb } = require('../scripts/build_project_kb');
 const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
 const { run: queryKb } = require('../scripts/query_kb');
+const { run: refreshMemoryIndexes } = require('../scripts/refresh_memory_indexes');
+const { run: buildCocosAuthoringProfile } = require('../scripts/build_cocos_authoring_profile');
 
 function testWorkspaceId() {
     assert.equal(workspaceIdFromRoot('E:/xile-workspace'), 'e-xile-workspace');
@@ -159,6 +161,13 @@ function testFeatureKbExternalData() {
     const output = captureOutput(queryKb, ['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--feature', 'feature-sample', '--json'], workspaceRoot);
     const parsed = JSON.parse(output);
     assert.equal(parsed.kind, 'feature-summary');
+
+    refreshMemoryIndexes(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+    buildCocosAuthoringProfile(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+
+    assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
+    assert.equal(fs.existsSync(context.paths.featureIndex), true);
+    assert.equal(fs.existsSync(path.join(context.paths.stateDir, 'cocos-authoring-profile.json')), true);
 }
 
 testWorkspaceId();

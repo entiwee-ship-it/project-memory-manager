@@ -496,7 +496,7 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
             '只有 KB 结果不足以回答问题时，再读 docs；最后才用 rg/grep 回源码确认。'
         ],
         queryExamples,
-        postSkillUpdateAction: 'node scripts/rebuild_kbs.js --root <project-root>',
+        postSkillUpdateAction: 'node scripts/rebuild_kbs.js --workspace-root <project-root>',
         artifacts: buildKbArtifactGuide(outputs),
         legacyCompatibility: {
             oldOutputNamesSupported: ['graph.json', 'lookup.json', 'scan.json', 'report.json'],

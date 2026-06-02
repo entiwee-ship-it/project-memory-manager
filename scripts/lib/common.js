@@ -46,11 +46,11 @@ function createDiagnosticError(context, error, filePath, options = {}) {
             if (featureKey) {
                 diagnostic += `  node scripts/build_chain_kb.js --config project-memory/kb/configs/${featureKey}.json\n`;
             } else {
-                diagnostic += '  node scripts/rebuild_kbs.js --root <project-root>\n';
+                diagnostic += '  node scripts/rebuild_kbs.js --workspace-root <project-root>\n';
             }
         }
         if (suggestInit) {
-            diagnostic += '  node scripts/init_project_memory.js --root <project-root>\n';
+            diagnostic += '  node scripts/init_project_memory.js --workspace-root <project-root>\n';
         }
     } else if (error instanceof SyntaxError) {
         diagnostic += '可能原因:\n';
@@ -294,7 +294,7 @@ function resolveProjectRoot(startDir = process.cwd(), options = {}) {
         }
         // 非严格模式下发出警告并返回当前目录（保持向后兼容）
         console.warn(`[SKILL-WARN] 未找到 project-memory 目录，将使用当前目录: ${path.resolve(startDir)}`);
-        console.warn(`[SKILL-WARN] 如需初始化，运行: node scripts/init_project_memory.js --root <path>`);
+        console.warn(`[SKILL-WARN] 如需初始化，运行: node scripts/init_project_memory.js --workspace-root <path>`);
     }
     
     return foundRoot || path.resolve(startDir);
@@ -318,13 +318,13 @@ function validateProjectRoot(root, options = {}) {
             `[SKILL-DIAGNOSIS] 未找到有效的项目根目录: ${root}\n` +
             `提示: 该目录下没有 project-memory 文件夹。\n\n` +
             `可能原因:\n` +
-            `  1. 未指定 --root 参数，且当前目录不是项目根目录\n` +
+            `  1. 未指定 --workspace-root 参数，且当前目录不是项目根目录\n` +
             `  2. 项目尚未初始化（缺少 project-memory 目录）\n\n` +
             `修复方法:\n` +
-            `  1. 指定 --root 参数: node scripts/${scriptName}.js --root <项目路径> ...\n` +
+            `  1. 指定 --workspace-root 参数: node scripts/${scriptName}.js --workspace-root <项目路径> ...\n` +
             `  2. 或切换到项目目录后运行\n` +
             `  3. 或设置环境变量: set PMM_PROJECT_ROOT=<项目路径>\n` +
-            `  4. 初始化新项目: node scripts/init_project_memory.js --root <项目路径>`
+            `  4. 初始化新项目: node scripts/init_project_memory.js --workspace-root <项目路径>`
         );
     }
     
@@ -336,7 +336,7 @@ function validateProjectRoot(root, options = {}) {
                 `[SKILL-DIAGNOSIS] 检测到在技能目录运行脚本: ${root}\n` +
                 `技能目录不能作为项目目录使用。\n\n` +
                 `修复方法:\n` +
-                `  1. 指定 --root 参数指向项目目录: node scripts/${scriptName}.js --root E:\\xile ...\n` +
+                `  1. 指定 --workspace-root 参数指向项目目录: node scripts/${scriptName}.js --workspace-root E:\\xile ...\n` +
                 `  2. 或切换到项目目录后运行: cd E:\\xile && node <技能路径>\\scripts\\${scriptName}.js ...\n` +
                 `  3. 或设置环境变量: set PMM_PROJECT_ROOT=E:\\xile`
             );
@@ -346,8 +346,8 @@ function validateProjectRoot(root, options = {}) {
             `[SKILL-DIAGNOSIS] 项目尚未完全初始化: ${root}\n` +
             `提示: 未找到 feature-registry.json。\n\n` +
             `修复方法:\n` +
-            `  1. 初始化项目记忆: node scripts/init_project_memory.js --root ${root}\n` +
-            `  2. 或重建 KB: node scripts/rebuild_kbs.js --root ${root}`
+            `  1. 初始化项目记忆: node scripts/init_project_memory.js --workspace-root ${root}\n` +
+            `  2. 或重建 KB: node scripts/rebuild_kbs.js --workspace-root ${root}`
         );
     }
 }

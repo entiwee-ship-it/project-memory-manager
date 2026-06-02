@@ -7,9 +7,9 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ## 先判断任务类型
 
-- 初始化新仓库时，先读 `references/core/onboarding-playbook.md` 与 `references/core/work-protocols.md`，再通过 MCP 或 `scripts/init_project_memory.js --workspace-root <repo-root>` 和 `scripts/detect_project_topology.js --workspace-root <repo-root>` 建立外置记忆
+- 初始化新仓库时，先读 `references/core/onboarding-playbook.md` 与 `references/core/work-protocols.md`，再优先通过 MCP `diagnose_workspace` -> `init_workspace` -> `detect_topology` 建立外置记忆；MCP 不可用时再运行 `scripts/init_project_memory.js --workspace-root <repo-root>` 和 `scripts/detect_project_topology.js --workspace-root <repo-root>`
 - 迁移旧体系时，先读 `references/core/document-boundaries.md`，再运行 `scripts/migrate_legacy_memory.js`，把长期结论迁入 docs，把可重建事实迁入 KB 配置和产物
-- 需要全盘扫描整个仓库、学习项目自己的消息/状态协议时，优先通过 MCP `build_project_index`，MCP 不可用时运行 `scripts/build_project_kb.js --workspace-root <repo-root>`，再读 `references/core/project-protocol-learning.md`
+- 需要全盘扫描整个仓库、学习项目自己的消息/状态协议时，优先通过 MCP `start_build_project_index` 并轮询 `get_job_status`，MCP 不可用时运行 `scripts/build_project_kb.js --workspace-root <repo-root>`，再读 `references/core/project-protocol-learning.md`
 - 当问题本质是"为什么这个阶段太早/太晚切换""为什么动画没播完就进下一步"这类业务时序问题时，优先看 `timing / phase / transition` patterns
 - 构建或刷新链路 KB 时，先读 `references/core/kb-schema.md`，再按技术栈读取对应 `references/adapters/*.md`，准备配置后运行 `scripts/build_chain_kb.js --config ...`
 - 查询调用链、事件、request、state 时，优先通过 MCP `query_project_chain`，MCP 不可用时运行 `scripts/query_project_kb.js --workspace-root <repo-root>`；当范围已经缩到 feature 再用 `scripts/query_kb.js --feature ...`
@@ -20,7 +20,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ## 默认工作流
 
-- 优先通过 MCP server 调用 `inspect_workspace`、`get_current_state`、`build_project_index` 和 `query_project_chain`
+- 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result` 和 `query_project_chain`
 - MCP 不可用时，再调用 CLI 脚本
 - CLI 默认使用 external-data layout，记忆、KB、状态、报告、锁和临时产物写入 PMM data root
 - legacy `project-memory/` 只在显式 `--layout legacy-project-memory` 时使用
@@ -36,8 +36,11 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ### 初始化新仓库
 
-- 运行 `node scripts/init_project_memory.js --workspace-root <repo-root> --name <project-name>`
-- 运行 `node scripts/detect_project_topology.js --workspace-root <repo-root>`
+- MCP 可用时，先运行 `diagnose_workspace`；若返回 `suggestedNextAction: "init_workspace"`，运行 `init_workspace`
+- 初始化后运行 `detect_topology`，直到 `hasConfiguredAreaRoots: true`
+- 大项目构建优先运行 `start_build_project_index`，再轮询 `get_job_status`，最后用 `get_job_result` 确认 `hasProjectGlobalKb: true`
+- MCP 不可用时，运行 `node scripts/init_project_memory.js --workspace-root <repo-root> --name <project-name>`
+- 再运行 `node scripts/detect_project_topology.js --workspace-root <repo-root>`
 - 按 `references/core/onboarding-playbook.md` 的默认顺序补齐 `AGENTS.md`、project overview、active work 与工作协议
 - 只在识别出技术栈后读取对应适配器，避免一次性加载全部技术说明
 
@@ -119,13 +122,15 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
 
 ### 构建 project-global KB
 
-- 运行 `node scripts/build_project_kb.js --workspace-root <repo-root>`
+- MCP 可用时优先运行 `start_build_project_index`，再用 `get_job_status` / `get_job_result` 等待完成
+- MCP 不可用时运行 `node scripts/build_project_kb.js --workspace-root <repo-root>`
 - 这一步会全盘扫描仓库，产出：
   - `<memory-root>/kb/project-global/chain.graph.json`
   - `<memory-root>/kb/project-global/chain.lookup.json`
   - `<memory-root>/kb/project-global/build.report.json`
   - `<memory-root>/state/project-protocols.json`
 - 这一步不是替代 feature KB，而是提供全局入口、消息协议学习和跨区域链路基座
+- 每个 workspace 只应该有一个 `project-global`；它是全局基座，feature KB 只有在为具体功能创建配置并构建后才会额外出现
 - 当升级技能版本后，优先重建 `project-global KB`，再重建 feature KB
 
 ### 查询链路

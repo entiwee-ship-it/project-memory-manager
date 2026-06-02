@@ -137,7 +137,7 @@ function rebuildFeature(rootOrContext, target) {
         : rootOrContext;
     try {
         console.log(`\n[REBUILD] ${path.relative(context.memoryRoot, target.configPath).replace(/\\/g, '/')}`);
-        buildChainKb(['--workspace-root', context.workspaceRoot, '--data-root', context.dataRoot, '--layout', context.layout, '--config', target.configPath]);
+        buildChainKb([...workspaceArgv(context), '--config', target.configPath]);
         return { 
             success: true, 
             featureKey: target.featureKey || path.basename(target.configPath, '.json') 
@@ -153,6 +153,10 @@ function rebuildFeature(rootOrContext, target) {
             configPath: target.configPath,
         };
     }
+}
+
+function workspaceArgv(context) {
+    return ['--workspace-root', context.workspaceRoot, '--data-root', context.dataRoot, '--layout', context.layout];
 }
 
 /**
@@ -246,7 +250,7 @@ function doRebuild(args, rootOrContext) {
     // 重建 project-global
     console.log('[REBUILD] project-global');
     try {
-        buildProjectKb(['--workspace-root', context.workspaceRoot, '--data-root', context.dataRoot, '--layout', context.layout]);
+        buildProjectKb(workspaceArgv(context));
     } catch (error) {
         console.error('[REBUILD-FAILED] project-global');
         console.error(`  错误: ${error.message}`);
@@ -263,15 +267,15 @@ function doRebuild(args, rootOrContext) {
             `修复建议:\n` +
             `  1. 检查项目结构是否正确\n` +
             `  2. 确认有源代码可供扫描\n` +
-            `  3. 重新初始化项目记忆: node scripts/init_project_memory.js --root ${root}`
+            `  3. 重新初始化项目记忆: node scripts/init_project_memory.js --workspace-root ${root}`
         );
     }
     
     // 如果只重建 project-global
     if (args.feature === 'project-global') {
         try {
-            buildCocosAuthoringProfile(['--root', root]);
-            refreshMemoryIndexes(['--root', root]);
+            buildCocosAuthoringProfile(workspaceArgv(context));
+            refreshMemoryIndexes(workspaceArgv(context));
             console.log('[REBUILD] ✅ project-global + cocos-authoring-profile 完成');
         } catch (error) {
             console.error('[SKILL-WARN] cocos-authoring-profile 或索引刷新失败:', error.message);
@@ -289,7 +293,7 @@ function doRebuild(args, rootOrContext) {
 
     if (targets.length <= 0) {
         console.warn('[SKILL-WARN] 未找到可重建的 KB 配置');
-        console.log('[SKILL-INFO] 如需初始化，运行: node scripts/init_project_memory.js --root ' + root);
+        console.log('[SKILL-INFO] 如需初始化，运行: node scripts/init_project_memory.js --workspace-root ' + root);
         return;
     }
 
@@ -312,14 +316,14 @@ function doRebuild(args, rootOrContext) {
 
     // 重建 cocos-authoring-profile（即使部分 feature 失败也继续）
     try {
-        buildCocosAuthoringProfile(['--root', root, ...(args.feature ? ['--feature', args.feature] : [])]);
+        buildCocosAuthoringProfile([...workspaceArgv(context), ...(args.feature ? ['--feature', args.feature] : [])]);
     } catch (error) {
         console.error('[SKILL-WARN] cocos-authoring-profile 重建失败:', error.message);
     }
     
     // 刷新索引（即使部分失败也继续）
     try {
-        refreshMemoryIndexes(['--root', root]);
+        refreshMemoryIndexes(workspaceArgv(context));
     } catch (error) {
         console.error('[SKILL-WARN] 索引刷新失败:', error.message);
     }

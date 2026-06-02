@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ensureDir, listFilesRecursive, normalize, writeJson } = require('./lib/common');
+const { ensureDir, listFilesRecursive, normalize, pathExists, readJsonSafe, writeJson } = require('./lib/common');
 const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { getTopologyAdapters } = require('./adapters/topology');
 
@@ -161,6 +161,39 @@ function detectIntegrations(root, adapters) {
     return integrations;
 }
 
+function mergeExistingProfile(root, outPath, areas, stacks) {
+    const existingProfile = readJsonSafe(outPath, { required: false, defaultValue: null });
+    if (!existingProfile || typeof existingProfile !== 'object') {
+        return null;
+    }
+
+    for (const [area, roots] of Object.entries(existingProfile.areas || {})) {
+        if (!areas[area] || !Array.isArray(roots)) {
+            continue;
+        }
+        for (const configuredRoot of roots) {
+            const normalizedRoot = normalize(configuredRoot);
+            const absoluteRoot = path.resolve(root, configuredRoot);
+            if (normalizedRoot && pathExists(absoluteRoot)) {
+                areas[area].add(normalizedRoot);
+            }
+        }
+    }
+
+    for (const [area, values] of Object.entries(existingProfile.stacks || {})) {
+        if (!stacks[area] || !Array.isArray(values)) {
+            continue;
+        }
+        for (const stack of values) {
+            if (String(stack || '').trim()) {
+                stacks[area].add(stack);
+            }
+        }
+    }
+
+    return existingProfile;
+}
+
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const root = args.root;
@@ -193,7 +226,19 @@ function run(argv = process.argv.slice(2)) {
 
     for (const manifestPath of manifests) {
         const relativeDir = path.relative(root, path.dirname(manifestPath));
-        const area = classifyAreaFromPath(relativeDir, adapters);
+        const manifestName = path.basename(manifestPath);
+        const pkg = manifestName === 'package.json' ? readPackage(manifestPath) : null;
+        const manifestText = manifestName === 'package.json' ? '' : readText(manifestPath);
+        let area = classifyAreaFromPath(relativeDir, adapters);
+        if (area === 'unknown') {
+            for (const adapter of adapters) {
+                const manifestArea = adapter.classifyAreaFromManifest?.({ manifestName, pkg, manifestText, relativeDir });
+                if (manifestArea && manifestArea !== 'unknown') {
+                    area = manifestArea;
+                    break;
+                }
+            }
+        }
         if (area === 'unknown') {
             continue;
         }
@@ -205,9 +250,6 @@ function run(argv = process.argv.slice(2)) {
             continue;
         }
 
-        const manifestName = path.basename(manifestPath);
-        const pkg = manifestName === 'package.json' ? readPackage(manifestPath) : null;
-        const manifestText = manifestName === 'package.json' ? '' : readText(manifestPath);
         for (const stack of detectStacksFromManifest(manifestName, pkg, relativeDir, adapters, manifestText)) {
             stacks[area].add(stack);
         }
@@ -219,6 +261,7 @@ function run(argv = process.argv.slice(2)) {
         stacks.ops.add('batch');
     }
 
+    const existingProfile = mergeExistingProfile(root, args.out, areas, stacks);
     const frontendCount = areas.frontend.size;
     const backendCount = areas.backend.size;
     const projectType = frontendCount > 0 && backendCount > 0
@@ -226,7 +269,7 @@ function run(argv = process.argv.slice(2)) {
         : 'single-stack';
 
     const profile = {
-        projectName: path.basename(root),
+        projectName: existingProfile?.projectName || path.basename(root),
         projectType,
         areas: Object.fromEntries(
             Object.entries(areas).map(([area, values]) => [area, Array.from(values).sort((left, right) => left.localeCompare(right))])

@@ -59,7 +59,7 @@ function run(argv = process.argv.slice(2)) {
         if (pathExists(profilePath)) {
             console.log(`[SKILL-INFO] 项目记忆已存在: ${memoryRoot}`);
             console.log(`[SKILL-INFO] 如需重新初始化，使用 --force 参数`);
-            console.log(`[SKILL-INFO] 或运行重建: node scripts/rebuild_kbs.js --root ${args.root}`);
+            console.log(`[SKILL-INFO] 或运行重建: node scripts/rebuild_kbs.js --workspace-root ${args.root}`);
             return;
         }
         

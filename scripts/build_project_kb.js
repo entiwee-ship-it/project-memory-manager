@@ -111,7 +111,7 @@ function buildProjectGlobalConfig(root, projectProfile, context = null) {
             `当前配置:\n` +
             `  areas: ${areas.length > 0 ? areas.join(', ') : '(空)'}\n\n` +
             `修复命令:\n` +
-            `  1. 运行拓扑检测: node scripts/detect_project_topology.js --root ${root}\n` +
+            `  1. 运行拓扑检测: node scripts/detect_project_topology.js --workspace-root ${root}\n` +
             `  2. 或手动编辑: project-memory/state/project-profile.json\n\n` +
             `项目结构示例:\n` +
             `  Cocos项目: assets/ 目录包含场景和资源\n` +
@@ -288,12 +288,12 @@ function updateProjectGlobalReport(report, graph, lookup, protocols) {
         },
         queryExamples: unique([
             ...(report.queryExamples || []),
-            'node scripts/query_project_kb.js --root <project-root>',
-            'node scripts/query_project_kb.js --root <project-root> --message <message> --downstream',
-            'node scripts/query_project_kb.js --root <project-root> --state <state> --upstream',
-            'node scripts/query_project_kb.js --root <project-root> --timing <query>',
-            'node scripts/query_project_kb.js --root <project-root> --phase <query>',
-            'node scripts/query_project_kb.js --root <project-root> --transition <query>',
+            'node scripts/query_project_kb.js --workspace-root <project-root>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --message <message> --downstream',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --state <state> --upstream',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --timing <query>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --phase <query>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --transition <query>',
         ]),
     };
 }

@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { normalize, pathExists, readJson, resolveProjectRoot, timestamp, writeJson } = require('./common');
+const { normalize, pathExists, readJson, timestamp, writeJson } = require('./common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./feature-kb');
+const { createWorkspaceContext } = require('./workspace-layout');
 const { loadSkillVersion } = require('../show_skill_version');
 
 function normalizeText(value) {
@@ -60,9 +61,17 @@ function isBuiltWithCurrentSkill(record = {}) {
     return Boolean(current.version && record?.builtWithSkill?.version && current.version === record.builtWithSkill.version);
 }
 
-function loadFeatureArtifacts(root, featureKey) {
-    const resolvedRoot = resolveProjectRoot(root || process.cwd());
-    const registryPath = path.join(resolvedRoot, 'project-memory', 'state', 'feature-registry.json');
+function asWorkspaceContext(rootOrContext = process.cwd()) {
+    if (rootOrContext && typeof rootOrContext === 'object' && rootOrContext.workspaceRoot && rootOrContext.memoryRoot) {
+        return rootOrContext;
+    }
+    return createWorkspaceContext({ workspaceRoot: rootOrContext || process.cwd() });
+}
+
+function loadFeatureArtifacts(rootOrContext, featureKey) {
+    const context = asWorkspaceContext(rootOrContext);
+    const resolvedRoot = context.workspaceRoot;
+    const registryPath = context.paths.featureRegistry;
     const registry = readJson(registryPath);
     const featureRecord = (registry.features || [])
         .map(item => normalizeFeatureRecord(item))
@@ -1422,8 +1431,9 @@ function buildFeatureAuthoringProfile(artifacts) {
     };
 }
 
-function loadFeatureRecords(root, featureKey = '') {
-    const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
+function loadFeatureRecords(rootOrContext, featureKey = '') {
+    const context = asWorkspaceContext(rootOrContext);
+    const registryPath = context.paths.featureRegistry;
     if (!pathExists(registryPath)) {
         return [];
     }
@@ -1433,8 +1443,9 @@ function loadFeatureRecords(root, featureKey = '') {
         .filter(item => (!featureKey || item.featureKey === featureKey) && item.outputs?.scan);
 }
 
-function buildProjectAuthoringProfile(root, featureKey = '') {
-    const resolvedRoot = resolveProjectRoot(root || process.cwd());
+function buildProjectAuthoringProfile(rootOrContext, featureKey = '') {
+    const context = asWorkspaceContext(rootOrContext);
+    const resolvedRoot = context.workspaceRoot;
     const profile = {
         generatedAt: timestamp(),
         builtWithSkill: loadCurrentSkillBuildInfo(),
@@ -1442,8 +1453,8 @@ function buildProjectAuthoringProfile(root, featureKey = '') {
         features: {},
     };
 
-    for (const featureRecord of loadFeatureRecords(resolvedRoot, featureKey)) {
-        const artifacts = loadFeatureArtifacts(resolvedRoot, featureRecord.featureKey);
+    for (const featureRecord of loadFeatureRecords(context, featureKey)) {
+        const artifacts = loadFeatureArtifacts(context, featureRecord.featureKey);
         if ((artifacts.scan.prefabs || []).length <= 0) {
             continue;
         }
@@ -1453,16 +1464,16 @@ function buildProjectAuthoringProfile(root, featureKey = '') {
     return profile;
 }
 
-function writeProjectAuthoringProfile(root, profile) {
-    const resolvedRoot = resolveProjectRoot(root || process.cwd());
-    const targetPath = path.join(resolvedRoot, 'project-memory', 'state', 'cocos-authoring-profile.json');
+function writeProjectAuthoringProfile(rootOrContext, profile) {
+    const context = asWorkspaceContext(rootOrContext);
+    const targetPath = path.join(context.paths.stateDir, 'cocos-authoring-profile.json');
     writeJson(targetPath, profile);
     return targetPath;
 }
 
-function loadProjectAuthoringProfile(root) {
-    const resolvedRoot = resolveProjectRoot(root || process.cwd());
-    const targetPath = path.join(resolvedRoot, 'project-memory', 'state', 'cocos-authoring-profile.json');
+function loadProjectAuthoringProfile(rootOrContext) {
+    const context = asWorkspaceContext(rootOrContext);
+    const targetPath = path.join(context.paths.stateDir, 'cocos-authoring-profile.json');
     if (!pathExists(targetPath)) {
         return null;
     }

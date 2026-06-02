@@ -101,21 +101,43 @@ node scripts/rebuild_kbs.js --workspace-root "<project-root>"
 
 ### Codex MCP first
 
-First version recommendation:
+推荐让 Codex 先走 MCP，而不是直接翻文件或手写 CLI。MCP server 启动入口：
 
 ```powershell
 node scripts/mcp_server.js
 ```
 
-Codex should call the MCP tools first. CLI scripts remain available for manual use:
+推荐给 Codex 配置一个固定的 `PMM_DATA_ROOT`，让记忆文件、KB、状态和报告都落在 PMM data root，而不是目标业务项目里：
+
+```toml
+[mcp_servers.project_memory_manager]
+command = "node"
+args = ["<project-memory-manager>/scripts/mcp_server.js"]
+
+[mcp_servers.project_memory_manager.env]
+PMM_DATA_ROOT = "<project-memory-data>"
+```
+
+Codex 的标准调用顺序：
+
+1. `inspect_workspace`：确认目标项目和 data root，不写文件
+2. `diagnose_workspace`：判断下一步是初始化、拓扑检测、构建还是查询
+3. `init_workspace`：只初始化外置 memory root
+4. `detect_topology`：生成 `state/project-profile.json`
+5. `start_build_project_index`：异步构建 `project-global KB`
+6. `get_job_status` / `get_job_result`：等待构建完成
+7. `query_project_chain`：查询入口、消息、状态、上下游链路
+
+CLI 仍保留给人工或 MCP 不可用时使用：
 
 ```powershell
 node scripts/init_project_memory.js --workspace-root E:/xile-workspace
+node scripts/detect_project_topology.js --workspace-root E:/xile-workspace
 node scripts/build_project_kb.js --workspace-root E:/xile-workspace
 node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 ```
 
-By default these commands write to `.runtime/data`, not to the target workspace.
+默认布局是 `external-data`，这些命令写入 `.runtime/data` 或 `PMM_DATA_ROOT`，不会在目标业务项目下创建 `project-memory/`。
 
 ## 这个技能解决什么问题
 
@@ -182,6 +204,8 @@ By default these commands write to `.runtime/data`, not to the target workspace.
 
 - `<memory-root>/kb/project-global/`：全盘扫描后的全局图
 - `<memory-root>/state/project-protocols.json`：从项目代码里学习出的消息、dispatcher、状态模式
+
+`project-global` 是每个 workspace 固定只有一个的全局 KB。它负责回答“这个项目整体有哪些入口、事件、状态流转、跨区域调用链”。feature KB 是按具体功能再细分的局部 KB，只有显式创建 feature 配置并构建后才会出现。因此刚接入一个项目时只看到一个 `project-global` 是正常状态。
 
 ## 这个技能如何工作
 

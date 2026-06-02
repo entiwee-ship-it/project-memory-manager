@@ -197,7 +197,7 @@ function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
             `修复命令:\n` +
             `  node scripts/build_chain_kb.js --config ${normalized.configPath || `project-memory/kb/configs/${normalized.featureKey}.json`}\n` +
             `  或重建全部:\n` +
-            `  node scripts/rebuild_kbs.js --root ${root}`
+            `  node scripts/rebuild_kbs.js --workspace-root ${root}`
         );
         error.code = 'KB_NOT_FOUND';
         error.featureKey = normalized.featureKey;
@@ -215,7 +215,7 @@ function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
             `修复命令:\n` +
             `  node scripts/build_chain_kb.js --config ${normalized.configPath || `project-memory/kb/configs/${normalized.featureKey}.json`}\n` +
             `  或重建全部:\n` +
-            `  node scripts/rebuild_kbs.js --root ${root}`
+            `  node scripts/rebuild_kbs.js --workspace-root ${root}`
         );
         error.code = 'KB_NOT_FOUND';
         error.featureKey = normalized.featureKey;

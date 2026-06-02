@@ -2,17 +2,29 @@
 
 const fs = require('fs');
 const path = require('path');
-const { readJson, resolveProjectRoot, timestamp, writeJson } = require('./lib/common');
+const { readJson, timestamp, writeJson } = require('./lib/common');
 const { normalizeConfig, normalizeFeatureRecord, toPosixPath } = require('./lib/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
-        root: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
     };
 
     for (let index = 0; index < argv.length; index++) {
-        if (argv[index] === '--root') {
+        if (argv[index] === '--root' || argv[index] === '--workspace-root') {
             args.root = argv[++index] || '';
+            continue;
+        }
+        if (argv[index] === '--data-root') {
+            args.dataRoot = argv[++index] || '';
+            continue;
+        }
+        if (argv[index] === '--layout') {
+            args.layout = argv[++index] || '';
         }
     }
 
@@ -25,7 +37,12 @@ function firstHeading(filePath) {
     return match ? match[1].trim() : path.basename(filePath, path.extname(filePath));
 }
 
-function scanFeatureDirs(featuresRoot) {
+function memoryRelative(context, filePath) {
+    return path.relative(context.memoryRoot, filePath).replace(/\\/g, '/');
+}
+
+function scanFeatureDirs(context) {
+    const featuresRoot = context.paths.featuresDir;
     if (!fs.existsSync(featuresRoot)) {
         return [];
     }
@@ -34,7 +51,7 @@ function scanFeatureDirs(featuresRoot) {
         .filter(entry => entry.isDirectory())
         .map(entry => {
             const featureKey = entry.name;
-            const kbDir = toPosixPath(path.join(path.relative(path.dirname(featuresRoot), featuresRoot), featureKey));
+            const kbDir = toPosixPath(path.join(featuresRoot, featureKey));
             return normalizeFeatureRecord({
                 featureKey,
                 featureName: featureKey,
@@ -67,12 +84,17 @@ function mergeFeatureRecords(...groups) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const root = resolveProjectRoot(args.root || process.cwd());
-    const workDir = path.join(root, 'project-memory', 'docs', 'work', 'active');
-    const configDir = path.join(root, 'project-memory', 'kb', 'configs');
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
+    const root = context.workspaceRoot;
+    const workDir = path.join(context.memoryRoot, 'docs', 'work', 'active');
+    const configDir = context.paths.configsDir;
     const domainDirs = [
-        path.join(root, 'project-memory', 'docs', 'domains'),
-        path.join(root, 'project-memory', 'docs', 'games'),
+        path.join(context.memoryRoot, 'docs', 'domains'),
+        path.join(context.memoryRoot, 'docs', 'games'),
     ];
 
     const workFiles = fs.existsSync(workDir)
@@ -86,14 +108,14 @@ function run(argv = process.argv.slice(2)) {
             ? fs.readdirSync(domainDir).filter(name => name.endsWith('.md')).map(name => path.join(domainDir, name))
             : []
     ));
-    const registryPath = path.join(root, 'project-memory', 'state', 'feature-registry.json');
+    const registryPath = context.paths.featureRegistry;
     const existingRegistry = fs.existsSync(registryPath) ? readJson(registryPath) : { features: [] };
     const existingFeatures = Array.isArray(existingRegistry.features) ? existingRegistry.features : [];
 
     const generatedAt = timestamp();
     const activeWorks = workFiles.map(filePath => ({
         title: firstHeading(filePath),
-        path: path.relative(root, filePath).replace(/\\/g, '/'),
+        path: memoryRelative(context, filePath),
         status: 'active',
     }));
 
@@ -104,38 +126,38 @@ function run(argv = process.argv.slice(2)) {
             featureName: normalized.featureName,
             summary: normalized.summary || '',
             areas: Array.isArray(normalized.areas) ? normalized.areas : [],
-            configPath: path.relative(root, filePath).replace(/\\/g, '/'),
+            configPath: toPosixPath(filePath),
             docsDir: normalized.docs?.featureDir || '',
             kbDir: normalized.kbDir,
             outputs: normalized.outputs || {},
             type: normalized.type || '',
         });
     });
-    const featuresFromKbDirs = scanFeatureDirs(path.join(root, 'project-memory', 'kb', 'features'));
+    const featuresFromKbDirs = scanFeatureDirs(context);
     const features = mergeFeatureRecords(existingFeatures, featuresFromConfigs, featuresFromKbDirs);
 
     const domains = domainFiles.map(filePath => ({
         title: firstHeading(filePath),
-        path: path.relative(root, filePath).replace(/\\/g, '/'),
+        path: memoryRelative(context, filePath),
     }));
 
-    writeJson(path.join(root, 'project-memory', 'state', 'active-work.json'), {
+    writeJson(path.join(context.paths.stateDir, 'active-work.json'), {
         generatedAt,
         activeWorks,
     });
-    writeJson(path.join(root, 'project-memory', 'state', 'feature-registry.json'), {
+    writeJson(context.paths.featureRegistry, {
         generatedAt,
         features,
     });
-    writeJson(path.join(root, 'project-memory', 'kb', 'indexes', 'features.json'), {
+    writeJson(context.paths.featureIndex, {
         generatedAt,
         features,
     });
-    writeJson(path.join(root, 'project-memory', 'kb', 'indexes', 'domains.json'), {
+    writeJson(path.join(context.paths.indexesDir, 'domains.json'), {
         generatedAt,
         domains,
     });
-    writeJson(path.join(root, 'project-memory', 'kb', 'indexes', 'games.json'), {
+    writeJson(path.join(context.paths.indexesDir, 'games.json'), {
         generatedAt,
         games: domains,
     });

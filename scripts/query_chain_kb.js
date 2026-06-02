@@ -274,7 +274,7 @@ function buildKbVersionStatus(graph) {
             : null,
         stale,
         recommendedAction: stale
-            ? 'node scripts/rebuild_kbs.js --root <project-root>'
+            ? 'node scripts/rebuild_kbs.js --workspace-root <project-root>'
             : '',
     };
 }

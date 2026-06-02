@@ -220,6 +220,9 @@ function detectStacksFromManifest({ manifestName, pkg, manifestText = '', relati
     if (manifestName === 'package.json') {
         const deps = collectPackageDeps(pkg);
         stacks.add('nodejs');
+        if (hasDependency(deps, ['vite', '@vitejs/plugin-vue', '@vitejs/plugin-react'])) {
+            stacks.add('vite');
+        }
         if (pkg?.creator?.version) {
             stacks.add('cocos');
             stacks.add('typescript');
@@ -298,6 +301,20 @@ function detectStacksFromManifest({ manifestName, pkg, manifestText = '', relati
         }
     }
     return stacks;
+}
+
+function classifyAreaFromManifest({ manifestName, pkg }) {
+    if (manifestName !== 'package.json') {
+        return 'unknown';
+    }
+    const deps = collectPackageDeps(pkg);
+    if (hasDependency(deps, ['vue', 'vue-router', 'react', 'react-dom', 'vite', '@vitejs/plugin-vue', '@vitejs/plugin-react', 'next', 'nuxt'])) {
+        return 'frontend';
+    }
+    if (hasDependency(deps, ['express', 'koa', 'fastify', 'pinus', '@nestjs/core', '@nestjs/common'])) {
+        return 'backend';
+    }
+    return 'unknown';
 }
 
 function detectIntegrations(root) {
@@ -422,6 +439,7 @@ function detectIntegrations(root) {
 module.exports = {
     name: 'generic',
     classifyAreaFromPath,
+    classifyAreaFromManifest,
     canonicalAreaRoot,
     detectStacksFromManifest,
     detectIntegrations,

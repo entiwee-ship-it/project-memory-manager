@@ -136,12 +136,12 @@ function loadProjectSummary(context) {
         builtWithSkill: graph.builtWithSkill || null,
         protocolsSummary: protocols.summary || {},
         examples: [
-            'node scripts/query_project_kb.js --root <project-root>',
-            'node scripts/query_project_kb.js --root <project-root> --message <message> --downstream',
-            'node scripts/query_project_kb.js --root <project-root> --timing <query>',
-            'node scripts/query_project_kb.js --root <project-root> --phase <query>',
-            'node scripts/query_project_kb.js --root <project-root> --transition <query>',
-            'node scripts/query_project_kb.js --root <project-root> --state <state> --upstream',
+            'node scripts/query_project_kb.js --workspace-root <project-root>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --message <message> --downstream',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --timing <query>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --phase <query>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --transition <query>',
+            'node scripts/query_project_kb.js --workspace-root <project-root> --state <state> --upstream',
         ],
     };
 }

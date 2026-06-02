@@ -136,7 +136,7 @@ function buildFeatureRebuildCommand(featureRecord) {
     if (!featureRecord?.configPath) {
         return '';
     }
-    return `node scripts/build_chain_kb.js --root <project-root> --config ${featureRecord.configPath}`;
+    return `node scripts/build_chain_kb.js --workspace-root <project-root> --config ${featureRecord.configPath}`;
 }
 
 function runQuietly(fn, argv) {
@@ -178,7 +178,7 @@ function ensureFeatureFresh(root, featureKey, autoActions = []) {
         throw createAuthoringError(`功能 KB 缺失或过期，但 registry 中没有 configPath: ${featureKey}`, {
             code: 'feature_kb_refresh_unavailable',
             nextActions: [
-                buildFeatureRebuildCommand(featureRecord) || 'node scripts/build_chain_kb.js --root <project-root> --config <config-path>',
+                buildFeatureRebuildCommand(featureRecord) || 'node scripts/build_chain_kb.js --workspace-root <project-root> --config <config-path>',
             ],
         });
     }
