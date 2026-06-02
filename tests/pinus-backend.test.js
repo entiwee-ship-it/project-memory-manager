@@ -74,8 +74,9 @@ function parseTraversal(output) {
 
 function runVersionAssertions() {
     const versionInfo = loadSkillVersion(repoRoot);
+    const expectedVersion = versionInfo.version;
     assert.equal(versionInfo.name, 'project-memory-manager');
-    assert.equal(versionInfo.version, '0.16.1');
+    assert.match(expectedVersion, /^\d+\.\d+\.\d+$/);
     assert.ok(Array.isArray(versionInfo.capabilities) && versionInfo.capabilities.length > 0);
     assert.ok(versionInfo.capabilities.includes('cocos-prefab-binding-kb'));
     assert.ok(versionInfo.capabilities.includes('cocos-authoring-plan'));
@@ -84,7 +85,7 @@ function runVersionAssertions() {
     assert.ok(String(versionInfo.rebuildCommand || '').includes('rebuild_kbs.js'));
 
     const textOutput = runWithCapturedOutput(showSkillVersion, ['--text', repoRoot], repoRoot);
-    assert.ok(textOutput.includes('project-memory-manager@0.16.1'));
+    assert.ok(textOutput.includes(`project-memory-manager@${expectedVersion}`));
     assert.ok(textOutput.includes('capabilities:'));
     assert.ok(textOutput.includes('upgradePolicy: edit-source-repo-only'));
     assert.ok(textOutput.includes('postUpdateRebuild:'));
@@ -256,17 +257,18 @@ function runFixtureAssertions() {
     assert.ok(Array.isArray(featureSummary.artifacts) && featureSummary.artifacts.some(item => item.key === 'entrypoint' && item.file === 'scripts/query_kb.js'));
     assert.ok(Array.isArray(featureSummary.examples) && featureSummary.examples.length > 0);
     assert.ok(featureSummary.examples.some(item => item.includes('scripts/query_kb.js')));
-    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, '0.16.1');
+    const expectedVersion = loadSkillVersion(repoRoot).version;
+    assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, expectedVersion);
     assert.equal(featureSummary.kbVersionStatus.stale, false);
 
     const featureSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
     assert.ok(featureSummaryText.includes('scripts/query_kb.js'));
     assert.ok(featureSummaryText.includes('build.report.json'));
-    assert.ok(featureSummaryText.includes('builtWithSkill: project-memory-manager@0.16.1'));
+    assert.ok(featureSummaryText.includes(`builtWithSkill: project-memory-manager@${expectedVersion}`));
 
     assert.equal(report.kind, 'kb-build-report');
     assert.ok(report.purpose.includes('构建汇总'));
-    assert.equal(report.builtWithSkill.version, '0.16.1');
+    assert.equal(report.builtWithSkill.version, expectedVersion);
     assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('scripts/query_kb.js')));
     assert.ok(String(report.postSkillUpdateAction || '').includes('rebuild_kbs.js'));
     assert.ok(Array.isArray(report.artifacts) && report.artifacts.some(item => item.key === 'lookup'));
@@ -696,8 +698,9 @@ function runRebuildAssertions() {
 
     const rebuiltGraph = readJson(graphPath);
     const rebuiltReport = readJson(reportPath);
-    assert.equal(rebuiltGraph.builtWithSkill.version, '0.16.1');
-    assert.equal(rebuiltReport.builtWithSkill.version, '0.16.1');
+    const expectedVersion = loadSkillVersion(repoRoot).version;
+    assert.equal(rebuiltGraph.builtWithSkill.version, expectedVersion);
+    assert.equal(rebuiltReport.builtWithSkill.version, expectedVersion);
 }
 
 function runLegacyCompatibilityAssertions() {
