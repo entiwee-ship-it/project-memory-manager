@@ -104,7 +104,7 @@ node scripts/rebuild_kbs.js --workspace-root "<project-root>"
 First version recommendation:
 
 ```powershell
-npm run mcp
+node scripts/mcp_server.js
 ```
 
 Codex should call the MCP tools first. CLI scripts remain available for manual use:
