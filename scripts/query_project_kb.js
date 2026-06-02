@@ -2,11 +2,15 @@
 
 const path = require('path');
 const { readJson, resolveProjectRoot } = require('./lib/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { run: runFeatureQuery } = require('./query_chain_kb');
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
-        root: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
         message: '',
         timing: '',
         phase: '',
@@ -41,6 +45,18 @@ function parseArgs(argv) {
         const token = argv[index];
         if (token === '--root') {
             args.root = argv[++index] || '';
+            continue;
+        }
+        if (token === '--workspace-root') {
+            args.root = argv[++index] || '';
+            continue;
+        }
+        if (token === '--data-root') {
+            args.dataRoot = argv[++index] || '';
+            continue;
+        }
+        if (token === '--layout') {
+            args.layout = argv[++index] || '';
             continue;
         }
         if (token === '--message') {
@@ -86,21 +102,23 @@ function matchContains(value, needle) {
     return normalizeText(value).includes(normalizeText(needle));
 }
 
-function loadProjectArtifacts(root) {
-    const graph = readJson(path.join(root, 'project-memory', 'kb', 'project-global', 'chain.graph.json'));
-    const lookup = readJson(path.join(root, 'project-memory', 'kb', 'project-global', 'chain.lookup.json'));
-    const protocols = readJson(path.join(root, 'project-memory', 'state', 'project-protocols.json'));
+function loadProjectArtifacts(context) {
+    const graph = readJson(path.join(context.paths.projectGlobalDir, 'chain.graph.json'));
+    const lookup = readJson(path.join(context.paths.projectGlobalDir, 'chain.lookup.json'));
+    const protocols = readJson(context.paths.projectProtocols);
     return { graph, lookup, protocols };
 }
 
-function loadProjectSummary(root) {
-    const { graph, lookup, protocols } = loadProjectArtifacts(root);
+function loadProjectSummary(context) {
+    const { graph, lookup, protocols } = loadProjectArtifacts(context);
 
     return {
         kind: 'project-summary',
         project: {
-            root,
-            kbDir: 'project-memory/kb/project-global',
+            root: context.workspaceRoot,
+            kbDir: context.paths.projectGlobalDir,
+            dataRoot: context.dataRoot,
+            layout: context.layout,
         },
         counts: {
             nodes: Array.isArray(graph.nodes) ? graph.nodes.length : 0,
@@ -200,14 +218,19 @@ function printProtocolResults(kind, results, asJson) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const root = resolveProjectRoot(args.root || process.cwd());
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
+    const root = context.workspaceRoot;
 
     if (!args.hasQuery) {
-        printProjectSummary(loadProjectSummary(root), args.json);
+        printProjectSummary(loadProjectSummary(context), args.json);
         return;
     }
 
-    const { protocols } = loadProjectArtifacts(root);
+    const { protocols } = loadProjectArtifacts(context);
 
     if (args.timing) {
         const results = searchProtocolEntries(
@@ -239,7 +262,7 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
 
-    const forwardedArgs = ['--feature', 'project-global', '--root', root, ...argv];
+    const forwardedArgs = ['--feature', 'project-global', '--workspace-root', root, '--data-root', context.dataRoot, '--layout', context.layout, ...argv];
     runFeatureQuery(forwardedArgs);
 }
 

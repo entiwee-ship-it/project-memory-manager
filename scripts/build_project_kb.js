@@ -3,11 +3,15 @@
 const path = require('path');
 const { buildLookup, run: buildChainKb } = require('./build_chain_kb');
 const { ensureDir, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('./lib/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { learnProjectProtocols } = require('./learn_project_protocols');
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
-        root: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
         json: false,
     };
 
@@ -15,6 +19,18 @@ function parseArgs(argv) {
         const token = argv[index];
         if (token === '--root') {
             args.root = argv[++index] || '';
+            continue;
+        }
+        if (token === '--workspace-root') {
+            args.root = argv[++index] || '';
+            continue;
+        }
+        if (token === '--data-root') {
+            args.dataRoot = argv[++index] || '';
+            continue;
+        }
+        if (token === '--layout') {
+            args.layout = argv[++index] || '';
             continue;
         }
         if (token === '--json') {
@@ -82,7 +98,7 @@ function collectProjectScanRoots(projectProfile, root) {
     };
 }
 
-function buildProjectGlobalConfig(root, projectProfile) {
+function buildProjectGlobalConfig(root, projectProfile, context = null) {
     const scanRoots = collectProjectScanRoots(projectProfile, root);
     if (scanRoots.methodRoots.length <= 0) {
         const areas = Object.keys(projectProfile?.areas || {});
@@ -109,21 +125,22 @@ function buildProjectGlobalConfig(root, projectProfile) {
         featureName: 'Project Global KB',
         summary: 'Full-project global knowledge graph',
         type: 'project-global',
-        kbDir: 'project-memory/kb/project-global',
+        kbDir: normalize(context?.paths?.projectGlobalDir || 'project-memory/kb/project-global'),
+        registerFeature: context?.layout === 'legacy-project-memory',
         areas: Object.keys(projectProfile?.areas || {}),
         componentRoots: scanRoots.componentRoots,
         assetRoots: scanRoots.assetRoots,
         methodRoots: scanRoots.methodRoots,
         prefabs: scanRoots.prefabs,
         outputs: {
-            scan: 'project-memory/kb/project-global/scan.raw.json',
-            graph: 'project-memory/kb/project-global/chain.graph.json',
-            lookup: 'project-memory/kb/project-global/chain.lookup.json',
-            report: 'project-memory/kb/project-global/build.report.json',
+            scan: normalize(context ? path.join(context.paths.projectGlobalDir, 'scan.raw.json') : 'project-memory/kb/project-global/scan.raw.json'),
+            graph: normalize(context ? path.join(context.paths.projectGlobalDir, 'chain.graph.json') : 'project-memory/kb/project-global/chain.graph.json'),
+            lookup: normalize(context ? path.join(context.paths.projectGlobalDir, 'chain.lookup.json') : 'project-memory/kb/project-global/chain.lookup.json'),
+            report: normalize(context ? path.join(context.paths.projectGlobalDir, 'build.report.json') : 'project-memory/kb/project-global/build.report.json'),
         },
         docs: {
-            featureDir: 'project-memory/docs/project',
-            featureIndex: 'project-memory/docs/project/PROJECT_Overview.md',
+            featureDir: normalize(context ? path.join(context.memoryRoot, 'docs', 'project') : 'project-memory/docs/project'),
+            featureIndex: normalize(context ? path.join(context.memoryRoot, 'docs', 'project', 'PROJECT_Overview.md') : 'project-memory/docs/project/PROJECT_Overview.md'),
         },
     };
 }
@@ -283,54 +300,57 @@ function updateProjectGlobalReport(report, graph, lookup, protocols) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const root = resolveProjectRoot(args.root || process.cwd());
-    
-    // 验证 root 是否有效（但 build_project_kb 可能用于初始化阶段，所以不强制要求 registry）
-    if (!pathExists(path.join(root, 'project-memory'))) {
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root || process.cwd(),
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
+    const root = context.workspaceRoot;
+
+    if (!pathExists(context.memoryRoot)) {
         throw new Error(
             `[SKILL-DIAGNOSIS] 未找到有效的项目根目录: ${root}\n` +
-            `提示: 该目录下没有 project-memory 文件夹。\n\n` +
+            `提示: 未找到 PMM 数据目录: ${context.memoryRoot}\n\n` +
             `可能原因:\n` +
-            `  1. 未指定 --root 参数，且当前目录不是项目根目录\n` +
-            `  2. 项目尚未初始化（缺少 project-memory 目录）\n\n` +
+            `  1. 未指定 --workspace-root 参数，且当前目录不是项目根目录\n` +
+            `  2. 尚未初始化 PMM 外置数据目录\n\n` +
             `修复方法:\n` +
-            `  1. 指定 --root 参数: node scripts/build_project_kb.js --root <项目路径>\n` +
+            `  1. 指定 --workspace-root 参数: node scripts/build_project_kb.js --workspace-root <项目路径>\n` +
             `  2. 或切换到项目目录后运行\n` +
             `  3. 或设置环境变量: set PMM_PROJECT_ROOT=<项目路径>\n` +
-            `  4. 初始化新项目: node scripts/init_project_memory.js --root <项目路径>`
+            `  4. 初始化新项目: node scripts/init_project_memory.js --workspace-root <项目路径>`
         );
     }
     
-    const projectProfile = loadProjectProfile(root);
+    const projectProfile = readJsonSafe(context.paths.projectProfile, { required: false, suggestInit: true });
     if (!projectProfile) {
-        const profilePath = path.join(root, 'project-memory', 'state', 'project-profile.json');
         throw new Error(
             `[SKILL-DIAGNOSIS] 未找到项目配置文件\n` +
-            `文件: ${profilePath}\n\n` +
+            `文件: ${context.paths.projectProfile}\n\n` +
             `可能原因:\n` +
             `  1. 项目记忆尚未初始化\n` +
             `  2. 当前目录不是项目根目录\n` +
             `  3. 初始化后未运行拓扑检测\n\n` +
             `修复命令:\n` +
-            `  1. 初始化项目: node scripts/init_project_memory.js --root ${root}\n` +
-            `  2. 检测拓扑: node scripts/detect_project_topology.js --root ${root}\n\n` +
+            `  1. 初始化项目: node scripts/init_project_memory.js --workspace-root ${root}\n` +
+            `  2. 检测拓扑: node scripts/detect_project_topology.js --workspace-root ${root}\n\n` +
             `验证项目根目录:\n` +
-            `  ls ${path.join(root, 'project-memory')}`
+            `  ls ${context.memoryRoot}`
         );
     }
 
-    const config = buildProjectGlobalConfig(root, projectProfile);
-    const configPath = path.join(root, 'project-memory', 'kb', 'configs', 'project-global.json');
+    const config = buildProjectGlobalConfig(root, projectProfile, context);
+    const configPath = path.join(context.paths.configsDir, 'project-global.json');
     ensureDir(path.dirname(configPath));
     writeJsonAtomic(configPath, config);
 
     buildChainKb(['--root', root, '--config', configPath]);
 
-    const scanPath = path.join(root, config.outputs.scan);
-    const graphPath = path.join(root, config.outputs.graph);
-    const lookupPath = path.join(root, config.outputs.lookup);
-    const reportPath = path.join(root, config.outputs.report);
-    const protocolsPath = path.join(root, 'project-memory', 'state', 'project-protocols.json');
+    const scanPath = path.resolve(root, config.outputs.scan);
+    const graphPath = path.resolve(root, config.outputs.graph);
+    const lookupPath = path.resolve(root, config.outputs.lookup);
+    const reportPath = path.resolve(root, config.outputs.report);
+    const protocolsPath = context.paths.projectProtocols;
 
     // 使用安全读取
     const raw = readJsonSafe(scanPath, { required: true });
@@ -352,9 +372,9 @@ function run(argv = process.argv.slice(2)) {
     const result = {
         kind: 'project-global-build',
         root: normalize(root),
-        graphPath: repoRelative(graphPath, root),
-        lookupPath: repoRelative(lookupPath, root),
-        protocolsPath: repoRelative(protocolsPath, root),
+        graphPath: normalize(graphPath),
+        lookupPath: normalize(lookupPath),
+        protocolsPath: normalize(protocolsPath),
         counts: {
             nodes: augmentedGraph.nodes.length,
             edges: augmentedGraph.edges.length,

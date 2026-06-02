@@ -9,6 +9,8 @@ const {
 } = require('../scripts/lib/workspace-layout');
 const { run: initProjectMemory } = require('../scripts/init_project_memory');
 const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
+const { run: buildProjectKb } = require('../scripts/build_project_kb');
+const { run: queryProjectKb } = require('../scripts/query_project_kb');
 
 function testWorkspaceId() {
     assert.equal(workspaceIdFromRoot('E:/xile-workspace'), 'e-xile-workspace');
@@ -66,9 +68,46 @@ function testInitAndTopologyUseExternalData() {
     assert.equal(fs.existsSync(context.paths.manifest), true);
 }
 
+function captureOutput(fn, args, cwd) {
+    const oldCwd = process.cwd();
+    const oldLog = console.log;
+    const logs = [];
+    try {
+        process.chdir(cwd);
+        console.log = (...values) => logs.push(values.map(value => String(value)).join(' '));
+        fn(args);
+        return logs.join('\n');
+    } finally {
+        console.log = oldLog;
+        process.chdir(oldCwd);
+    }
+}
+
+function testProjectKbExternalData() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-global-workspace-'));
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-global-data-'));
+    const serviceRoot = path.join(workspaceRoot, 'server', 'api');
+    fs.mkdirSync(path.join(serviceRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(serviceRoot, 'package.json'), '{"dependencies":{"typescript":"latest","express":"latest"}}\n');
+    fs.writeFileSync(path.join(serviceRoot, 'src', 'sample.ts'), 'export function ping(){ return "pong"; }\n');
+
+    initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'global-sample']);
+    detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+    buildProjectKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
+    assert.equal(fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')), true);
+
+    const output = captureOutput(queryProjectKb, ['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--json'], workspaceRoot);
+    const parsed = JSON.parse(output);
+    assert.equal(parsed.kind, 'project-summary');
+}
+
 testWorkspaceId();
 testExternalDataContext();
 testLegacyContext();
 testParseArgs();
 testInitAndTopologyUseExternalData();
+testProjectKbExternalData();
 console.log('workspace-layout validation passed');

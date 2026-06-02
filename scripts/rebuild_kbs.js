@@ -22,6 +22,7 @@ function parseArgs(argv) {
     const args = {
         root: '',
         feature: '',
+        layout: '',
         continueOnError: true, // 默认继续执行
     };
 
@@ -32,6 +33,10 @@ function parseArgs(argv) {
         }
         if (argv[index] === '--feature') {
             args.feature = argv[++index] || '';
+            continue;
+        }
+        if (argv[index] === '--layout') {
+            args.layout = argv[++index] || '';
             continue;
         }
         if (argv[index] === '--stop-on-error') {
@@ -215,7 +220,7 @@ function doRebuild(args, root) {
     // 重建 project-global
     console.log('[REBUILD] project-global');
     try {
-        buildProjectKb(['--root', root]);
+        buildProjectKb(['--root', root, ...(args.layout ? ['--layout', args.layout] : [])]);
     } catch (error) {
         console.error('[REBUILD-FAILED] project-global');
         console.error(`  错误: ${error.message}`);

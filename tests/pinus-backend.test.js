@@ -604,7 +604,8 @@ function runCocosAuthoringAssertions() {
 
 function runProjectGlobalAssertions() {
     const tempRoot = copyFixtureToTemp(projectGlobalFixtureRoot, 'pmm-project-global-');
-    const buildLogs = runWithCapturedOutput(buildProjectKb, ['--root', tempRoot], repoRoot);
+    const legacyLayoutArgs = ['--layout', 'legacy-project-memory'];
+    const buildLogs = runWithCapturedOutput(buildProjectKb, ['--root', tempRoot, ...legacyLayoutArgs], repoRoot);
     assert.ok(buildLogs.includes('项目全局 KB 已构建'));
 
     const graph = readJson(path.join(tempRoot, 'project-memory', 'kb', 'project-global', 'chain.graph.json'));
@@ -628,7 +629,7 @@ function runProjectGlobalAssertions() {
 
     const nestedCwd = path.join(tempRoot, 'client', 'assets', 'script', 'game');
     const projectSummary = parseTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--json'], nestedCwd)
     );
     assert.equal(projectSummary.kind, 'project-summary');
     assert.ok(projectSummary.counts.messages >= 1);
@@ -637,35 +638,35 @@ function runProjectGlobalAssertions() {
     assert.ok(projectSummary.counts.transitionPatterns >= 1);
 
     const messageDownstream = namesFromTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--message', 'PKPut', '--downstream', '--depth', '3', '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--message', 'PKPut', '--downstream', '--depth', '3', '--json'], nestedCwd)
     );
     assert.ok(messageDownstream.includes('TableMsg.pkPut'));
     assert.ok(messageDownstream.includes('TableMsg.pkPutCard'));
 
     const messageUpstream = namesFromTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--message', 'PKPut', '--upstream', '--depth', '2', '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--message', 'PKPut', '--upstream', '--depth', '2', '--json'], nestedCwd)
     );
     assert.ok(messageUpstream.includes('DaMaZiGameApi.sendPut'));
     assert.ok(messageUpstream.includes('TableMsg.handleMsg'));
 
     const messageDetail = parseTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--message', 'PKPut', '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--message', 'PKPut', '--json'], nestedCwd)
     );
     assert.equal(messageDetail.type, 'message');
     assert.ok(Array.isArray(messageDetail.handlers) && messageDetail.handlers.includes('TableMsg.pkPut'));
 
     const timingPatterns = parseTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--timing', 'doAfterHands', '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--timing', 'doAfterHands', '--json'], nestedCwd)
     );
     assert.ok(Array.isArray(timingPatterns) && timingPatterns.some(item => item.kind === 'scheduled-delay' && item.nextMethods.includes('DaMaZiView.enterPutPhase')));
 
     const phasePatterns = parseTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--phase', 'doAfterHands', '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--phase', 'doAfterHands', '--json'], nestedCwd)
     );
     assert.ok(Array.isArray(phasePatterns) && phasePatterns.some(item => item.entryMethod === 'DaMaZiView.doAfterHands'));
 
     const transitionPatterns = parseTraversal(
-        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, '--transition', 'phase', '--json'], nestedCwd)
+        runWithCapturedOutput(queryProjectKb, ['--root', tempRoot, ...legacyLayoutArgs, '--transition', 'phase', '--json'], nestedCwd)
     );
     assert.ok(Array.isArray(transitionPatterns) && transitionPatterns.some(item => item.driverMethod === 'DaMaZiView.doAfterHands'));
 }
@@ -692,7 +693,7 @@ function runRebuildAssertions() {
     assert.ok(staleSummaryText.includes('[stale-kb]'));
     assert.ok(staleSummaryText.includes('rebuild_kbs.js'));
 
-    const rebuildLogs = runWithCapturedOutput(rebuildKbs, ['--root', tempRoot], repoRoot);
+    const rebuildLogs = runWithCapturedOutput(rebuildKbs, ['--root', tempRoot, '--layout', 'legacy-project-memory'], repoRoot);
     assert.ok(rebuildLogs.includes('[REBUILD]'));
     assert.ok(rebuildLogs.includes('KB 重建报告'));
 
