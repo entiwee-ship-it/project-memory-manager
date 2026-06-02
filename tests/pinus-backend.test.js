@@ -85,6 +85,7 @@ function runVersionAssertions() {
     assert.ok(versionInfo.capabilities.includes('cocos-authoring-apply'));
     assert.equal(versionInfo.upgradePolicy, 'edit-source-repo-only');
     assert.ok(String(versionInfo.rebuildCommand || '').includes('rebuild_kbs.js'));
+    assert.ok(String(versionInfo.rebuildCommand || '').includes('--workspace-root'));
 
     const textOutput = runWithCapturedOutput(showSkillVersion, ['--text', repoRoot], repoRoot);
     assert.ok(textOutput.includes(`project-memory-manager@${expectedVersion}`));

@@ -10,7 +10,7 @@
     "npx skills check",
     "npx skills update"
   ],
-  "rebuildCommand": "node scripts/rebuild_kbs.js --root <project-root>",
+  "rebuildCommand": "node scripts/rebuild_kbs.js --workspace-root <project-root>",
   "capabilities": [
     "pinus-backend-kb",
     "cocos-static-call-kb",

@@ -50,7 +50,7 @@ function buildUpgradeGuidance(versionInfo, skillPath) {
         ? versionInfo.updateCommands
         : ['npx skills check', 'npx skills update'];
     const rebuildCommand = versionInfo.rebuildCommand
-        || 'node scripts/rebuild_kbs.js --root <project-root>';
+        || 'node scripts/rebuild_kbs.js --workspace-root <project-root>';
 
     return {
         policy: versionInfo.upgradePolicy || 'edit-source-repo-only',
