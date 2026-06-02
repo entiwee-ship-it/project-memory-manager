@@ -200,7 +200,7 @@ function startStdioServer() {
             return;
         }
         try {
-            const request = JSON.parse(line);
+            const request = JSON.parse(line.replace(/^\uFEFF/, ''));
             const response = await handleMcpRequest(request);
             if (response) {
                 process.stdout.write(`${JSON.stringify(response)}\n`);
