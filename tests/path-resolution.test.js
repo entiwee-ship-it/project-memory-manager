@@ -12,6 +12,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
 const { resolveProjectRoot, validateProjectRoot } = require('../scripts/lib/common');
+const { createWorkspaceContext } = require('../scripts/lib/workspace-layout');
 
 // 创建临时测试项目
 function createTempProject() {
@@ -31,6 +32,12 @@ function createTempProject() {
         JSON.stringify({ projectName: 'test-project', projectType: 'test' }, null, 2)
     );
     
+    return tempDir;
+}
+
+function createPlainTempProject() {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-plain-'));
+    fs.writeFileSync(path.join(tempDir, 'package.json'), '{"dependencies":{"vite":"latest"}}\n');
     return tempDir;
 }
 
@@ -97,27 +104,43 @@ console.log('\n2. 测试 validateProjectRoot 函数...');
     }
 }
 
-// 测试 3: detectProjectTopology 应该将输出写入 --root 指定的目录
-console.log('\n3. 测试 detectProjectTopology --root 参数...');
+// 测试 3: detectProjectTopology 默认应将输出写入外置 data root
+console.log('\n3. 测试 detectProjectTopology 默认 external-data 布局...');
 {
-    const tempProject = createTempProject();
-    // 删除已有的 profile，让脚本重新生成
-    fs.unlinkSync(path.join(tempProject, 'project-memory', 'state', 'project-profile.json'));
+    const tempProject = createPlainTempProject();
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-data-'));
     
     try {
         const originalCwd = process.cwd();
         process.chdir(os.tmpdir()); // 切换到其他目录
         
         try {
-            detectProjectTopology(['--root', tempProject]);
+            detectProjectTopology(['--root', tempProject, '--data-root', dataRoot]);
             
-            // 验证输出文件是否写入 --root 指定的目录
-            const profilePath = path.join(tempProject, 'project-memory', 'state', 'project-profile.json');
-            assert.strictEqual(fs.existsSync(profilePath), true, 'project-profile.json 应该写入 --root 目录');
-            console.log('   ✓ detectProjectTopology 正确写入 --root 目录');
+            const context = createWorkspaceContext({ workspaceRoot: tempProject, dataRoot });
+            assert.strictEqual(fs.existsSync(context.paths.projectProfile), true, 'project-profile.json 应该写入外置 data root');
+            assert.strictEqual(fs.existsSync(path.join(tempProject, 'project-memory')), false, '默认 external-data 不应创建 project-memory');
+            console.log('   ✓ detectProjectTopology 正确写入外置 data root');
         } finally {
             process.chdir(originalCwd);
         }
+    } finally {
+        cleanupTempProject(tempProject);
+        cleanupTempProject(dataRoot);
+    }
+}
+
+// 测试 4: legacy 布局仍可显式写入 --root/project-memory
+console.log('\n4. 测试 detectProjectTopology legacy-project-memory 布局...');
+{
+    const tempProject = createTempProject();
+    fs.unlinkSync(path.join(tempProject, 'project-memory', 'state', 'project-profile.json'));
+
+    try {
+        detectProjectTopology(['--root', tempProject, '--layout', 'legacy-project-memory']);
+        const profilePath = path.join(tempProject, 'project-memory', 'state', 'project-profile.json');
+        assert.strictEqual(fs.existsSync(profilePath), true, 'legacy 布局应写入 --root/project-memory');
+        console.log('   ✓ detectProjectTopology 保留 legacy 写入能力');
     } finally {
         cleanupTempProject(tempProject);
     }

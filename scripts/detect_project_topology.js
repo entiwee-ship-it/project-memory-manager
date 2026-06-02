@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ensureDir, listFilesRecursive, normalize, writeJson } = require('./lib/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { getTopologyAdapters } = require('./adapters/topology');
 
 const MANIFEST_BASENAMES = new Set([
@@ -39,8 +40,11 @@ function hasIgnoredSegment(relativePath) {
 }
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
-        root: '',
+        root: layoutArgs.workspaceRoot || '',
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
         out: '',
     };
 
@@ -48,6 +52,18 @@ function parseArgs(argv) {
         const token = argv[index];
         if (token === '--root') {
             args.root = path.resolve(argv[++index]);
+            continue;
+        }
+        if (token === '--workspace-root') {
+            args.root = path.resolve(argv[++index]);
+            continue;
+        }
+        if (token === '--data-root') {
+            args.dataRoot = path.resolve(argv[++index]);
+            continue;
+        }
+        if (token === '--layout') {
+            args.layout = argv[++index] || '';
             continue;
         }
         if (token === '--out') {
@@ -59,11 +75,18 @@ function parseArgs(argv) {
     if (!args.root) {
         args.root = process.cwd();
     }
+
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root,
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
     
     // 如果没有指定 out，基于 root 生成默认路径
     if (!args.out) {
-        args.out = path.join(args.root, 'project-memory', 'state', 'project-profile.json');
+        args.out = context.paths.projectProfile;
     }
+    args.context = context;
 
     return args;
 }

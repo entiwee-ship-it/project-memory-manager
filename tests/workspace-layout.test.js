@@ -7,6 +7,8 @@ const {
     parseLayoutArgs,
     workspaceIdFromRoot,
 } = require('../scripts/lib/workspace-layout');
+const { run: initProjectMemory } = require('../scripts/init_project_memory');
+const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
 
 function testWorkspaceId() {
     assert.equal(workspaceIdFromRoot('E:/xile-workspace'), 'e-xile-workspace');
@@ -49,8 +51,24 @@ function testParseArgs() {
     assert.equal(parsed.layout, 'external-data');
 }
 
+function testInitAndTopologyUseExternalData() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-workspace-'));
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-data-'));
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"dependencies":{"vite":"latest"}}\n');
+
+    initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'sample']);
+    detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
+    assert.equal(fs.existsSync(context.paths.projectProfile), true);
+    assert.equal(fs.existsSync(context.paths.featureRegistry), true);
+    assert.equal(fs.existsSync(context.paths.manifest), true);
+}
+
 testWorkspaceId();
 testExternalDataContext();
 testLegacyContext();
 testParseArgs();
+testInitAndTopologyUseExternalData();
 console.log('workspace-layout validation passed');

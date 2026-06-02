@@ -3,18 +3,30 @@
 const fs = require('fs');
 const path = require('path');
 const { ensureDir, pathExists, writeJsonAtomic, writeTextAtomic } = require('./lib/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 
 function parseArgs(argv) {
+    const layoutArgs = parseLayoutArgs(argv);
     const args = {
-        root: process.cwd(),
-        name: path.basename(process.cwd()),
+        root: layoutArgs.workspaceRoot || process.cwd(),
+        dataRoot: layoutArgs.dataRoot || '',
+        layout: layoutArgs.layout || '',
+        name: path.basename(layoutArgs.workspaceRoot || process.cwd()),
         force: false,
     };
 
     for (let index = 0; index < argv.length; index++) {
         const token = argv[index];
-        if (token === '--root') {
+        if (token === '--root' || token === '--workspace-root') {
             args.root = path.resolve(argv[++index]);
+            continue;
+        }
+        if (token === '--data-root') {
+            args.dataRoot = path.resolve(argv[++index]);
+            continue;
+        }
+        if (token === '--layout') {
+            args.layout = argv[++index] || '';
             continue;
         }
         if (token === '--name') {
@@ -31,7 +43,12 @@ function parseArgs(argv) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
-    const memoryRoot = path.join(args.root, 'project-memory');
+    const context = createWorkspaceContext({
+        workspaceRoot: args.root,
+        dataRoot: args.dataRoot,
+        layout: args.layout,
+    });
+    const memoryRoot = context.memoryRoot;
     
     // 检查是否已存在
     if (pathExists(memoryRoot) && !args.force) {
@@ -112,6 +129,14 @@ function run(argv = process.argv.slice(2)) {
         });
         writeJsonAtomic(path.join(memoryRoot, 'state', 'active-work.json'), { generatedAt: null, activeWorks: [] });
         writeJsonAtomic(path.join(memoryRoot, 'state', 'feature-registry.json'), { generatedAt: null, features: [] });
+        writeJsonAtomic(context.paths.manifest, {
+            workspaceRoot: context.workspaceRoot,
+            workspaceId: context.workspaceId,
+            layout: context.layout,
+            dataRoot: context.dataRoot,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        });
     } catch (err) {
         throw new Error(
             `[SKILL-DIAGNOSIS] 写入初始文件失败\n` +
@@ -126,7 +151,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     console.log(`[SKILL-INFO] 项目记忆已初始化: ${memoryRoot}`);
-    console.log(`[SKILL-INFO] 下一步: node scripts/detect_project_topology.js --root ${args.root}`);
+    console.log(`[SKILL-INFO] 下一步: node scripts/detect_project_topology.js --workspace-root ${context.workspaceRoot}`);
 }
 
 module.exports = {
