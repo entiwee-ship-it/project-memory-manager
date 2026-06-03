@@ -357,8 +357,8 @@ def validate_skill_version(skill_path: Path, expected_skill_name: str = "") -> t
         return False, "skill-version.json 的 upgradeMessage 过短", None
     if install_command and "skills add" not in install_command:
         return False, "skill-version.json 的 installCommand 必须包含 skills add", None
-    if rebuild_command and "rebuild_kbs.js" not in rebuild_command:
-        return False, "skill-version.json 的 rebuildCommand 必须指向 rebuild_kbs.js", None
+    if rebuild_command and "src/bin/rebuild-kbs.js" not in rebuild_command.replace("\\", "/"):
+        return False, "skill-version.json 的 rebuildCommand 必须指向 src/bin/rebuild-kbs.js", None
     if update_commands is not None and (
         not isinstance(update_commands, list)
         or any(not isinstance(item, str) or not item.strip() for item in update_commands)
