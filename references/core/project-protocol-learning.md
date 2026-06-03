@@ -14,9 +14,9 @@
 ## 默认命令
 
 ```bash
-node scripts/build_project_kb.js --root <repo-root>
-node scripts/query_project_kb.js --root <repo-root>
-node scripts/query_project_kb.js --root <repo-root> --message <message> --downstream
+node src/bin/build-project.js --root <repo-root>
+node src/bin/query-project.js --root <repo-root>
+node src/bin/query-project.js --root <repo-root> --message <message> --downstream
 ```
 
 ## 当前学习范围
@@ -34,10 +34,10 @@ node scripts/query_project_kb.js --root <repo-root> --message <message> --downst
 ## 当前查询入口
 
 ```bash
-node scripts/query_project_kb.js --root <repo-root> --message <message>
-node scripts/query_project_kb.js --root <repo-root> --timing <query>
-node scripts/query_project_kb.js --root <repo-root> --phase <query>
-node scripts/query_project_kb.js --root <repo-root> --transition <query>
+node src/bin/query-project.js --root <repo-root> --message <message>
+node src/bin/query-project.js --root <repo-root> --timing <query>
+node src/bin/query-project.js --root <repo-root> --phase <query>
+node src/bin/query-project.js --root <repo-root> --transition <query>
 ```
 
 ## 不做的事

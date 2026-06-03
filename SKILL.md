@@ -1,316 +1,80 @@
 ---
 name: project-memory-manager
-description: 'KB-first AI project memory manager for full-stack repositories with structured semantic summary extraction and intelligent querying. Use when: (1) initializing project memory, (2) building knowledge bases with call chain analysis, (3) querying method relationships using natural language (e.g., "find methods that filter data"), (4) analyzing code semantics without reading source, or (5) working with Cocos/Pinus/Vue/React/Node.js projects.'
+description: External project memory manager for Codex. Use MCP first to initialize, build, discover, and query repository KBs stored outside the target project.
 ---
 
 # 项目记忆管理器
 
-## 先判断任务类型
+## 什么时候使用
 
-- 初始化新仓库时，先读 `references/core/onboarding-playbook.md` 与 `references/core/work-protocols.md`，再优先通过 MCP `diagnose_workspace` -> `init_workspace` -> `detect_topology` 建立外置记忆；MCP 不可用时再运行 `scripts/init_project_memory.js --workspace-root <repo-root>` 和 `scripts/detect_project_topology.js --workspace-root <repo-root>`
-- 迁移旧体系时，先读 `references/core/document-boundaries.md`，再运行 `scripts/migrate_legacy_memory.js`，把长期结论迁入 docs，把可重建事实迁入 KB 配置和产物
-- 需要全盘扫描整个仓库、学习项目自己的消息/状态协议时，优先通过 MCP `start_build_project_index` 并轮询 `get_job_status`，MCP 不可用时运行 `scripts/build_project_kb.js --workspace-root <repo-root>`，再读 `references/core/project-protocol-learning.md`
-- 需要创建 feature KB 时，先通过 MCP `discover_features` 发现候选，再用 `build_feature_index` 对确认的候选生成并构建 KB；MCP 不可用时运行 `scripts/discover_features.js --workspace-root <repo-root>` 和 `scripts/build_feature_index.js --workspace-root <repo-root> --feature-key <key>`
-- 当问题本质是"为什么这个阶段太早/太晚切换""为什么动画没播完就进下一步"这类业务时序问题时，优先看 `timing / phase / transition` patterns
-- 构建或刷新链路 KB 时，先读 `references/core/kb-schema.md`，再按技术栈读取对应 `references/adapters/*.md`，准备配置后运行 `scripts/build_chain_kb.js --config ...`
-- 查询调用链、事件、request、state 时，优先通过 MCP `query_project_chain`；当范围已经缩到 feature，优先通过 MCP `query_feature_chain`；MCP 不可用时再运行 `scripts/query_project_kb.js --workspace-root <repo-root>` 或 `scripts/query_kb.js --feature ...`
-- 当任务是"给 Cocos 节点挂脚本、补点击事件、给脚本字段绑节点/组件/资源"时，先读 `references/adapters/cocos.md`，再运行 `scripts/cocos_authoring.js`
-- 校验技能包或在新环境自举依赖时，先读 `references/core/validation.md`，再在技能根目录运行 `python scripts/validate_skill_runtime.py . --mode auto`
-- 需要扩展新技术栈、补拓扑规则或制定前后端协同时，先读 `references/core/adapter-protocol.md` 与 `references/core/fullstack-coordination.md`
-- 当任务是"升级这个技能本身"时，永远以 GitHub 源仓库为准，不要直接修改已安装副本目录
+当 Codex 需要理解一个现有项目的结构、跨文件调用链、HTTP 请求、Pinus 消息、Vue/Express 全栈链路、Cocos prefab 绑定、状态读写或项目协议时，使用 PMM。PMM 的记忆文件必须放在外置 data root，不能写入目标业务项目。
 
 ## 默认工作流
 
-- 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result`、`discover_features`、`build_feature_index`、`query_project_chain` 和 `query_feature_chain`
-- MCP 不可用时，再调用 CLI 脚本
-- CLI 默认使用 external-data layout，记忆、KB、状态、报告、锁和临时产物写入 PMM data root
-- PMM data root 默认是技能源码/安装目录同级的 `project-memory-data`，可用 `PMM_DATA_ROOT` 或 `--data-root` 覆盖
-- legacy `project-memory/` 只在显式 `--layout legacy-project-memory` 时使用
-- 业务源码目录默认只读，不创建 `project-memory/`
+1. 先通过 MCP `get_current_state` 查看目标项目是否已有 PMM data root。
+2. 没有状态时，使用 MCP `init_workspace` 和 `detect_topology` 初始化外置记忆。
+3. 需要全局理解时，使用 `build_project_index` 或 `start_build_project_index`。
+4. 需要 feature 级链路时，先 `discover_features`，再 `build_feature_index`。
+5. 查询时优先 MCP，只有 MCP 不可用时才使用 CLI。
 
-### 会话开始
+## MCP 优先规则
 
-- 先读目标仓库根的 `AGENTS.md`
-- 通过 MCP `get_current_state` 确认 `memoryRoot`、`projectProfile` 和 `featureRegistry` 的实际位置
-- 再读任务相关 docs，优先看 `FAQ.md`、`LOCATE.md`、`CHANGE_GUIDE.md` 和对应 feature 文档
-- 当任务是定位入口、事件绑定、request-callback、状态流转或上下游调用时，先查 `project-global KB`，再决定是否做 feature 级或局部源码搜索
-- 若 PMM data root 尚未初始化，立即切到"初始化或刷新项目记忆"流程
+MCP 可用时不要优先读生成的 JSON 文件。先调用：
 
-### 初始化新仓库
+- `query_project_chain`: 项目全局 summary、message、state、timing、phase、transition。
+- `query_feature_chain`: 单 feature 的 method、event、request、endpoint、state、upstream、downstream。
+- `get_current_state`: 检查 KB 是否存在、是否 stale。
 
-- MCP 可用时，先运行 `diagnose_workspace`；若返回 `suggestedNextAction: "init_workspace"`，运行 `init_workspace`
-- 初始化后运行 `detect_topology`，直到 `hasConfiguredAreaRoots: true`
-- 大项目构建优先运行 `start_build_project_index`，再轮询 `get_job_status`，最后用 `get_job_result` 确认 `hasProjectGlobalKb: true`
-- MCP 不可用时，运行 `node scripts/init_project_memory.js --workspace-root <repo-root> --name <project-name>`
-- 再运行 `node scripts/detect_project_topology.js --workspace-root <repo-root>`
-- 按 `references/core/onboarding-playbook.md` 的默认顺序补齐 `AGENTS.md`、project overview、active work 与工作协议
-- 只在识别出技术栈后读取对应适配器，避免一次性加载全部技术说明
+## 查询顺序
 
-### 迁移旧体系
+1. 项目范围不清楚时，先用 `query_project_chain`。
+2. 已知 feature 时，用 `query_feature_chain`。
+3. 只知道关键词时，先查 `type/name/request/message/state`，再决定是否读源码。
+4. KB 结果不足时，读 `docs/` 和 `references/`。
+5. 最后才用 `rg` 回源码确认细节。
 
-- 运行 `node scripts/migrate_legacy_memory.js --root <repo-root> --source .kimi`
-- 先保留旧体系快照，再迁移长期结论
-- 用 `references/core/document-boundaries.md` 判断哪些内容进入 docs，哪些内容应沉淀为 KB 配置或可重建产物
-- 迁移后刷新 `project-profile.json`、`active-work.json` 与 feature registry
+## 构建和刷新 KB
 
-### 构建或刷新功能 KB
+MCP 不可用时使用 CLI：
 
-- 自动发现候选：`discover_features`，或 CLI `node scripts/discover_features.js --workspace-root <repo-root>`
-- 从候选构建：`build_feature_index`，或 CLI `node scripts/build_feature_index.js --workspace-root <repo-root> --feature-key <key>`
-- 候选文件位于 `<memory-root>/state/feature-candidates.json`
-- 后台全栈结构会自动识别 `cms-client` + `cms-server`，例如生成 `qyproject-admin` 候选并覆盖前端 API、后端 route、controller 和 service 链路
-- 先准备 KB 配置 JSON，明确 `featureKey`、入口文件、关注目录与语义标签
-- **标准构建**: `node scripts/build_chain_kb.js --config <config-path>`
-- **启用结构化摘要**（推荐，支持语义查询）: `node scripts/build_chain_kb.js --config <config-path> --enable-structured-summary`
-- 构建后会自动同步 `feature-registry.json` 与 `kb/indexes/features.json`
-- 用 `references/core/kb-schema.md` 校验节点类型、边类型与查询面是否覆盖任务需求
-
-#### 结构化语义摘要
-
-启用 `--enable-structured-summary` 后，提取器会分析方法体 AST，生成语义操作序列：
-- **操作类型**: filter, map, condition, loop, assignment, method_call, return
-- **数据流**: 追踪变量从输入到输出的流转路径
-- **复杂度**: 自动评估为 low/medium/high
-
-**优势**:
-- AI 不读源码即可理解方法语义（80%场景）
-- 支持自然语言查询："找到过滤数据的方法"
-- 精确匹配代码模式而非文本搜索
-
-### 查询调用链
-
-**节点 ID 格式说明**:
-- 节点 ID 使用 `slugify` 标准化（全小写、路径分隔符转为 `-`），例如 `method:e-xile-xy-client-assets-script-game-poker-liuyangsanshierzhangviewcomp.ts:onroundend`
-- **查询时使用原始驼峰命名**（如 `onOpenSmallSettlement`），工具自动匹配
-
-**基础查询**:
-```bash
-# 方法上下游链路
-node scripts/query_chain_kb.js --feature <key> --method <name> --downstream
-
-# 事件订阅关系
-node scripts/query_chain_kb.js --feature <key> --event <name>
-
-# 诊断调用链
-node scripts/analyze_call_chain.js --feature <key> --caller <method> --callee <method>
+```powershell
+node src/bin/init-workspace.js --workspace-root <project-root> --data-root <pmm-data-root>
+node src/bin/detect-topology.js --workspace-root <project-root> --data-root <pmm-data-root>
+node src/bin/build-project.js --workspace-root <project-root> --data-root <pmm-data-root>
+node src/bin/discover-features.js --workspace-root <project-root> --data-root <pmm-data-root>
+node src/bin/build-feature.js --workspace-root <project-root> --data-root <pmm-data-root> --feature-key <key>
+node src/bin/rebuild-kbs.js --workspace-root <project-root> --data-root <pmm-data-root>
 ```
 
-**语义查询（需启用结构化摘要）**:
-```bash
-# 查询包含 filter 操作的方法
-node scripts/query_chain_kb.js --feature <key> --has-operation filter
+## 升级后处理
 
-# 查询包含条件判断且复杂度>=medium的方法
-node scripts/query_chain_kb.js --feature <key> --has-operation condition --min-complexity medium
+PMM 升级后先重启 Codex，让 MCP 重新加载。之后对目标项目执行：
 
-# 查询数据流向特定变量的方法
-node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
-
-# 支持的操作类型: filter, map, condition, loop, assignment, method_call
-# 复杂度级别: low, medium, high
+```powershell
+node src/bin/rebuild-kbs.js --workspace-root <project-root> --data-root <pmm-data-root>
 ```
 
-**使用语义查询的场景**:
-- "找到所有过滤无效数据的方法" → `--has-operation filter`
-- "找到有复杂业务逻辑的方法" → `--min-complexity high`
-- "找到处理 historyData 的方法" → `--data-flow-to historyData`
-- 若拓扑或抽取结果不稳定，只补适配器规则，不要手改 KB 产物
-- 后端仓库可直接使用 `serverRoots`、`moduleRoots`、`dbRoots` 或 `scanTargets.handlers/remotes/modules/routes/schemas`
-- Pinus 后端优先参考 `assets/templates/KB_CONFIG_PINUS_BACKEND_EXAMPLE.json`
-- 类似 `qyserver` 的仓库优先用绝对 `scanTargets` + `extractorAdapter: "pinus"`，不要在目标仓库里手工同步索引
-- **全栈项目（前后端混合）**：使用 `"extractorAdapter": "fullstack"`，同时支持 Cocos 前端和 Pinus 后端解析
-- **预制体自动扫描**：`prefabs` 字段为空时，会自动从 `assetRoots` 递归扫描所有 `.prefab` 文件
-- **JSDoc 语义提取**：自动提取代码注释中的 @param、@returns、@example 等标签，提供业务语义
-- **类型信息增强**：方法节点包含参数类型、返回类型、访问修饰符等完整类型信息
-- **导入解析诊断**：构建后显示导入解析成功率，如有未解析导入可使用 `scripts/diagnose_import_resolution.js` 诊断
-- **前后端数据流分析**：使用 `scripts/query_dataflow.js` 追踪字段级和方法级的数据流向
-- 旧字段 `key` / `name` / `outputDir` 与旧输出文件名仍兼容，但会打印弃用告警
+如果 MCP 配置仍指向旧路径，改成：
 
-### 构建 project-global KB
-
-- MCP 可用时优先运行 `start_build_project_index`，再用 `get_job_status` / `get_job_result` 等待完成
-- MCP 不可用时运行 `node scripts/build_project_kb.js --workspace-root <repo-root>`
-- 这一步会全盘扫描仓库，产出：
-  - `<memory-root>/kb/project-global/chain.graph.json`
-  - `<memory-root>/kb/project-global/chain.lookup.json`
-  - `<memory-root>/kb/project-global/build.report.json`
-  - `<memory-root>/state/project-protocols.json`
-- 这一步不是替代 feature KB，而是提供全局入口、消息协议学习和跨区域链路基座
-- 默认跳过 `node_modules`、`.git`、`.runtime`、`dist`、`build`、`coverage`、`out`、`.next`、`.nuxt`、`project-memory`、`project-memory-data`、`codex-work/work/tmp`、`legacy-root-backups` 和 `codex-tools`
-- 每个 workspace 只应该有一个 `project-global`；它是全局基座，feature KB 只有在为具体功能创建配置并构建后才会额外出现
-- 当升级技能版本后，优先重建 `project-global KB`，再重建 feature KB
-
-### 查询链路
-
-- 全局入口优先：`node scripts/query_project_kb.js --workspace-root <repo-root>`
-- 全局消息查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --message <message> --downstream`
-- 全局时序查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --timing <query>`
-- 全局阶段查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --phase <query>`
-- 全局状态转换查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --transition <query>`
-- 后台接口链路可用 `--request <query>`、`--endpoint <query>`、`--method <query> --downstream|--upstream`
-- 通过 MCP 查询 project-global 时，重复查询会命中缓存；KB 文件 mtime 变化会自动失效，具体查询默认 `limit=20`、最大 `limit=100`，可传 `timeoutMs`
-- 当范围已经缩小到单一 feature，优先通过 MCP `query_feature_chain` 查询；MCP 不可用时再运行 `node scripts/query_kb.js --feature <feature-key> ...`
-- 若已经在技能根目录，可直接运行 `node scripts/query_kb.js --feature <feature-key> ...`
-- 若不在技能根目录，再使用 `node <skill-path>/scripts/query_kb.js --feature <feature-key> ...`
-- 若只执行 `--feature <key>`，脚本会先返回 feature 摘要、默认排查顺序、推荐命令和各 KB 文件用途
-- 优先用 `--downstream <query>`、`--upstream <query>`，或 `--method/--event/--request/--state <query> --downstream|--upstream`
-- 如果查询返回 `ambiguous`，优先查看同一结果里的 `recommendations.groups`；它会把候选按 HTTP 接口、Pinus 路由、请求、方法、UI/Prefab、状态/数据等入口分组，并给出可继续执行的推荐命令
-- `scripts/query_chain_kb.js` 仍保留兼容，但默认推荐入口改为 `scripts/query_kb.js`
-- 兼容旧写法 `--from <query> --direction <upstream|downstream>`
-- `build.report.json` 是给人看的说明文件；`chain.lookup.json` / `chain.graph.json` / `scan.raw.json` 默认都不建议直接手读
-- 当只知道业务语义词时，先试 `--name` 或 `--tag`
-- 只有 KB 无法回答时，才做补充性的 `rg` / `grep`
-
-### Cocos 创作辅助
-
-- 先运行 `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile` 看 prefab 的节点、组件、可绑定字段和已有事件模式
-- 如果问题是"节点 / 组件索引是多少""Spine 组件在哪""脚本字段有没有绑上"，优先继续用 profile 过滤：
-  - `--node <node-name>` / `--component <component-name>` / `--field <field-name>`
-- 新增点击事件时，运行：
-  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent click-event --source-node <source-node> --target-component <target-component> --handler <method>`
-- 新增字段绑定时，运行：
-  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-node <node-path>`
-  - 或 `--target-component <component-name>` / `--target-asset <asset-name>`
-- 先让脚本输出"该改脚本还是改 prefab"的规划，再决定是否真正修改 prefab
-
-### Cocos Profile 查询（避免 PowerShell 转义问题）
-
-**重要**：当需要查询 `cocos-authoring-profile.json` 中的原始配置信息时，**不要**使用 `python -c "..."` 内联代码（PowerShell 对 `[]` 等特殊字符处理有问题），而是使用专用脚本：
-
-```bash
-# 列出所有 features
-node scripts/query_cocos_profile.js --list-features
-
-# 列出包含 golden 的 features
-node scripts/query_cocos_profile.js --list-features --filter golden
-
-# 列出所有 prefabs
-node scripts/query_cocos_profile.js --list-prefabs
-
-# 查找包含 goldenEgg 的 prefabs
-node scripts/query_cocos_profile.js --list-prefabs --filter goldenEgg
-
-# 查找标题动画节点（如 EggsTitle, PrizeBoxTitle）
-node scripts/query_cocos_profile.js --find-node EggsTitle
-
-# 查看特定 prefab 详情
-node scripts/query_cocos_profile.js --prefab-detail goldenEgg
-
-# JSON 输出（供脚本解析）
-node scripts/query_cocos_profile.js --prefab-detail goldenEgg --json
+```text
+E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js
 ```
 
-### 会话收口
+## 必读文档索引
 
-- 更新 active work 或对应工作文档
-- 结构变化时刷新 KB 与索引
-- 长期认知变化后更新 docs
-- 高频修复优先补 `FAQ.md`、`LOCATE.md`、`CHANGE_GUIDE.md`
-
-### 升级这个技能本身
-
-**重要规则**：
-- 永远不要把 `<installed-skill-path>` 或其它已安装副本当作最终修改目标
-- 正确流程是：修改 GitHub 源仓库 -> 校验 -> commit/push -> 更新
-- 技能升级完成后，必须在技能根目录执行 `node scripts/rebuild_kbs.js --workspace-root <project-root>` 重建现有 KB
-- 如果当前查询脚本提示 `[stale-kb]`，说明 KB 还是旧技能版本构建的，先重建再继续分析
-
-**更新方式**：
-
-- **OpenAI Codex CLI**: `npx skills check && npx skills update`
-- **Kimi CLI**: `node scripts/install_to_kimi_cli.js --update`
-
-### 生产环境优化
-
-在纯 AI 使用环境中，可清理非必需文件减小技能包体积：
-
-```bash
-# 预览可清理的文件
-node scripts/clean_for_production.js --level=standard --dry-run
-
-# 执行清理
-node scripts/clean_for_production.js --level=standard
-```
-
-清理后核心功能不受影响，如需恢复可重新安装技能包。
-
-### 自主安装指南（供 AI 参考）
-
-当用户需要安装或更新本技能时，AI 可协助执行以下步骤：
-
-**场景1: 用户询问如何安装技能**
-1. 询问用户使用的 AI 客户端（Codex CLI 或 Kimi CLI）
-2. 根据客户端提供对应的安装命令
-3. 指导用户完成校验步骤
-
-**场景2: 用户询问如何更新技能**
-1. 检测当前技能安装方式（检查技能路径是否包含 `.config/agents` 或 `kimi_cli`）
-2. 执行对应的更新命令
-3. 验证更新后的版本
-4. 提醒用户重建项目 KB
-
-**场景3: 技能安装失败**
-1. 检查 Git 是否可用
-2. 检查网络连接
-3. 检查目标目录权限
-4. 提供手动安装方案
-
-## 环境依赖
-
-技能自带 TypeScript 运行时（位于 `node_modules/typescript`），不依赖目标项目的 TypeScript 安装：
-- **AST 解析**: 使用技能自己的 TS 解析器分析代码结构
-- **版本兼容性**: 技能使用 TypeScript 6.x，支持最新 TS/JS 语法
-- **无需项目安装**: 目标项目即使没有安装 typescript，技能也能正常工作
-
-如遇到 TypeScript 相关问题：
-```bash
-# 重新安装技能依赖
-cd <skill-install-path>
-npm install
-```
-
-## 故障排除
-
-常见问题及解决方案见 `references/core/troubleshooting.md`：
-
-- **技能版本不更新** - `npx skills update` 无效
-- **安装路径混乱** - 脚本找不到文件
-- **残留文件报警告** - 清理临时配置
-- **路径解析问题** - Windows 大小写问题
-- **调用链断裂** - 诊断导入解析
-- **构建失败** - 检查清单
-
-## 按需读取这些 references
-
-### 核心文档
-- 接管与首次落地：`references/core/onboarding-playbook.md`
-- 日常协作顺序：`references/core/work-protocols.md`
-- docs 与 KB 边界：`references/core/document-boundaries.md`
-- KB schema 与查询面：`references/core/kb-schema.md`
-
-### 进阶主题
-- 项目协议学习：`references/core/project-protocol-learning.md`
-- 全栈协同：`references/core/fullstack-coordination.md`
-- 适配器扩展规则：`references/core/adapter-protocol.md`
-- 校验与环境自举：`references/core/validation.md`
-- 故障排除：`references/core/troubleshooting.md`
-
-### 其他参考
-- API 参考：`references/api-reference.md`
-- 生产清理：`references/core/production-cleanup.md`
-- 版本历史：`CHANGELOG.md`
-- 贡献指南：`CONTRIBUTING.md`
-- 使用示例：`examples/complete-workflow.md`
+- `docs/user/quick-start.md`
+- `docs/user/mcp-first.md`
+- `docs/user/external-data-layout.md`
+- `docs/reference/cli.md`
+- `docs/reference/mcp-tools.md`
+- `docs/developer/source-layout.md`
+- `docs/developer/testing.md`
+- `docs/guides/troubleshooting.md`
 
 ## 核心规则
 
-- `docs` 是长期结论层
-- `KB` 是可脚本重建事实层
-- 不要把全仓库搜索当作第一轮定位动作
-- 不要把穷举方法表直接灌进长期 docs
-- 不要手改 KB 产物
-- 结构变化后刷新 KB
-- 长期认知变化后更新 docs
-- 优先补脚本、配置或适配器，不要把一次性推理结果写成长期协议
-- 依赖 `process.cwd()` 的脚本要先切到目标仓库根；带 `--workspace-root` 的脚本可以从任意目录运行
-- **避免使用 `python -c "..."` 内联代码**（PowerShell 转义问题），优先使用 Node.js 脚本或 Python 文件
+- 记忆文件是记忆文件，业务项目是业务项目，PMM 源码是 PMM 源码。
+- 不创建或恢复 `scripts/` 旧入口。
+- 不把 PMM runtime 文件写进目标项目，除非用户明确要求 legacy 布局。
+- 查询优先 MCP，构建优先 MCP，CLI 是 fallback 和维护入口。
+- 发现 stale KB 时先重建，再相信查询结果。

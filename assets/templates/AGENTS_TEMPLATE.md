@@ -16,12 +16,12 @@
 - `project-memory/docs/project/PROJECT_Overview.md`
 
 ## KB 快速入口
-- 先运行：`node <skill-path>/scripts/query_project_kb.js --root <repo-root>`
-- 先运行：`node <skill-path>/scripts/query_kb.js --feature <feature-key>`
-- 查消息：`node <skill-path>/scripts/query_project_kb.js --root <repo-root> --message <message> --downstream`
-- 查上下游：`node <skill-path>/scripts/query_kb.js --feature <feature-key> --downstream <query>`
-- 查具体方法：`node <skill-path>/scripts/query_kb.js --feature <feature-key> --method <name> --downstream`
-- 当只知道语义词时：`node <skill-path>/scripts/query_kb.js --feature <feature-key> --type method --name <keyword>`
+- 先运行：`node <skill-path>/src/bin/query-project.js --root <repo-root>`
+- 先运行：`node <skill-path>/src/bin/query-feature.js --feature <feature-key>`
+- 查消息：`node <skill-path>/src/bin/query-project.js --root <repo-root> --message <message> --downstream`
+- 查上下游：`node <skill-path>/src/bin/query-feature.js --feature <feature-key> --downstream <query>`
+- 查具体方法：`node <skill-path>/src/bin/query-feature.js --feature <feature-key> --method <name> --downstream`
+- 当只知道语义词时：`node <skill-path>/src/bin/query-feature.js --feature <feature-key> --type method --name <keyword>`
 - 只有 KB 不足时，才回 docs 或 `rg`
 
 ## 当前工作

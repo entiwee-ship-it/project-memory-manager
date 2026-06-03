@@ -30,10 +30,10 @@
 
 ```bash
 # 预览清理内容（强烈推荐先预览）
-node scripts/clean_for_production.js --level=standard --dry-run
+node src/bin/clean-production.js --level=standard --dry-run
 
 # 执行标准清理
-node scripts/clean_for_production.js --level=standard
+node src/bin/clean-production.js --level=standard
 ```
 
 ### 清理级别
@@ -43,7 +43,7 @@ node scripts/clean_for_production.js --level=standard
 仅清理最大的非必要文件。
 
 ```bash
-node scripts/clean_for_production.js --level=minimal
+node src/bin/clean-production.js --level=minimal
 ```
 
 **清理内容**：
@@ -64,7 +64,7 @@ node scripts/clean_for_production.js --level=minimal
 平衡体积和功能，是推荐级别。
 
 ```bash
-node scripts/clean_for_production.js --level=standard
+node src/bin/clean-production.js --level=standard
 ```
 
 **额外清理内容**：
@@ -87,7 +87,7 @@ node scripts/clean_for_production.js --level=standard
 仅保留 AI 运行必需的最低限度文件。
 
 ```bash
-node scripts/clean_for_production.js --level=full
+node src/bin/clean-production.js --level=full
 ```
 
 **额外清理内容**：
@@ -126,8 +126,8 @@ node scripts/clean_for_production.js --level=full
 ✓ SKILL.md
 ✓ skill-version.json
 ✓ package.json
-✓ scripts/init_project_memory.js
-✓ scripts/build_chain_kb.js
+✓ src/bin/init-workspace.js
+✓ src/bin/build-feature.js
 ...
 ✓ 所有核心文件完好
 ```
@@ -162,11 +162,11 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 - name: Cleanup for Production
   run: |
     cd ~/.config/agents/skills/project-memory-manager
-    node scripts/clean_for_production.js --level=standard
+    node src/bin/clean-production.js --level=standard
 
 - name: Verify
   run: |
-    node scripts/show_skill_version.js --text
+    node src/bin/show-version.js --text
 ```
 
 ### 安装后自动清理
@@ -184,7 +184,7 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git \
 # 清理
 SKILL_PATH="${HOME}/.config/agents/skills/project-memory-manager"
 cd "$SKILL_PATH"
-node scripts/clean_for_production.js --level=standard
+node src/bin/clean-production.js --level=standard
 
 echo "技能安装并清理完成"
 ```

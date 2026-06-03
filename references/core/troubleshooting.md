@@ -7,10 +7,10 @@
 **诊断**：
 ```bash
 # 检查当前版本
-node scripts/check_skill_version.js
+node src/bin/check-version.js
 
 # 对比远程版本
-node scripts/check_skill_version.js --fix
+node src/bin/check-version.js --fix
 ```
 
 **解决**：
@@ -20,7 +20,7 @@ npx skills remove project-memory-manager -g
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
 
 # 方法2: 自动修复
-node scripts/check_skill_version.js --fix
+node src/bin/check-version.js --fix
 ```
 
 ---
@@ -32,10 +32,10 @@ node scripts/check_skill_version.js --fix
 **诊断**：
 ```bash
 # 检查技能安装位置
-node scripts/check_skill_version.js
+node src/bin/check-version.js
 
 # 检查路径问题
-node scripts/diagnose_paths.js --root <your-project>
+node src/bin/diagnose-paths.js --root <your-project>
 ```
 
 **常见路径**：
@@ -59,13 +59,13 @@ export AGENTS_CONFIG_DIR=~/.config/agents           # Linux/Mac
 **诊断**：
 ```bash
 # 干运行查看可清理文件
-node scripts/clean_temp_files.js --dry-run
+node src/bin/clean-temp.js --dry-run
 ```
 
 **解决**：
 ```bash
 # 清理残留文件
-node scripts/clean_temp_files.js
+node src/bin/clean-temp.js
 
 # 测试配置建议命名 xxx-test.json，方便识别
 ```
@@ -79,7 +79,7 @@ node scripts/clean_temp_files.js
 **诊断**：
 ```bash
 # 诊断路径问题
-node scripts/diagnose_paths.js --root <your-project>
+node src/bin/diagnose-paths.js --root <your-project>
 ```
 
 **解决**：
@@ -104,11 +104,11 @@ if (normalizePath(path1) === normalizePath(path2)) // ✅
 **解决**：主动检查版本
 ```bash
 # 添加到 .bashrc / .zshrc / PowerShell profile
-alias pmm-check='node ~/.config/agents/skills/project-memory-manager/scripts/check_skill_version.js'
+alias pmm-check='node ~/.config/agents/skills/project-memory-manager/src/bin/check-version.js'
 
 # 定期运行（建议每周）
 npx skills check
-node scripts/check_skill_version.js
+node src/bin/check-version.js
 ```
 
 ---
@@ -120,10 +120,10 @@ node scripts/check_skill_version.js
 **诊断**：
 ```bash
 # 诊断导入解析
-node scripts/diagnose_import_resolution.js --root <project> --file <script.ts>
+node src/bin/diagnose-imports.js --root <project> --file <script.ts>
 
 # 诊断调用链
-node scripts/debug_call_chain.js --feature <key> --method <name>
+node src/bin/debug-call-chain.js --feature <key> --method <name>
 ```
 
 ---
@@ -136,4 +136,4 @@ node scripts/debug_call_chain.js --feature <key> --method <name>
 1. 检查配置文件 JSON 格式是否有效
 2. 检查所有路径是否存在
 3. 检查 `extractorAdapter` 是否设置正确
-4. 运行 `node scripts/diagnose_paths.js` 检查路径问题
+4. 运行 `node src/bin/diagnose-paths.js` 检查路径问题

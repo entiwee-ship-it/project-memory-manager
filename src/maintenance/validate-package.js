@@ -235,7 +235,11 @@ function validateSkillVersion(skillPath, expectedSkillName) {
 
 function validateRequiredStructure(skillPath) {
     const requiredPaths = [
-        'scripts',
+        'src',
+        path.join('src', 'bin'),
+        path.join('src', 'commands'),
+        path.join('src', 'mcp'),
+        path.join('src', 'shared'),
         'references',
         'assets',
         'skill-version.json',

@@ -20,10 +20,10 @@ git clone https://github.com/entiwee-ship-it/project-memory-manager.git
 cd project-memory-manager
 
 # 2. 预览安装（可选，查看将要执行的操作）
-node scripts/install_to_kimi_cli.js --dry-run
+node src/bin/install-kimi.js --dry-run
 
 # 3. 正式安装
-node scripts/install_to_kimi_cli.js
+node src/bin/install-kimi.js
 ```
 
 安装成功后会显示：
@@ -80,7 +80,7 @@ ln -s /path/to/skills/project-memory-manager \
 
 ```powershell
 cd project-memory-manager
-node scripts/install_to_kimi_cli.js --update
+node src/bin/install-kimi.js --update
 ```
 
 ### 强制重新安装
@@ -88,7 +88,7 @@ node scripts/install_to_kimi_cli.js --update
 如果遇到问题，可以强制重新安装：
 
 ```powershell
-node scripts/install_to_kimi_cli.js --force
+node src/bin/install-kimi.js --force
 ```
 
 ### 手动更新
@@ -160,8 +160,8 @@ rm -rf ~/.config/kimi/skills/project-memory-manager
 
 | 功能 | Kimi CLI | Codex CLI |
 |------|----------|-----------|
-| 安装命令 | `node scripts/install_to_kimi_cli.js` | `npx skills add` |
-| 更新命令 | `node scripts/install_to_kimi_cli.js --update` | `npx skills update` |
+| 安装命令 | `node src/bin/install-kimi.js` | `npx skills add` |
+| 更新命令 | `node src/bin/install-kimi.js --update` | `npx skills update` |
 | 配置位置 | `SKILL.md` frontmatter | `agents/openai.yaml` |
 | 技能目录 | 内部目录 | `~/.config/agents/skills/` |
 

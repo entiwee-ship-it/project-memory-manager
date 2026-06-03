@@ -84,7 +84,7 @@ Active work 文档模板，记录当前进行中的工作。
 ### 初始化时使用
 
 ```powershell
-node scripts/init_project_memory.js --root <项目根目录> --name <项目名称>
+node src/bin/init-workspace.js --root <项目根目录> --name <项目名称>
 ```
 
 初始化脚本会自动复制相关模板到目标项目。

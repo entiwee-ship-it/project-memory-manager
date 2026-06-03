@@ -7,7 +7,7 @@
 构建 KB 时必须启用结构化摘要：
 
 ```bash
-node scripts/build_chain_kb.js --config <config-path> --enable-structured-summary
+node src/bin/build-feature.js --workspace-root <project-root> --feature-key <feature-key>
 ```
 
 ## 示例 1：查找过滤数据的方法
@@ -15,7 +15,7 @@ node scripts/build_chain_kb.js --config <config-path> --enable-structured-summar
 查找所有使用 `.filter()` 方法过滤数据的方法：
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operation filter --limit 5
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang --has-operation filter --limit 5
 ```
 
 预期输出：
@@ -40,7 +40,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operati
 查找包含条件判断且复杂度为 high 的方法：
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operation condition --min-complexity high --limit 5
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang --has-operation condition --min-complexity high --limit 5
 ```
 
 ## 示例 3：查找处理特定数据的方法
@@ -48,7 +48,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operati
 查找数据流中涉及 `historyData` 的方法：
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --data-flow-to historyData
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang --data-flow-to historyData
 ```
 
 ## 示例 4：组合查询
@@ -56,7 +56,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --data-flow-t
 查找有复杂条件判断且数据流向 `result` 变量的方法：
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang \
   --has-operation condition \
   --min-complexity medium \
   --data-flow-to result \
@@ -68,7 +68,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
 查找包含循环（for/of/while）的方法：
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operation loop
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang --has-operation loop
 ```
 
 ## 支持的操作类型
@@ -96,7 +96,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operati
 使用 `--json` 参数获取机器可读的输出：
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang --has-operation filter --json
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang --has-operation filter --json
 ```
 
 输出格式：

@@ -7,7 +7,7 @@
 ## 默认命令
 
 ```bash
-node scripts/show_skill_version.js --text
+node src/bin/show-version.js --text
 python scripts/validate_skill_runtime.py . --mode auto
 ```
 
@@ -17,9 +17,9 @@ python scripts/validate_skill_runtime.py . --mode auto
 npx skills check
 npx skills update
 cd "<installed-skill-path>"
-node scripts/show_skill_version.js --text
+node src/bin/show-version.js --text
 python scripts/validate_skill_runtime.py . --mode auto
-node scripts/rebuild_kbs.js --root <project-root>
+node src/bin/rebuild-kbs.js --root <project-root>
 ```
 
 ## 模式

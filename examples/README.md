@@ -43,7 +43,7 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 ```powershell
 cd <你的项目目录>
-node <技能路径>/scripts/init_project_memory.js --root . --name "MyProject"
+node <技能路径>/src/bin/init-workspace.js --root . --name "MyProject"
 ```
 
 ### 3. 查看完整示例

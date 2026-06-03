@@ -9,7 +9,7 @@
 初始化新项目的项目记忆系统。
 
 ```bash
-node scripts/init_project_memory.js --root <repo-root> --name <project-name>
+node src/bin/init-workspace.js --root <repo-root> --name <project-name>
 ```
 
 **参数：**
@@ -29,7 +29,7 @@ node scripts/init_project_memory.js --root <repo-root> --name <project-name>
 检测项目技术栈和区域分布。
 
 ```bash
-node scripts/detect_project_topology.js --root <repo-root> [--out <output-path>]
+node src/bin/detect-topology.js --root <repo-root> [--out <output-path>]
 ```
 
 **参数：**
@@ -48,7 +48,7 @@ node scripts/detect_project_topology.js --root <repo-root> [--out <output-path>]
 构建功能级知识库。
 
 ```bash
-node scripts/build_chain_kb.js --config <config-path> [--enable-structured-summary]
+node src/bin/build-feature.js --workspace-root <repo-root> --feature-key <feature-key>
 ```
 
 **参数：**
@@ -81,7 +81,7 @@ node scripts/build_chain_kb.js --config <config-path> [--enable-structured-summa
 构建项目级全局知识库。
 
 ```bash
-node scripts/build_project_kb.js --root <repo-root>
+node src/bin/build-project.js --root <repo-root>
 ```
 
 **参数：**
@@ -101,16 +101,16 @@ node scripts/build_project_kb.js --root <repo-root>
 
 ```bash
 # 项目摘要
-node scripts/query_project_kb.js --root <repo-root>
+node src/bin/query-project.js --root <repo-root>
 
 # 消息查询
-node scripts/query_project_kb.js --root <repo-root> --message <msg> --downstream
+node src/bin/query-project.js --root <repo-root> --message <msg> --downstream
 
 # 时序查询
-node scripts/query_project_kb.js --root <repo-root> --timing <query>
+node src/bin/query-project.js --root <repo-root> --timing <query>
 
 # 阶段查询
-node scripts/query_project_kb.js --root <repo-root> --phase <query>
+node src/bin/query-project.js --root <repo-root> --phase <query>
 ```
 
 **参数：**
@@ -131,17 +131,17 @@ node scripts/query_project_kb.js --root <repo-root> --phase <query>
 
 ```bash
 # 功能摘要
-node scripts/query_kb.js --feature <feature-key>
+node src/bin/query-feature.js --feature <feature-key>
 
 # 方法上下游
-node scripts/query_kb.js --feature <key> --method <name> --downstream
+node src/bin/query-feature.js --feature <key> --method <name> --downstream
 
 # 事件查询
-node scripts/query_kb.js --feature <key> --event <name>
+node src/bin/query-feature.js --feature <key> --event <name>
 
 # 语义查询（需启用结构化摘要）
-node scripts/query_kb.js --feature <key> --has-operation filter
-node scripts/query_kb.js --feature <key> --min-complexity high
+node src/bin/query-feature.js --feature <key> --has-operation filter
+node src/bin/query-feature.js --feature <key> --min-complexity high
 ```
 
 **参数：**
@@ -167,14 +167,14 @@ node scripts/query_kb.js --feature <key> --min-complexity high
 
 ```bash
 # Prefab 概览
-node scripts/cocos_authoring.js --feature <key> --prefab <name> --intent profile
+node src/bin/cocos-authoring.js --feature <key> --prefab <name> --intent profile
 
 # 添加点击事件
-node scripts/cocos_authoring.js --feature <key> --prefab <name> --intent click-event \
+node src/bin/cocos-authoring.js --feature <key> --prefab <name> --intent click-event \
   --source-node <node> --target-component <comp> --handler <method>
 
 # 字段绑定
-node scripts/cocos_authoring.js --feature <key> --prefab <name> --intent field-binding \
+node src/bin/cocos-authoring.js --feature <key> --prefab <name> --intent field-binding \
   --component-node <node> --component <comp> --field <field> --target-node <target>
 ```
 
@@ -194,7 +194,7 @@ node scripts/cocos_authoring.js --feature <key> --prefab <name> --intent field-b
 诊断路径问题。
 
 ```bash
-node scripts/diagnose_paths.js --root <repo-root>
+node src/bin/diagnose-paths.js --root <repo-root>
 ```
 
 #### `diagnose_import_resolution.js`
@@ -202,7 +202,7 @@ node scripts/diagnose_paths.js --root <repo-root>
 诊断导入解析问题。
 
 ```bash
-node scripts/diagnose_import_resolution.js --root <repo-root> --file <script-file>
+node src/bin/diagnose-imports.js --root <repo-root> --file <script-file>
 ```
 
 ---
@@ -214,7 +214,7 @@ node scripts/diagnose_import_resolution.js --root <repo-root> --file <script-fil
 重建所有 KB。
 
 ```bash
-node scripts/rebuild_kbs.js --root <repo-root>
+node src/bin/rebuild-kbs.js --root <repo-root>
 ```
 
 **参数：**
@@ -229,7 +229,7 @@ node scripts/rebuild_kbs.js --root <repo-root>
 迁移旧记忆体系。
 
 ```bash
-node scripts/migrate_legacy_memory.js --root <repo-root> --source <old-system>
+node src/bin/migrate-legacy-memory.js --root <repo-root> --source <old-system>
 ```
 
 ---

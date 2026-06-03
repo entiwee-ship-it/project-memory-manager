@@ -16,7 +16,7 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 cd /path/to/your/project
 
 # 初始化项目记忆
-node ~/.config/agents/skills/project-memory-manager/scripts/init_project_memory.js \
+node ~/.config/agents/skills/project-memory-manager/src/bin/init-workspace.js \
   --root . \
   --name "MyGameProject"
 ```
@@ -24,7 +24,7 @@ node ~/.config/agents/skills/project-memory-manager/scripts/init_project_memory.
 ## 第三步：检测项目拓扑
 
 ```bash
-node ~/.config/agents/skills/project-memory-manager/scripts/detect_project_topology.js --root .
+node ~/.config/agents/skills/project-memory-manager/src/bin/detect-topology.js --root .
 ```
 
 这将生成 `project-memory/state/project-profile.json`，识别前端/后端/共享等区域。
@@ -70,7 +70,7 @@ cp ~/.config/agents/skills/project-memory-manager/assets/templates/KB_CONFIG_TEM
 ## 第五步：构建 KB
 
 ```bash
-node ~/.config/agents/skills/project-memory-manager/scripts/build_chain_kb.js \
+node ~/.config/agents/skills/project-memory-manager/src/bin/build-feature.js \
   --root . \
   --config project-memory/kb/configs/liu-yang-san-shi-er-zhang-config.json \
   --enable-structured-summary
@@ -89,7 +89,7 @@ node ~/.config/agents/skills/project-memory-manager/scripts/build_chain_kb.js \
 ### 6.1 查看 Feature 摘要
 
 ```bash
-node ~/.config/agents/skills/project-memory-manager/scripts/query_kb.js \
+node ~/.config/agents/skills/project-memory-manager/src/bin/query-feature.js \
   --feature liu-yang-san-shi-er-zhang
 ```
 
@@ -97,7 +97,7 @@ node ~/.config/agents/skills/project-memory-manager/scripts/query_kb.js \
 
 ```bash
 # 查看 onOpenSmallSettlement 调用了哪些方法
-node scripts/query_kb.js --feature liu-yang-san-shi-er-zhang \
+node src/bin/query-feature.js --feature liu-yang-san-shi-er-zhang \
   --method onOpenSmallSettlement --downstream
 ```
 
@@ -105,7 +105,7 @@ node scripts/query_kb.js --feature liu-yang-san-shi-er-zhang \
 
 ```bash
 # 检查 onRoundEnd 是否调用 onOpenSmallSettlement
-node scripts/analyze_call_chain.js \
+node src/bin/analyze-call-chain.js \
   --feature liu-yang-san-shi-er-zhang \
   --caller onRoundEnd \
   --callee onOpenSmallSettlement
@@ -116,7 +116,7 @@ node scripts/analyze_call_chain.js \
 ### 7.1 查找过滤无效数据的方法
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang \
   --has-operation filter \
   --limit 10
 ```
@@ -124,7 +124,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
 ### 7.2 查找有提前返回（卫语句）的方法
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang \
   --has-operation condition \
   --min-complexity medium
 ```
@@ -132,14 +132,14 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
 ### 7.3 查找处理特定变量的方法
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang \
   --data-flow-to "this.directionList"
 ```
 
 ### 7.4 获取 JSON 格式结果
 
 ```bash
-node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
+node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang \
   --has-operation filter \
   --json > filter-methods.json
 ```
@@ -149,7 +149,7 @@ node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang \
 ### 8.1 查看 Prefab 结构
 
 ```bash
-node scripts/cocos_authoring.js \
+node src/bin/cocos-authoring.js \
   --feature liu-yang-san-shi-er-zhang \
   --prefab SmallSettlement \
   --intent profile
@@ -158,7 +158,7 @@ node scripts/cocos_authoring.js \
 ### 8.2 添加点击事件
 
 ```bash
-node scripts/cocos_authoring.js \
+node src/bin/cocos-authoring.js \
   --feature liu-yang-san-shi-er-zhang \
   --prefab SmallSettlement \
   --intent click-event \
@@ -177,7 +177,7 @@ node scripts/cocos_authoring.js \
 ls project-memory/state/feature-registry.json
 
 # 重新构建
-node scripts/build_chain_kb.js --root . --config ...
+node src/bin/build-feature.js --workspace-root . --feature-key <feature-key>
 ```
 
 ### 问题："结构化摘要不可用"
@@ -200,6 +200,6 @@ console.log('Methods with bodySummary:', withSummary);
 2. 尝试更通用的操作类型
 3. 查看支持的操作类型列表：
    ```bash
-   node scripts/query_chain_kb.js --feature liu-yang-san-shi-er-zhang
+   node src/bin/query-chain.js --feature liu-yang-san-shi-er-zhang
    # 查看帮助信息中的操作类型列表
    ```

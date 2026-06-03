@@ -153,7 +153,7 @@ type Operation =
 
 ### 输出文件用途
 
-- `scripts/query_kb.js`
+- `src/bin/query-feature.js`
   - purpose: 统一查询入口
   - useWhen: 遇到入口、事件、request、state、上下游链路问题时先运行
 - `build.report.json`

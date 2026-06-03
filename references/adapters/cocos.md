@@ -65,10 +65,10 @@
 **查询示例**:
 ```bash
 # 查找使用 filter 的方法
-node scripts/query_chain_kb.js --feature <key> --has-operation filter
+node src/bin/query-chain.js --feature <key> --has-operation filter
 
 # 查找数据流向 directionList 的方法
-node scripts/query_chain_kb.js --feature <key> --data-flow-to "this.directionList"
+node src/bin/query-chain.js --feature <key> --data-flow-to "this.directionList"
 ```
 
 ## 绑定语义
@@ -106,26 +106,26 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to "this.directionLis
 
 ## 推荐查询
 
-- `node scripts/query_kb.js --feature <feature-key>`
-- `node scripts/query_kb.js --feature <feature-key> --type binding --name <field|handler>`
-- `node scripts/query_kb.js --feature <feature-key> --type ui-node --name <node-path>`
-- `node scripts/query_kb.js --feature <feature-key> --type asset --name <asset-name>`
-- `node scripts/query_chain_kb.js --feature <feature-key> --downstream <binding-node-name>`
-- `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
+- `node src/bin/query-feature.js --feature <feature-key>`
+- `node src/bin/query-feature.js --feature <feature-key> --type binding --name <field|handler>`
+- `node src/bin/query-feature.js --feature <feature-key> --type ui-node --name <node-path>`
+- `node src/bin/query-feature.js --feature <feature-key> --type asset --name <asset-name>`
+- `node src/bin/query-chain.js --feature <feature-key> --downstream <binding-node-name>`
+- `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
 
 ## 创作辅助层
 
-现在新增了 `scripts/cocos_authoring.js`，它不是只解释现状，而是给“新增功能时该怎么绑定”出规划，必要时还能直接应用修改。
+现在新增了 `src/bin/cocos-authoring.js`，它不是只解释现状，而是给“新增功能时该怎么绑定”出规划，必要时还能直接应用修改。
 
 第一版支持两类规划：
 
 - 新增点击事件
   - 示例：
-    - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent click-event --source-node <source-node> --target-component <target-component> --handler <method>`
+    - `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent click-event --source-node <source-node> --target-component <target-component> --handler <method>`
 - 新增字段绑定
   - 示例：
-    - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-node <node-path>`
-    - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-asset <asset-name>`
+    - `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-node <node-path>`
+    - `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent field-binding --component-node <component-node> --component <target-component> --field <field-name> --target-asset <asset-name>`
 
 它当前会输出：
 
@@ -137,16 +137,16 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to "this.directionLis
 
 如果你只是想先看某个 prefab 里“有哪些节点、哪些脚本、哪些可绑定字段、已有事件习惯”，可以直接运行：
 
-- `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
+- `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile`
 
 如果你要直接回答“Prefab 里这个节点 / 组件的具体索引是多少”“脚本字段有没有绑上”“Spine 组件到底挂在哪”，优先用 profile 的过滤参数，而不是写临时 Python：
 
 - 节点定位：
-  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --node <node-name> --json`
+  - `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --node <node-name> --json`
 - 组件定位：
-  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --component <component-name> --json`
+  - `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --component <component-name> --json`
 - 字段绑定审计：
-  - `node scripts/cocos_authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --component <component-name> --field <field-name> --json`
+  - `node src/bin/cocos-authoring.js --feature <feature-key> --prefab <prefab-name> --intent profile --component <component-name> --field <field-name> --json`
 
 现在 `profile` 结果里会直接包含：
 
