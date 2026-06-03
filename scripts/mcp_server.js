@@ -8,6 +8,8 @@ const { createWorkspaceContext } = require('./lib/workspace-layout');
 const { run: initProjectMemory } = require('./init_project_memory');
 const { run: detectProjectTopology } = require('./detect_project_topology');
 const { run: buildProjectKb } = require('./build_project_kb');
+const { run: discoverFeaturesCli } = require('./discover_features');
+const { run: buildFeatureIndexCli } = require('./build_feature_index');
 const { run: queryProjectKb } = require('./query_project_kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
@@ -122,6 +124,35 @@ const TOOL_DEFINITIONS = [
                 jobId: { type: 'string' },
             },
             required: ['jobId'],
+        },
+    },
+    {
+        name: 'discover_features',
+        description: 'Discover feature candidates from project-global KB and optionally write feature-candidates.json.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                limit: { type: 'number' },
+                minConfidence: { type: 'string' },
+                write: { type: 'boolean' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'build_feature_index',
+        description: 'Generate a feature KB config from a discovered candidate and optionally build it.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                featureKey: { type: 'string' },
+                dryRun: { type: 'boolean' },
+            },
+            required: ['workspaceRoot', 'featureKey'],
         },
     },
     {
@@ -435,6 +466,33 @@ function getJobResult(args) {
     });
 }
 
+function discoverFeatures(args) {
+    const argv = [...layoutArgv(args), '--json'];
+    if (Number.isFinite(args.limit)) {
+        argv.push('--limit', String(args.limit));
+    }
+    if (args.minConfidence) {
+        argv.push('--min-confidence', args.minConfidence);
+    }
+    if (args.write === false) {
+        argv.push('--no-write');
+    }
+    const captured = captureConsoleLog(() => discoverFeaturesCli(argv));
+    return textResult(captured.value || captured.output);
+}
+
+function buildFeatureIndex(args) {
+    const argv = [...layoutArgv(args), '--feature-key', args.featureKey, '--json'];
+    if (args.dryRun !== false) {
+        argv.push('--dry-run');
+    }
+    const captured = captureConsoleLog(() => buildFeatureIndexCli(argv));
+    return textResult({
+        ...(captured.value || {}),
+        workspaceState: buildWorkspaceState(args),
+    });
+}
+
 function queryProjectChain(args) {
     const argv = [...layoutArgv(args), '--json'];
     for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
@@ -494,9 +552,13 @@ async function handleMcpRequest(request) {
                                         ? getJobStatus(args)
                                         : name === 'get_job_result'
                                             ? getJobResult(args)
-                                            : name === 'query_project_chain'
-                                                ? queryProjectChain(args)
-                                                : textResult({ error: `Unknown tool: ${name}` });
+                                            : name === 'discover_features'
+                                                ? discoverFeatures(args)
+                                                : name === 'build_feature_index'
+                                                    ? buildFeatureIndex(args)
+                                                    : name === 'query_project_chain'
+                                                        ? queryProjectChain(args)
+                                                        : textResult({ error: `Unknown tool: ${name}` });
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {

@@ -10,6 +10,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 - 初始化新仓库时，先读 `references/core/onboarding-playbook.md` 与 `references/core/work-protocols.md`，再优先通过 MCP `diagnose_workspace` -> `init_workspace` -> `detect_topology` 建立外置记忆；MCP 不可用时再运行 `scripts/init_project_memory.js --workspace-root <repo-root>` 和 `scripts/detect_project_topology.js --workspace-root <repo-root>`
 - 迁移旧体系时，先读 `references/core/document-boundaries.md`，再运行 `scripts/migrate_legacy_memory.js`，把长期结论迁入 docs，把可重建事实迁入 KB 配置和产物
 - 需要全盘扫描整个仓库、学习项目自己的消息/状态协议时，优先通过 MCP `start_build_project_index` 并轮询 `get_job_status`，MCP 不可用时运行 `scripts/build_project_kb.js --workspace-root <repo-root>`，再读 `references/core/project-protocol-learning.md`
+- 需要创建 feature KB 时，先通过 MCP `discover_features` 发现候选，再用 `build_feature_index` 对确认的候选生成并构建 KB；MCP 不可用时运行 `scripts/discover_features.js --workspace-root <repo-root>` 和 `scripts/build_feature_index.js --workspace-root <repo-root> --feature-key <key>`
 - 当问题本质是"为什么这个阶段太早/太晚切换""为什么动画没播完就进下一步"这类业务时序问题时，优先看 `timing / phase / transition` patterns
 - 构建或刷新链路 KB 时，先读 `references/core/kb-schema.md`，再按技术栈读取对应 `references/adapters/*.md`，准备配置后运行 `scripts/build_chain_kb.js --config ...`
 - 查询调用链、事件、request、state 时，优先通过 MCP `query_project_chain`，MCP 不可用时运行 `scripts/query_project_kb.js --workspace-root <repo-root>`；当范围已经缩到 feature 再用 `scripts/query_kb.js --feature ...`
@@ -20,7 +21,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ## 默认工作流
 
-- 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result` 和 `query_project_chain`
+- 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result`、`discover_features`、`build_feature_index` 和 `query_project_chain`
 - MCP 不可用时，再调用 CLI 脚本
 - CLI 默认使用 external-data layout，记忆、KB、状态、报告、锁和临时产物写入 PMM data root
 - legacy `project-memory/` 只在显式 `--layout legacy-project-memory` 时使用
@@ -53,6 +54,9 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ### 构建或刷新功能 KB
 
+- 自动发现候选：`discover_features`，或 CLI `node scripts/discover_features.js --workspace-root <repo-root>`
+- 从候选构建：`build_feature_index`，或 CLI `node scripts/build_feature_index.js --workspace-root <repo-root> --feature-key <key>`
+- 候选文件位于 `<memory-root>/state/feature-candidates.json`
 - 先准备 KB 配置 JSON，明确 `featureKey`、入口文件、关注目录与语义标签
 - **标准构建**: `node scripts/build_chain_kb.js --config <config-path>`
 - **启用结构化摘要**（推荐，支持语义查询）: `node scripts/build_chain_kb.js --config <config-path> --enable-structured-summary`

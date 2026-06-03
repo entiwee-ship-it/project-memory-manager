@@ -46,6 +46,28 @@ function writeWebsiteWorkspace(workspaceRoot) {
     fs.writeFileSync(path.join(websiteRoot, 'src', 'main.js'), 'export function mountApp(){ return "ok"; }\n');
 }
 
+function writeFeatureDiscoveryWorkspace(workspaceRoot) {
+    writeWebsiteWorkspace(workspaceRoot);
+    const serverRoot = path.join(workspaceRoot, 'qy-server', 'game-server');
+    const routeRoot = path.join(serverRoot, 'app', 'http', 'routes', 'activity');
+    fs.mkdirSync(routeRoot, { recursive: true });
+    fs.writeFileSync(path.join(serverRoot, 'package.json'), JSON.stringify({
+        dependencies: {
+            express: '^4.18.0',
+            pinus: '^2.0.0',
+        },
+    }, null, 2));
+    fs.writeFileSync(path.join(routeRoot, 'goldenEgg.ts'), [
+        'import express from "express";',
+        'const router = express.Router();',
+        'router.get("/activity/goldenEgg/getActivityInfo", function getActivityInfo(req, res) {',
+        '  res.json({ ok: true });',
+        '});',
+        'export default router;',
+        '',
+    ].join('\n'));
+}
+
 async function testToolsList() {
     const response = await handleMcpRequest({
         jsonrpc: '2.0',
@@ -66,6 +88,8 @@ async function testToolsList() {
         'start_build_project_index',
         'get_job_status',
         'get_job_result',
+        'discover_features',
+        'build_feature_index',
         'query_project_chain',
     ]) {
         assert.ok(names.includes(expectedName), `missing MCP tool: ${expectedName}`);
@@ -215,6 +239,37 @@ async function testAsyncBuildJob() {
     assert.equal(result.hasProjectGlobalKb, true);
 }
 
+async function testDiscoverAndBuildFeatureIndexDryRun() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFeatureDiscoveryWorkspace(workspaceRoot);
+
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+    const discoverResponse = await callTool('discover_features', {
+        workspaceRoot,
+        dataRoot,
+        limit: 5,
+        minConfidence: 'low',
+    });
+    const discovered = parseTextResult(discoverResponse);
+    assert.equal(discovered.kind, 'feature-discovery');
+    assert.equal(discovered.candidateCount > 0, true);
+    assert.ok(discovered.outputPath.endsWith('feature-candidates.json'));
+
+    const featureKey = discovered.candidates[0].featureKey;
+    const buildResponse = await callTool('build_feature_index', {
+        workspaceRoot,
+        dataRoot,
+        featureKey,
+        dryRun: true,
+    });
+    const result = parseTextResult(buildResponse);
+    assert.equal(result.kind, 'feature-index-build');
+    assert.equal(result.featureKey, featureKey);
+    assert.equal(result.built, false);
+    assert.equal(result.workspaceState.hasProjectGlobalKb, true);
+    assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
+}
+
 Promise.all([
     testInitialize(),
     testToolsList(),
@@ -223,6 +278,7 @@ Promise.all([
     testDetectTopologyKeepsManualAreaRoots(),
     testBuildProjectIndexAutoPreparesWorkspace(),
     testAsyncBuildJob(),
+    testDiscoverAndBuildFeatureIndexDryRun(),
 ])
     .then(() => console.log('mcp-server validation passed'))
     .catch(error => {

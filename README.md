@@ -126,7 +126,9 @@ Codex 的标准调用顺序：
 4. `detect_topology`：生成 `state/project-profile.json`
 5. `start_build_project_index`：异步构建 `project-global KB`
 6. `get_job_status` / `get_job_result`：等待构建完成
-7. `query_project_chain`：查询入口、消息、状态、上下游链路
+7. `discover_features`：从 `project-global KB` 发现 feature 候选
+8. `build_feature_index`：从已确认候选生成并构建 feature KB
+9. `query_project_chain`：查询入口、消息、状态、上下游链路
 
 CLI 仍保留给人工或 MCP 不可用时使用：
 
@@ -134,6 +136,8 @@ CLI 仍保留给人工或 MCP 不可用时使用：
 node scripts/init_project_memory.js --workspace-root E:/xile-workspace
 node scripts/detect_project_topology.js --workspace-root E:/xile-workspace
 node scripts/build_project_kb.js --workspace-root E:/xile-workspace
+node scripts/discover_features.js --workspace-root E:/xile-workspace
+node scripts/build_feature_index.js --workspace-root E:/xile-workspace --feature-key <feature-key>
 node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 ```
 
@@ -207,6 +211,8 @@ node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 
 `project-global` 是每个 workspace 固定只有一个的全局 KB。它负责回答“这个项目整体有哪些入口、事件、状态流转、跨区域调用链”。feature KB 是按具体功能再细分的局部 KB，只有显式创建 feature 配置并构建后才会出现。因此刚接入一个项目时只看到一个 `project-global` 是正常状态。
 
+feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory-root>/state/feature-candidates.json`，确认候选后再运行 `build_feature_index`。这样避免按目录批量创建低质量 KB，同时保留跨前端、后端、消息和状态链路的业务边界。
+
 ## 这个技能如何工作
 
 这个技能遵循 KB-first 的定位协议：
@@ -241,6 +247,8 @@ node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 - 项目级协议学习（message / dispatcher / state pattern）
 - 项目级业务时序学习（timing / phase / transition pattern）
 - project 级查询入口
+- feature 候选自动发现
+- 候选驱动的 feature KB 配置生成
 - 方法上下游查询
 - 组件与 handler 绑定查询
 - 事件 subscribers / emitters 查询
