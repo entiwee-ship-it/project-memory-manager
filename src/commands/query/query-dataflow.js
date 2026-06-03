@@ -3,11 +3,11 @@
  * 查询前后端数据流
  * 
  * 使用方法:
- *   node scripts/query_dataflow.js --feature <key> [--field <field-name>] [--method <method-name>]
+ *   node src/bin/query-dataflow.js --feature <key> [--field <field-name>] [--method <method-name>]
  * 
  * 示例:
- *   node scripts/query_dataflow.js --feature game-feature --field historyData
- *   node scripts/query_dataflow.js --feature game-feature --method onOpenSmallSettlement
+ *   node src/bin/query-dataflow.js --feature game-feature --field historyData
+ *   node src/bin/query-dataflow.js --feature game-feature --method onOpenSmallSettlement
  */
 
 const fs = require('fs');
@@ -163,8 +163,8 @@ function findMethodDataFlow(data, methodName) {
     return results;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     if (!args.feature) {
         console.log('Usage: node query_dataflow.js --feature <key> [--field <name>] [--method <name>]');
@@ -227,4 +227,14 @@ function main() {
     console.log('\n=== Analysis Complete ===');
 }
 
-main();
+module.exports = {
+    findDataFlowForField,
+    findMethodDataFlow,
+    loadFeatureData,
+    parseArgs,
+    run,
+};
+
+if (require.main === module) {
+    run();
+}

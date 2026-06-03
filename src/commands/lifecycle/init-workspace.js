@@ -2,8 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ensureDir, pathExists, writeJsonAtomic, writeTextAtomic } = require('../src/shared/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
+const { ensureDir, pathExists, writeJsonAtomic, writeTextAtomic } = require('../../shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -59,7 +59,7 @@ function run(argv = process.argv.slice(2)) {
         if (pathExists(profilePath)) {
             console.log(`[SKILL-INFO] 项目记忆已存在: ${memoryRoot}`);
             console.log(`[SKILL-INFO] 如需重新初始化，使用 --force 参数`);
-            console.log(`[SKILL-INFO] 或运行重建: node scripts/rebuild_kbs.js --workspace-root ${args.root}`);
+            console.log(`[SKILL-INFO] 或运行重建: node src/bin/rebuild-kbs.js --workspace-root ${args.root}`);
             return;
         }
         
@@ -151,7 +151,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     console.log(`[SKILL-INFO] 项目记忆已初始化: ${memoryRoot}`);
-    console.log(`[SKILL-INFO] 下一步: node scripts/detect_project_topology.js --workspace-root ${context.workspaceRoot}`);
+    console.log(`[SKILL-INFO] 下一步: node src/bin/detect-topology.js --workspace-root ${context.workspaceRoot}`);
 }
 
 module.exports = {

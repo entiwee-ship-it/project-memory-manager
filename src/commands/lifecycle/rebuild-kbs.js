@@ -10,14 +10,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const { readJsonSafe, writeJsonAtomic } = require('../src/shared/common');
-const { normalizeFeatureRecord } = require('../src/graph/feature-kb');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
-const { run: buildChainKb } = require('../src/graph/build-chain-kb');
-const { withLock } = require('../src/shared/lock');
-const { run: buildProjectKb } = require('./build_project_kb');
-const { run: buildCocosAuthoringProfile } = require('./build_cocos_authoring_profile');
-const { run: refreshMemoryIndexes } = require('./refresh_memory_indexes');
+const { readJsonSafe, writeJsonAtomic } = require('../../shared/common');
+const { normalizeFeatureRecord } = require('../../graph/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
+const { run: buildChainKb } = require('../../graph/build-chain-kb');
+const { withLock } = require('../../shared/lock');
+const { run: buildProjectKb } = require('../build/build-project');
+const { run: buildCocosAuthoringProfile } = require('../../../scripts/build_cocos_authoring_profile');
+const { run: refreshMemoryIndexes } = require('../../lifecycle/refresh-memory-indexes');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -189,7 +189,7 @@ function printReport(results, rootOrContext) {
             console.log(`    配置: ${r.configPath}`);
             console.log(`    错误: ${r.error?.message?.split('\n')[0] || 'Unknown'}`);
             console.log(`    修复建议: 检查配置格式，运行:`);
-            console.log(`      node scripts/build_chain_kb.js --workspace-root ${context.workspaceRoot} --config ${path.relative(context.memoryRoot, r.configPath)}`);
+            console.log(`      node src/bin/build-feature.js --workspace-root ${context.workspaceRoot} --feature-key ${r.featureKey}`);
         });
     }
     
@@ -267,7 +267,7 @@ function doRebuild(args, rootOrContext) {
             `修复建议:\n` +
             `  1. 检查项目结构是否正确\n` +
             `  2. 确认有源代码可供扫描\n` +
-            `  3. 重新初始化项目记忆: node scripts/init_project_memory.js --workspace-root ${root}`
+            `  3. 重新初始化项目记忆: node src/bin/init-workspace.js --workspace-root ${root}`
         );
     }
     
@@ -293,7 +293,7 @@ function doRebuild(args, rootOrContext) {
 
     if (targets.length <= 0) {
         console.warn('[SKILL-WARN] 未找到可重建的 KB 配置');
-        console.log('[SKILL-INFO] 如需初始化，运行: node scripts/init_project_memory.js --workspace-root ' + root);
+        console.log('[SKILL-INFO] 如需初始化，运行: node src/bin/init-workspace.js --workspace-root ' + root);
         return;
     }
 

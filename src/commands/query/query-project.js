@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { readJson, resolveProjectRoot } = require('../src/shared/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
-const { run: runFeatureQuery } = require('./query_chain_kb');
+const { readJson, resolveProjectRoot } = require('../../shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
+const { run: runFeatureQuery } = require('../../query/query-chain');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -137,12 +137,12 @@ function loadProjectSummary(context) {
         builtWithSkill: graph.builtWithSkill || null,
         protocolsSummary: protocols.summary || {},
         examples: [
-            'node scripts/query_project_kb.js --workspace-root <project-root>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --message <message> --downstream',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --timing <query>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --phase <query>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --transition <query>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --state <state> --upstream',
+            'node src/bin/query-project.js --workspace-root <project-root>',
+            'node src/bin/query-project.js --workspace-root <project-root> --message <message> --downstream',
+            'node src/bin/query-project.js --workspace-root <project-root> --timing <query>',
+            'node src/bin/query-project.js --workspace-root <project-root> --phase <query>',
+            'node src/bin/query-project.js --workspace-root <project-root> --transition <query>',
+            'node src/bin/query-project.js --workspace-root <project-root> --state <state> --upstream',
         ],
     };
 }

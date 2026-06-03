@@ -3,11 +3,11 @@
  * 查看方法完整代码
  * 
  * 使用方法:
- *   node scripts/view_method_body.js --feature <key> --method <name> [--root <path>] [--file <script.ts>]
+ *   node src/bin/view-method-body.js --feature <key> --method <name> [--root <path>] [--file <script.ts>]
  * 
  * 示例:
- *   node scripts/view_method_body.js --feature game --method onOpenSmallSettlement --root E:\xile
- *   node scripts/view_method_body.js --feature game --method onRoundEnd --file xy-client/assets/script/game/Controller.ts
+ *   node src/bin/view-method-body.js --feature game --method onOpenSmallSettlement --root E:\xile
+ *   node src/bin/view-method-body.js --feature game --method onRoundEnd --file xy-client/assets/script/game/Controller.ts
  */
 
 const fs = require('fs');
@@ -97,11 +97,11 @@ function extractMethodFromSource(filePath, methodName) {
     return null;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     if (!args.feature || !args.method) {
-        console.log('Usage: node view_method_body.js --feature <key> --method <name> [--root <path>] [--file <script.ts>]');
+        console.log('Usage: node src/bin/view-method-body.js --feature <key> --method <name> [--root <path>] [--file <script.ts>]');
         process.exit(1);
     }
     
@@ -232,5 +232,14 @@ function main() {
     console.log('\n=== End ===');
 }
 
-main();
+module.exports = {
+    extractMethodFromSource,
+    loadScanData,
+    parseArgs,
+    run,
+};
+
+if (require.main === module) {
+    run();
+}
 

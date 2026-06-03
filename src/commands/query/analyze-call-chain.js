@@ -3,7 +3,7 @@
  * 分析调用链断裂原因
  * 
  * 使用方法:
- *   node scripts/analyze_call_chain.js --feature <key> --caller <method> --callee <method>
+ *   node src/bin/analyze-call-chain.js --feature <key> --caller <method> --callee <method>
  */
 
 const fs = require('fs');
@@ -133,14 +133,14 @@ function analyzeMethodCalls(data, callerName, calleeName) {
     return analysis;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     if (!args.feature || !args.caller || !args.callee) {
-        console.log('用法: node analyze_call_chain.js --feature <key> --caller <method> --callee <method> [--root <path>]');
+        console.log('用法: node src/bin/analyze-call-chain.js --feature <key> --caller <method> --callee <method> [--root <path>]');
         console.log('');
         console.log('示例:');
-        console.log('  node analyze_call_chain.js --feature liu-yang-san-shi-er-zhang --caller onRoundEnd --callee onOpenSmallSettlement');
+        console.log('  node src/bin/analyze-call-chain.js --feature liu-yang-san-shi-er-zhang --caller onRoundEnd --callee onOpenSmallSettlement');
         console.log('');
         console.log('注意: 方法名使用原始驼峰命名（如 onOpenSmallSettlement），不要手动转换为小写。');
         process.exit(1);
@@ -227,5 +227,15 @@ function main() {
     console.log('\n=== End ===');
 }
 
-main();
+module.exports = {
+    analyzeMethodCalls,
+    loadFeatureData,
+    parseArgs,
+    run,
+    slugify,
+};
+
+if (require.main === module) {
+    run();
+}
 

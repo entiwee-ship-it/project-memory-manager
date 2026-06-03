@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { hasOwn, readJson, readJsonSafe } = require('../src/shared/common');
-const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../src/graph/feature-kb');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
-const { loadSkillVersion } = require('./show_skill_version');
+const { hasOwn, readJson, readJsonSafe } = require('../shared/common');
+const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../graph/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
+const { loadSkillVersion } = require('../../scripts/show_skill_version');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -170,7 +170,7 @@ function parseArgs(argv) {
 
     if (!args.feature) {
         throw new Error(
-            '用法: node query_chain_kb.js --feature <key> [查询选项] [--json]\n\n' +
+            '用法: node src/bin/query-feature.js --feature <key> [查询选项] [--json]\n\n' +
             '基本查询:\n' +
             '  --method <name> [--upstream|--downstream]  查询方法上下游链路\n' +
             '  --event <name>                              查询事件订阅关系\n' +
@@ -222,7 +222,7 @@ function loadFeatureLookup(context, featureKey) {
             `  1. 项目记忆尚未初始化\n` +
             `  2. 当前目录不是项目根目录\n\n` +
             `修复命令:\n` +
-            `  node scripts/init_project_memory.js --workspace-root <project-root>\n` +
+            `  node src/bin/init-workspace.js --workspace-root <project-root>\n` +
             `  或切换到正确的项目目录`
         );
     }
@@ -243,7 +243,7 @@ function loadFeatureLookup(context, featureKey) {
             (normalizedFeatures.length > 10 ? `\n  ... 还有 ${normalizedFeatures.length - 10} 个` : '') +
             `\n\n修复命令:\n` +
             `  1. 检查 feature 名称是否正确\n` +
-            `  2. 构建该 feature: node scripts/build_chain_kb.js --workspace-root <project-root> --config <config-path>\n` +
+            `  2. 构建该 feature: node src/bin/build-feature.js --workspace-root <project-root> --feature-key <feature-key>\n` +
             `  3. 或重建全部: node src/bin/rebuild-kbs.js --workspace-root <project-root>`
         );
     }
@@ -253,7 +253,7 @@ function loadFeatureLookup(context, featureKey) {
 
 function currentSkillVersionInfo() {
     try {
-        return loadSkillVersion(path.resolve(__dirname, '..'));
+        return loadSkillVersion(path.resolve(__dirname, '..', '..'));
     } catch {
         return null;
     }
@@ -1235,7 +1235,7 @@ function buildRecommendedCommands(featureKey, lookup = {}) {
         `node src/bin/query-feature.js --feature ${featureKey} --downstream <query>`,
         `node src/bin/query-feature.js --feature ${featureKey} --method <name> --downstream`,
         `node src/bin/query-feature.js --feature ${featureKey} --type method --name <keyword>`,
-        `node scripts/query_chain_kb.js --feature ${featureKey} --downstream <query>`,
+        `node src/bin/query-chain.js --feature ${featureKey} --downstream <query>`,
     ];
 
     if (Array.isArray(lookup.nodesByType?.binding) && lookup.nodesByType.binding.length > 0) {

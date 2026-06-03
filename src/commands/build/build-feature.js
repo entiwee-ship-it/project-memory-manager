@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-const { run: buildChainKb } = require('../src/graph/build-chain-kb');
-const { writeJsonAtomic } = require('../src/shared/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
+const { run: buildChainKb } = require('../../graph/build-chain-kb');
+const { writeJsonAtomic } = require('../../shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 const {
     discoverFeaturesForContext,
     generateFeatureConfig,
     readFeatureCandidates,
     writeFeatureCandidates,
-} = require('../src/discovery/feature-discovery');
+} = require('../../discovery/feature-discovery');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -49,7 +49,7 @@ function parseArgs(argv) {
     }
 
     if (!args.featureKey) {
-        throw new Error('用法: node scripts/build_feature_index.js --workspace-root <project-root> --feature-key <key> [--dry-run]');
+        throw new Error('用法: node src/bin/build-feature.js --workspace-root <project-root> --feature-key <key> [--dry-run]');
     }
 
     return args;

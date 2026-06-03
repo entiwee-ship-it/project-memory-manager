@@ -9,8 +9,8 @@ const path = require('path');
 const os = require('os');
 
 const repoRoot = path.resolve(__dirname, '..');
-const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
-const { run: queryProjectKb } = require('../scripts/query_project_kb');
+const { run: detectProjectTopology } = require('../src/commands/lifecycle/detect-topology');
+const { run: queryProjectKb } = require('../src/commands/query/query-project');
 const { resolveProjectRoot, validateProjectRoot } = require('../src/shared/common');
 const { createWorkspaceContext } = require('../src/shared/workspace-layout');
 

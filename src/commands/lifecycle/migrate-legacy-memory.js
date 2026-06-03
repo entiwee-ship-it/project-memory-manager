@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ensureDir } = require('../src/shared/common');
+const { ensureDir } = require('../../shared/common');
 
 function parseArgs(argv) {
     const args = {

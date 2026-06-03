@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { buildLookup, run: buildChainKb } = require('../src/graph/build-chain-kb');
-const { ensureDir, hasDefaultIgnoredPathSegment, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('../src/shared/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
-const { learnProjectProtocols } = require('./learn_project_protocols');
+const { buildLookup, run: buildChainKb } = require('../../graph/build-chain-kb');
+const { ensureDir, hasDefaultIgnoredPathSegment, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('../../shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
+const { learnProjectProtocols } = require('../../lifecycle/learn-project-protocols');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -129,7 +129,7 @@ function buildProjectGlobalConfig(root, projectProfile, context = null) {
             `当前配置:\n` +
             `  areas: ${areas.length > 0 ? areas.join(', ') : '(空)'}\n\n` +
             `修复命令:\n` +
-            `  1. 运行拓扑检测: node scripts/detect_project_topology.js --workspace-root ${root}\n` +
+            `  1. 运行拓扑检测: node src/bin/detect-topology.js --workspace-root ${root}\n` +
             `  2. 或手动编辑: project-memory/state/project-profile.json\n\n` +
             `项目结构示例:\n` +
             `  Cocos项目: assets/ 目录包含场景和资源\n` +
@@ -306,12 +306,12 @@ function updateProjectGlobalReport(report, graph, lookup, protocols) {
         },
         queryExamples: unique([
             ...(report.queryExamples || []),
-            'node scripts/query_project_kb.js --workspace-root <project-root>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --message <message> --downstream',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --state <state> --upstream',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --timing <query>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --phase <query>',
-            'node scripts/query_project_kb.js --workspace-root <project-root> --transition <query>',
+            'node src/bin/query-project.js --workspace-root <project-root>',
+            'node src/bin/query-project.js --workspace-root <project-root> --message <message> --downstream',
+            'node src/bin/query-project.js --workspace-root <project-root> --state <state> --upstream',
+            'node src/bin/query-project.js --workspace-root <project-root> --timing <query>',
+            'node src/bin/query-project.js --workspace-root <project-root> --phase <query>',
+            'node src/bin/query-project.js --workspace-root <project-root> --transition <query>',
         ]),
     };
 }
@@ -333,10 +333,10 @@ function run(argv = process.argv.slice(2)) {
             `  1. 未指定 --workspace-root 参数，且当前目录不是项目根目录\n` +
             `  2. 尚未初始化 PMM 外置数据目录\n\n` +
             `修复方法:\n` +
-            `  1. 指定 --workspace-root 参数: node scripts/build_project_kb.js --workspace-root <项目路径>\n` +
+            `  1. 指定 --workspace-root 参数: node src/bin/build-project.js --workspace-root <项目路径>\n` +
             `  2. 或切换到项目目录后运行\n` +
             `  3. 或设置环境变量: set PMM_PROJECT_ROOT=<项目路径>\n` +
-            `  4. 初始化新项目: node scripts/init_project_memory.js --workspace-root <项目路径>`
+            `  4. 初始化新项目: node src/bin/init-workspace.js --workspace-root <项目路径>`
         );
     }
     
@@ -350,8 +350,8 @@ function run(argv = process.argv.slice(2)) {
             `  2. 当前目录不是项目根目录\n` +
             `  3. 初始化后未运行拓扑检测\n\n` +
             `修复命令:\n` +
-            `  1. 初始化项目: node scripts/init_project_memory.js --workspace-root ${root}\n` +
-            `  2. 检测拓扑: node scripts/detect_project_topology.js --workspace-root ${root}\n\n` +
+            `  1. 初始化项目: node src/bin/init-workspace.js --workspace-root ${root}\n` +
+            `  2. 检测拓扑: node src/bin/detect-topology.js --workspace-root ${root}\n\n` +
             `验证项目根目录:\n` +
             `  ls ${context.memoryRoot}`
         );

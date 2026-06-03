@@ -10,16 +10,16 @@ const cocosPrefabFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-prefab-sa
 const projectGlobalFixtureRoot = path.join(__dirname, 'fixtures', 'project-global-sample');
 const adminFullstackFixtureRoot = path.join(__dirname, 'fixtures', 'admin-fullstack-sample');
 const { run: buildChainKb } = require('../src/graph/build-chain-kb');
-const { run: buildProjectKb } = require('../scripts/build_project_kb');
+const { run: buildProjectKb } = require('../src/commands/build/build-project');
 const { buildLookup } = require('../src/graph/build-chain-kb');
-const { run: queryChainKb } = require('../scripts/query_chain_kb');
-const { run: queryKb } = require('../scripts/query_kb');
-const { run: queryProjectKb } = require('../scripts/query_project_kb');
+const { run: queryChainKb } = require('../src/query/query-chain');
+const { run: queryKb } = require('../src/commands/query/query-feature');
+const { run: queryProjectKb } = require('../src/commands/query/query-project');
 const { run: buildCocosAuthoringProfile } = require('../scripts/build_cocos_authoring_profile');
 const { run: cocosAuthoring } = require('../scripts/cocos_authoring');
 const { run: planCocosBinding } = require('../scripts/plan_cocos_binding');
-const { run: rebuildKbs } = require('../scripts/rebuild_kbs');
-const { run: refreshMemoryIndexes } = require('../scripts/refresh_memory_indexes');
+const { run: rebuildKbs } = require('../src/commands/lifecycle/rebuild-kbs');
+const { run: refreshMemoryIndexes } = require('../src/lifecycle/refresh-memory-indexes');
 const { detectInstallContext, loadSkillVersion, run: showSkillVersion } = require('../scripts/show_skill_version');
 const { validateSkillVersion } = require('../scripts/validate_skill_package');
 
@@ -815,7 +815,7 @@ function runProjectGlobalAssertions() {
     assert.ok(report.protocolLearning.timingPatterns >= 1);
     assert.ok(report.protocolLearning.phasePatterns >= 1);
     assert.ok(report.protocolLearning.transitionPatterns >= 1);
-    assert.ok(report.queryExamples.some(item => item.includes('query_project_kb.js')));
+    assert.ok(report.queryExamples.some(item => item.includes('src/bin/query-project.js')));
 
     const nestedCwd = path.join(tempRoot, 'client', 'assets', 'script', 'game');
     const projectSummary = parseTraversal(

@@ -8,13 +8,13 @@ const {
     parseLayoutArgs,
     workspaceIdFromRoot,
 } = require('../src/shared/workspace-layout');
-const { run: initProjectMemory } = require('../scripts/init_project_memory');
-const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
-const { run: buildProjectKb } = require('../scripts/build_project_kb');
+const { run: initProjectMemory } = require('../src/commands/lifecycle/init-workspace');
+const { run: detectProjectTopology } = require('../src/commands/lifecycle/detect-topology');
+const { run: buildProjectKb } = require('../src/commands/build/build-project');
 const { run: buildChainKb } = require('../src/graph/build-chain-kb');
-const { run: queryProjectKb } = require('../scripts/query_project_kb');
-const { run: queryKb } = require('../scripts/query_kb');
-const { run: refreshMemoryIndexes } = require('../scripts/refresh_memory_indexes');
+const { run: queryProjectKb } = require('../src/commands/query/query-project');
+const { run: queryKb } = require('../src/commands/query/query-feature');
+const { run: refreshMemoryIndexes } = require('../src/lifecycle/refresh-memory-indexes');
 const { run: buildCocosAuthoringProfile } = require('../scripts/build_cocos_authoring_profile');
 
 function testWorkspaceId() {

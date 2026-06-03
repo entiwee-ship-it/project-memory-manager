@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { normalize, readJson, resolveProjectRoot, timestamp, writeJson } = require('../src/shared/common');
-const { loadSkillVersion } = require('./show_skill_version');
+const { normalize, readJson, resolveProjectRoot, timestamp, writeJson } = require('../shared/common');
+const { loadSkillVersion } = require('../../scripts/show_skill_version');
 
 function parseArgs(argv) {
     const args = {
@@ -45,7 +45,7 @@ function parseArgs(argv) {
 }
 
 function loadCurrentSkillBuildInfo() {
-    const versionInfo = loadSkillVersion(path.resolve(__dirname, '..'));
+    const versionInfo = loadSkillVersion(path.resolve(__dirname, '..', '..'));
     return {
         name: versionInfo.name || '',
         version: versionInfo.version || '',
