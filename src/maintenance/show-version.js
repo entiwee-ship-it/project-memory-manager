@@ -6,7 +6,7 @@ const path = require('path');
 function parseArgs(argv) {
     const args = {
         text: false,
-        skillPath: path.resolve(__dirname, '..'),
+        skillPath: path.resolve(__dirname, '..', '..'),
     };
 
     for (const token of argv) {
@@ -50,7 +50,7 @@ function buildUpgradeGuidance(versionInfo, skillPath) {
         ? versionInfo.updateCommands
         : ['npx skills check', 'npx skills update'];
     const rebuildCommand = versionInfo.rebuildCommand
-        || 'node scripts/rebuild_kbs.js --workspace-root <project-root>';
+        || 'node src/bin/rebuild-kbs.js --workspace-root <project-root>';
 
     return {
         policy: versionInfo.upgradePolicy || 'edit-source-repo-only',

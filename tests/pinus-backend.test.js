@@ -15,13 +15,13 @@ const { buildLookup } = require('../src/graph/build-chain-kb');
 const { run: queryChainKb } = require('../src/query/query-chain');
 const { run: queryKb } = require('../src/commands/query/query-feature');
 const { run: queryProjectKb } = require('../src/commands/query/query-project');
-const { run: buildCocosAuthoringProfile } = require('../scripts/build_cocos_authoring_profile');
-const { run: cocosAuthoring } = require('../scripts/cocos_authoring');
-const { run: planCocosBinding } = require('../scripts/plan_cocos_binding');
+const { run: buildCocosAuthoringProfile } = require('../src/commands/cocos/build-cocos-authoring-profile');
+const { run: cocosAuthoring } = require('../src/commands/cocos/cocos-authoring');
+const { run: planCocosBinding } = require('../src/commands/cocos/plan-cocos-binding');
 const { run: rebuildKbs } = require('../src/commands/lifecycle/rebuild-kbs');
 const { run: refreshMemoryIndexes } = require('../src/lifecycle/refresh-memory-indexes');
-const { detectInstallContext, loadSkillVersion, run: showSkillVersion } = require('../scripts/show_skill_version');
-const { validateSkillVersion } = require('../scripts/validate_skill_package');
+const { detectInstallContext, loadSkillVersion, run: showSkillVersion } = require('../src/maintenance/show-version');
+const { validateSkillVersion } = require('../src/maintenance/validate-package');
 
 process.env.PMM_LAYOUT = process.env.PMM_LAYOUT || 'legacy-project-memory';
 

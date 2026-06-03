@@ -3,12 +3,12 @@
  * 诊断路径问题
  * 
  * 使用方法:
- *   node scripts/diagnose_paths.js [--workspace-root <path>]
+ *   node src/bin/diagnose-paths.js [--workspace-root <path>]
  */
 
 const fs = require('fs');
 const path = require('path');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -105,7 +105,7 @@ function findPathIssues(context) {
             issues.push({
                 severity: 'warning',
                 message: `${dir.name} 不存在: ${dir.path}`,
-                fix: `node scripts/init_project_memory.js ${layoutCommandArgs}`,
+                fix: `node src/bin/init-workspace.js ${layoutCommandArgs}`,
             });
         }
     }
@@ -114,7 +114,7 @@ function findPathIssues(context) {
         issues.push({
             severity: 'warning',
             message: `项目画像不存在: ${context.paths.projectProfile}`,
-            fix: `node scripts/detect_project_topology.js ${layoutCommandArgs}`,
+            fix: `node src/bin/detect-topology.js ${layoutCommandArgs}`,
         });
     }
     
@@ -173,8 +173,8 @@ function findPathIssues(context) {
     return issues;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     const context = createWorkspaceContext({
         workspaceRoot: args.root || process.cwd(),
         dataRoot: args.dataRoot,
@@ -194,9 +194,9 @@ function main() {
     // 测试路径解析
     console.log('路径解析测试:');
     const testPaths = [
-        'scripts/build_chain_kb.js',
-        './scripts/build_chain_kb.js',
-        'scripts\\build_chain_kb.js',
+        'src/bin/build-feature.js',
+        './src/bin/build-feature.js',
+        'src\\bin\\build-feature.js',
         context.paths.configsDir,
     ];
     
@@ -259,5 +259,14 @@ function main() {
     console.log('5. Windows 上注意大小写不敏感问题');
 }
 
-main();
+module.exports = {
+    findPathIssues,
+    parseArgs,
+    run,
+    testPathResolution,
+};
+
+if (require.main === module) {
+    run();
+}
 

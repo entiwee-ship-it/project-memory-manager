@@ -3,15 +3,15 @@
  * 诊断导入解析问题
  * 
  * 使用方法:
- *   node scripts/diagnose_import_resolution.js --root <project-root> --file <script-file>
+ *   node src/bin/diagnose-imports.js --root <project-root> --file <script-file>
  * 
  * 示例:
- *   node scripts/diagnose_import_resolution.js --root ./my-game --file ./my-game/app/modules/test.ts
+ *   node src/bin/diagnose-imports.js --root ./my-game --file ./my-game/app/modules/test.ts
  */
 
 const fs = require('fs');
 const path = require('path');
-const { createExtractContext } = require('./adapters/extract');
+const { createExtractContext } = require('../../adapters/extract');
 
 function parseArgs(argv) {
     const args = { root: '', file: '', adapter: 'fullstack' };
@@ -41,8 +41,8 @@ function extractImportsFromFile(filePath) {
     return imports;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     console.log('=== Import Resolution Diagnosis ===\n');
     console.log('Project Root:', args.root || '(not specified)');
@@ -51,7 +51,7 @@ function main() {
     
     if (!args.file) {
         console.error('\n❌ Error: --file is required');
-        console.log('\nUsage: node scripts/diagnose_import_resolution.js --root <project-root> --file <script-file> [--adapter <mode>]');
+        console.log('\nUsage: node src/bin/diagnose-imports.js --root <project-root> --file <script-file> [--adapter <mode>]');
         process.exit(1);
     }
     
@@ -129,5 +129,13 @@ function main() {
     console.log('\n=== Diagnosis Complete ===');
 }
 
-main();
+module.exports = {
+    extractImportsFromFile,
+    parseArgs,
+    run,
+};
+
+if (require.main === module) {
+    run();
+}
 

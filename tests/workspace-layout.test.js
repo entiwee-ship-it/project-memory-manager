@@ -15,7 +15,7 @@ const { run: buildChainKb } = require('../src/graph/build-chain-kb');
 const { run: queryProjectKb } = require('../src/commands/query/query-project');
 const { run: queryKb } = require('../src/commands/query/query-feature');
 const { run: refreshMemoryIndexes } = require('../src/lifecycle/refresh-memory-indexes');
-const { run: buildCocosAuthoringProfile } = require('../scripts/build_cocos_authoring_profile');
+const { run: buildCocosAuthoringProfile } = require('../src/commands/cocos/build-cocos-authoring-profile');
 
 function testWorkspaceId() {
     assert.equal(workspaceIdFromRoot('E:/xile-workspace'), 'e-xile-workspace');

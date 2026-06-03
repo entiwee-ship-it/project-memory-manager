@@ -4,7 +4,7 @@ const path = require('path');
 const { hasOwn, readJson, readJsonSafe } = require('../shared/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../graph/feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
-const { loadSkillVersion } = require('../../scripts/show_skill_version');
+const { loadSkillVersion } = require('../maintenance/show-version');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);

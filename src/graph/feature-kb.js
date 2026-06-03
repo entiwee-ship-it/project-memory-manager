@@ -195,9 +195,9 @@ function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
             `  1. 该 feature 尚未构建\n` +
             `  2. 构建后文件被移动或删除\n\n` +
             `修复命令:\n` +
-            `  node scripts/build_chain_kb.js --config ${normalized.configPath || `project-memory/kb/configs/${normalized.featureKey}.json`}\n` +
+            `  node src/bin/build-feature.js --workspace-root ${root} --feature-key ${normalized.featureKey || '<feature-key>'}\n` +
             `  或重建全部:\n` +
-            `  node scripts/rebuild_kbs.js --workspace-root ${root}`
+            `  node src/bin/rebuild-kbs.js --workspace-root ${root}`
         );
         error.code = 'KB_NOT_FOUND';
         error.featureKey = normalized.featureKey;
@@ -213,9 +213,9 @@ function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
             `  1. 该 feature 尚未构建\n` +
             `  2. 构建后文件被移动或删除\n\n` +
             `修复命令:\n` +
-            `  node scripts/build_chain_kb.js --config ${normalized.configPath || `project-memory/kb/configs/${normalized.featureKey}.json`}\n` +
+            `  node src/bin/build-feature.js --workspace-root ${root} --feature-key ${normalized.featureKey || '<feature-key>'}\n` +
             `  或重建全部:\n` +
-            `  node scripts/rebuild_kbs.js --workspace-root ${root}`
+            `  node src/bin/rebuild-kbs.js --workspace-root ${root}`
         );
         error.code = 'KB_NOT_FOUND';
         error.featureKey = normalized.featureKey;

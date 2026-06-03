@@ -76,13 +76,13 @@ function createDiagnosticError(context, error, filePath, options = {}) {
         if (suggestRebuild) {
             diagnostic += '修复命令:\n';
             if (featureKey) {
-                diagnostic += `  node scripts/build_chain_kb.js --config project-memory/kb/configs/${featureKey}.json\n`;
+                diagnostic += `  node src/bin/build-feature.js --workspace-root <project-root> --feature-key ${featureKey}\n`;
             } else {
-                diagnostic += '  node scripts/rebuild_kbs.js --workspace-root <project-root>\n';
+                diagnostic += '  node src/bin/rebuild-kbs.js --workspace-root <project-root>\n';
             }
         }
         if (suggestInit) {
-            diagnostic += '  node scripts/init_project_memory.js --workspace-root <project-root>\n';
+            diagnostic += '  node src/bin/init-workspace.js --workspace-root <project-root>\n';
         }
     } else if (error instanceof SyntaxError) {
         diagnostic += '可能原因:\n';
@@ -328,10 +328,23 @@ function resolveProjectRoot(startDir = process.cwd(), options = {}) {
         }
         // 非严格模式下发出警告并返回当前目录（保持向后兼容）
         console.warn(`[SKILL-WARN] 未找到 project-memory 目录，将使用当前目录: ${path.resolve(startDir)}`);
-        console.warn(`[SKILL-WARN] 如需初始化，运行: node scripts/init_project_memory.js --workspace-root <path>`);
+        console.warn(`[SKILL-WARN] 如需初始化，运行: node src/bin/init-workspace.js --workspace-root <path>`);
     }
     
     return foundRoot || path.resolve(startDir);
+}
+
+function cliEntrypointName(scriptName = 'script') {
+    const mapping = {
+        build_project_kb: 'build-project',
+        build_feature_index: 'build-feature',
+        detect_project_topology: 'detect-topology',
+        init_project_memory: 'init-workspace',
+        query_kb: 'query-feature',
+        query_project_kb: 'query-project',
+        rebuild_kbs: 'rebuild-kbs',
+    };
+    return mapping[scriptName] || String(scriptName || 'script').replace(/_/g, '-');
 }
 
 /**
@@ -344,6 +357,7 @@ function resolveProjectRoot(startDir = process.cwd(), options = {}) {
  */
 function validateProjectRoot(root, options = {}) {
     const { scriptName = 'script', requireRegistry = true } = options;
+    const cliEntrypoint = cliEntrypointName(scriptName);
     const pmDir = path.join(root, 'project-memory');
     const registryPath = path.join(pmDir, 'state', 'feature-registry.json');
     
@@ -355,10 +369,10 @@ function validateProjectRoot(root, options = {}) {
             `  1. 未指定 --workspace-root 参数，且当前目录不是项目根目录\n` +
             `  2. 项目尚未初始化（缺少 project-memory 目录）\n\n` +
             `修复方法:\n` +
-            `  1. 指定 --workspace-root 参数: node scripts/${scriptName}.js --workspace-root <项目路径> ...\n` +
+            `  1. 指定 --workspace-root 参数: node src/bin/${cliEntrypoint}.js --workspace-root <项目路径> ...\n` +
             `  2. 或切换到项目目录后运行\n` +
             `  3. 或设置环境变量: set PMM_PROJECT_ROOT=<项目路径>\n` +
-            `  4. 初始化新项目: node scripts/init_project_memory.js --workspace-root <项目路径>`
+            `  4. 初始化新项目: node src/bin/init-workspace.js --workspace-root <项目路径>`
         );
     }
     
@@ -370,8 +384,8 @@ function validateProjectRoot(root, options = {}) {
                 `[SKILL-DIAGNOSIS] 检测到在技能目录运行脚本: ${root}\n` +
                 `技能目录不能作为项目目录使用。\n\n` +
                 `修复方法:\n` +
-                `  1. 指定 --workspace-root 参数指向项目目录: node scripts/${scriptName}.js --workspace-root E:\\xile ...\n` +
-                `  2. 或切换到项目目录后运行: cd E:\\xile && node <技能路径>\\scripts\\${scriptName}.js ...\n` +
+                `  1. 指定 --workspace-root 参数指向项目目录: node src/bin/${cliEntrypoint}.js --workspace-root E:\\xile ...\n` +
+                `  2. 或切换到项目目录后运行: cd E:\\xile && node <技能路径>\\src\\bin\\${cliEntrypoint}.js ...\n` +
                 `  3. 或设置环境变量: set PMM_PROJECT_ROOT=E:\\xile`
             );
         }
@@ -380,8 +394,8 @@ function validateProjectRoot(root, options = {}) {
             `[SKILL-DIAGNOSIS] 项目尚未完全初始化: ${root}\n` +
             `提示: 未找到 feature-registry.json。\n\n` +
             `修复方法:\n` +
-            `  1. 初始化项目记忆: node scripts/init_project_memory.js --workspace-root ${root}\n` +
-            `  2. 或重建 KB: node scripts/rebuild_kbs.js --workspace-root ${root}`
+            `  1. 初始化项目记忆: node src/bin/init-workspace.js --workspace-root ${root}\n` +
+            `  2. 或重建 KB: node src/bin/rebuild-kbs.js --workspace-root ${root}`
         );
     }
 }
@@ -449,6 +463,7 @@ function timestamp() {
 module.exports = {
     DEFAULT_SCAN_IGNORE_SEGMENTS,
     DEFAULT_SCAN_IGNORE_PATH_PARTS,
+    cliEntrypointName,
     createDiagnosticError,
     ensureDir,
     findProjectRoot,

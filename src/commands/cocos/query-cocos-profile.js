@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
  * Cocos 创作配置查询 - AI 专用
- * 用法: node scripts/query_cocos_profile.js --root <path> [选项]
+ * 用法: node src/bin/query-cocos-profile.js --root <path> [选项]
  * 
  * 示例:
- *   node scripts/query_cocos_profile.js --list-features
- *   node scripts/query_cocos_profile.js --list-prefabs --filter golden
- *   node scripts/query_cocos_profile.js --find-node EggsTitle
- *   node scripts/query_cocos_profile.js --prefab-detail goldenEgg
+ *   node src/bin/query-cocos-profile.js --list-features
+ *   node src/bin/query-cocos-profile.js --list-prefabs --filter golden
+ *   node src/bin/query-cocos-profile.js --find-node EggsTitle
+ *   node src/bin/query-cocos-profile.js --prefab-detail goldenEgg
  */
 
 const path = require('path');
-const { readJson, resolveProjectRoot, normalize } = require('../src/shared/common');
+const { readJson, resolveProjectRoot, normalize } = require('../../shared/common');
 
 function parseArgs(argv) {
     const args = {

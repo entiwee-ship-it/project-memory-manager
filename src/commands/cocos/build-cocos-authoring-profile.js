@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { normalize, repoRelative } = require('../src/shared/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
+const { normalize, repoRelative } = require('../../shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 const {
     buildProjectAuthoringProfile,
     loadProjectAuthoringProfile,
     writeProjectAuthoringProfile,
-} = require('./lib/cocos-authoring');
+} = require('../../extraction/cocos/cocos-authoring');
 
 function displayPath(filePath, root) {
     const relative = repoRelative(filePath, root);

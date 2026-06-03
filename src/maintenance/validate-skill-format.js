@@ -159,7 +159,7 @@ function validateAssets() {
     checkDir(assetsDir);
 }
 
-function main() {
+function run() {
     console.log('=== Agent Skills 格式验证 ===\n');
     
     validateSkillMd();
@@ -195,4 +195,14 @@ function main() {
     return 0;
 }
 
-main();
+module.exports = {
+    run,
+    validateAssets,
+    validateDirectoryStructure,
+    validateScripts,
+    validateSkillMd,
+};
+
+if (require.main === module) {
+    run();
+}

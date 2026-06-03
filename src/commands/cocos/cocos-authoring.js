@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { resolveProjectRoot, readJson, validateProjectRoot } = require('../src/shared/common');
-const { normalizeFeatureRecord } = require('../src/graph/feature-kb');
+const { resolveProjectRoot, readJson, validateProjectRoot } = require('../../shared/common');
+const { normalizeFeatureRecord } = require('../../graph/feature-kb');
 const {
     buildAuthoringProfile,
     createAuthoringError,
@@ -12,10 +12,10 @@ const {
     loadProjectAuthoringProfile,
     planClickEvent,
     planFieldBinding,
-} = require('./lib/cocos-authoring');
-const { applyClickEventChange, applyFieldBindingChange } = require('./lib/cocos-authoring-apply');
-const { run: buildChainKb } = require('../src/graph/build-chain-kb');
-const { run: buildCocosAuthoringProfile } = require('./build_cocos_authoring_profile');
+} = require('../../extraction/cocos/cocos-authoring');
+const { applyClickEventChange, applyFieldBindingChange } = require('../../extraction/cocos/cocos-authoring-apply');
+const { run: buildChainKb } = require('../../graph/build-chain-kb');
+const { run: buildCocosAuthoringProfile } = require('./build-cocos-authoring-profile');
 
 function parseArgs(argv) {
     const args = {
@@ -136,7 +136,7 @@ function buildFeatureRebuildCommand(featureRecord) {
     if (!featureRecord?.configPath) {
         return '';
     }
-    return `node scripts/build_chain_kb.js --workspace-root <project-root> --config ${featureRecord.configPath}`;
+    return `node src/bin/build-feature.js --workspace-root <project-root> --config ${featureRecord.configPath}`;
 }
 
 function runQuietly(fn, argv) {
@@ -178,7 +178,7 @@ function ensureFeatureFresh(root, featureKey, autoActions = []) {
         throw createAuthoringError(`功能 KB 缺失或过期，但 registry 中没有 configPath: ${featureKey}`, {
             code: 'feature_kb_refresh_unavailable',
             nextActions: [
-                buildFeatureRebuildCommand(featureRecord) || 'node scripts/build_chain_kb.js --workspace-root <project-root> --config <config-path>',
+                buildFeatureRebuildCommand(featureRecord) || 'node src/bin/build-feature.js --workspace-root <project-root> --config <config-path>',
             ],
         });
     }

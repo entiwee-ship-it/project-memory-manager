@@ -3,7 +3,7 @@
  * 检查技能版本并提示更新
  * 
  * 使用方法:
- *   node scripts/check_skill_version.js [--fix]
+ *   node src/bin/check-version.js [--fix]
  * 
  * 选项:
  *   --fix  自动执行修复建议
@@ -102,8 +102,8 @@ function compareVersions(v1, v2) {
     return 0;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     console.log('=== Project Memory Manager Version Check ===\n');
     
@@ -180,7 +180,18 @@ function main() {
     console.log('\n=== 使用提示 ===');
     console.log('1. 如果 npx skills update 无效，尝试强制重装');
     console.log('2. 如果路径混乱，检查 AGENTS_CONFIG_DIR 环境变量');
-    console.log('3. 定期运行此检查: node scripts/check_skill_version.js');
+    console.log('3. 定期运行此检查: node src/bin/check-version.js');
 }
 
-main();
+module.exports = {
+    compareVersions,
+    findSkillInstallPath,
+    getLocalVersion,
+    getRemoteVersion,
+    parseArgs,
+    run,
+};
+
+if (require.main === module) {
+    run();
+}

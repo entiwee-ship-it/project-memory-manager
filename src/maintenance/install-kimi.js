@@ -6,7 +6,7 @@
  * 支持首次安装和后续更新。
  * 
  * 使用方式:
- *   node scripts/install_to_kimi_cli.js [--update]
+ *   node src/bin/install-kimi.js [--update]
  * 
  * 参数:
  *   --update    更新模式（拉取最新代码）
@@ -72,8 +72,8 @@ function runCommand(command, cwd, dryRun = false) {
 }
 
 // 主函数
-function main() {
-    const args = process.argv.slice(2);
+function run(argv = process.argv.slice(2)) {
+    const args = argv;
     const isUpdate = args.includes('--update');
     const isForce = args.includes('--force');
     const dryRun = args.includes('--dry-run');
@@ -97,7 +97,7 @@ function main() {
         log('  - Kimi CLI 未安装');
         log('  - 技能目录路径不在预设列表中');
         log('\n请手动指定技能目录路径:');
-        log(`  node scripts/install_to_kimi_cli.js --skills-dir <路径>`);
+        log(`  node src/bin/install-kimi.js --skills-dir <路径>`);
         process.exit(1);
     }
     
@@ -166,7 +166,7 @@ function main() {
         log('\n5. 生产环境优化（可选）...', 'cyan');
         log('  如需清理非必要文件，请运行:', 'yellow');
         log(`  cd "${skillDir}"`, 'cyan');
-        log('  node scripts/clean_for_production.js --level=standard', 'cyan');
+        log('  node src/bin/clean-production.js --level=standard', 'cyan');
 
         // 6. 完成
         log('\n' + '='.repeat(60), 'green');
@@ -179,7 +179,7 @@ function main() {
         
         if (!isUpdate) {
             log('\n后续更新:', 'cyan');
-            log('  node scripts/install_to_kimi_cli.js --update');
+            log('  node src/bin/install-kimi.js --update');
         }
 
         log('');
@@ -191,9 +191,9 @@ function main() {
 }
 
 // 导出供其他脚本使用
-module.exports = { findKimiSkillsDir, SKILL_NAME, REPO_URL };
+module.exports = { findKimiSkillsDir, run, SKILL_NAME, REPO_URL };
 
 // 直接运行
 if (require.main === module) {
-    main();
+    run();
 }

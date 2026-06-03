@@ -4,13 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { spawn, spawnSync } = require('child_process');
-const { createWorkspaceContext } = require('../src/shared/workspace-layout');
-const { run: initProjectMemory } = require('./init_project_memory');
-const { run: detectProjectTopology } = require('./detect_project_topology');
-const { run: buildProjectKb } = require('./build_project_kb');
-const { run: discoverFeaturesCli } = require('./discover_features');
-const { run: buildFeatureIndexCli } = require('./build_feature_index');
-const { loadSkillVersion } = require('./show_skill_version');
+const { createWorkspaceContext } = require('../shared/workspace-layout');
+const { run: initProjectMemory } = require('../commands/lifecycle/init-workspace');
+const { run: detectProjectTopology } = require('../commands/lifecycle/detect-topology');
+const { run: buildProjectKb } = require('../commands/build/build-project');
+const { run: discoverFeaturesCli } = require('../commands/build/discover-features');
+const { run: buildFeatureIndexCli } = require('../commands/build/build-feature');
+const { loadSkillVersion } = require('../maintenance/show-version');
 
 const jobs = new Map();
 let nextJobId = 1;
@@ -521,8 +521,8 @@ function createJob(type, args) {
 function runNodeScript(job, phase, scriptName, args) {
     return new Promise(resolve => {
         job.phase = phase;
-        const child = spawn(process.execPath, [path.join(__dirname, scriptName), ...args], {
-            cwd: path.resolve(__dirname, '..'),
+        const child = spawn(process.execPath, [path.resolve(__dirname, '..', 'bin', scriptName), ...args], {
+            cwd: path.resolve(__dirname, '..', '..'),
             windowsHide: true,
         });
         child.stdout.on('data', chunk => {
@@ -547,21 +547,21 @@ async function runBuildJob(job) {
     job.status = 'running';
     job.startedAt = new Date().toISOString();
     const args = layoutArgv(job.args);
-    const initOk = await runNodeScript(job, 'init', 'init_project_memory.js', args);
+    const initOk = await runNodeScript(job, 'init', 'init-workspace.js', args);
     if (!initOk) {
         job.status = 'failed';
         job.endedAt = new Date().toISOString();
         return;
     }
     if (job.args.forceTopology !== false) {
-        const topologyOk = await runNodeScript(job, 'topology', 'detect_project_topology.js', args);
+        const topologyOk = await runNodeScript(job, 'topology', 'detect-topology.js', args);
         if (!topologyOk) {
             job.status = 'failed';
             job.endedAt = new Date().toISOString();
             return;
         }
     }
-    const buildOk = await runNodeScript(job, 'build', 'build_project_kb.js', args);
+    const buildOk = await runNodeScript(job, 'build', 'build-project.js', args);
     job.status = buildOk ? 'succeeded' : 'failed';
     job.phase = buildOk ? 'done' : job.phase;
     job.endedAt = new Date().toISOString();
@@ -635,8 +635,8 @@ function buildFeatureIndex(args) {
 
 function runQueryScript(scriptName, argv, timeoutMs) {
     const startedAt = Date.now();
-    const child = spawnSync(process.execPath, [path.join(__dirname, scriptName), ...argv], {
-        cwd: path.resolve(__dirname, '..'),
+    const child = spawnSync(process.execPath, [path.resolve(__dirname, '..', 'bin', scriptName), ...argv], {
+        cwd: path.resolve(__dirname, '..', '..'),
         encoding: 'utf8',
         windowsHide: true,
         timeout: timeoutMs,
@@ -740,7 +740,7 @@ function queryProjectChain(args) {
         }, queryMeta));
     }
 
-    const result = runQueryScript('query_project_kb.js', argv, options.timeoutMs);
+    const result = runQueryScript('query-project.js', argv, options.timeoutMs);
     if (!result.ok) {
         return textResult({
             ok: false,
@@ -782,7 +782,7 @@ function queryFeatureChain(args) {
     const options = resolveMcpQueryOptions(args);
     const argv = [...layoutArgv(args), '--feature', args.feature, '--json'];
     appendQuerySelectorArgs(argv, args, options);
-    const result = runQueryScript('query_kb.js', argv, options.timeoutMs);
+    const result = runQueryScript('query-feature.js', argv, options.timeoutMs);
     if (!result.ok) {
         return textResult({
             ok: false,
@@ -811,7 +811,7 @@ function queryFeatureChain(args) {
 
 async function handleMcpRequest(request) {
     if (request.method === 'initialize') {
-        const version = loadSkillVersion(path.resolve(__dirname, '..')).version;
+        const version = loadSkillVersion(path.resolve(__dirname, '..', '..')).version;
         return {
             jsonrpc: '2.0',
             id: request.id,
@@ -889,7 +889,7 @@ function startStdioServer() {
     });
 }
 
-module.exports = { handleMcpRequest, startStdioServer };
+module.exports = { handleMcpRequest, run: startStdioServer, startStdioServer };
 
 if (require.main === module) {
     startStdioServer();

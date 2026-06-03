@@ -3,7 +3,7 @@
  * 清理技能生成的临时文件和残留配置
  * 
  * 使用方法:
- *   node scripts/clean_temp_files.js [--dry-run]
+ *   node src/bin/clean-temp.js [--dry-run]
  * 
  * 选项:
  *   --dry-run  只显示要删除的文件，不实际删除
@@ -158,8 +158,8 @@ function deletePath(targetPath, dryRun = false) {
     }
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     console.log('=== Project Memory Manager 清理工具 ===\n');
     
@@ -227,4 +227,14 @@ function main() {
     console.log('3. 删除 feature 时同时删除对应 KB 配置');
 }
 
-main();
+module.exports = {
+    deletePath,
+    findFilesToClean,
+    findProjectRoot,
+    parseArgs,
+    run,
+};
+
+if (require.main === module) {
+    run();
+}

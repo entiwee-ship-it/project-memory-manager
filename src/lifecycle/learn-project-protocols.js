@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { normalize, readJson, resolveProjectRoot, timestamp, writeJson } = require('../shared/common');
-const { loadSkillVersion } = require('../../scripts/show_skill_version');
+const { loadSkillVersion } = require('../maintenance/show-version');
 
 function parseArgs(argv) {
     const args = {

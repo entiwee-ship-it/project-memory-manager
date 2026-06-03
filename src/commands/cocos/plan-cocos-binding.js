@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { run: runCocosAuthoring } = require('./cocos_authoring');
+const { run: runCocosAuthoring } = require('./cocos-authoring');
 
 function translateArgs(argv = []) {
     const translated = [];

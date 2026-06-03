@@ -16,7 +16,7 @@ const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/worksp
 const { run: buildChainKb } = require('../../graph/build-chain-kb');
 const { withLock } = require('../../shared/lock');
 const { run: buildProjectKb } = require('../build/build-project');
-const { run: buildCocosAuthoringProfile } = require('../../../scripts/build_cocos_authoring_profile');
+const { run: buildCocosAuthoringProfile } = require('../cocos/build-cocos-authoring-profile');
 const { run: refreshMemoryIndexes } = require('../../lifecycle/refresh-memory-indexes');
 
 function parseArgs(argv) {

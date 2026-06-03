@@ -8,7 +8,7 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const RELEASE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function parseArgs(argv) {
-    const defaultSkillPath = path.resolve(__dirname, '..');
+    const defaultSkillPath = path.resolve(__dirname, '..', '..');
     return {
         skillPath: path.resolve(argv[0] || defaultSkillPath),
     };
@@ -208,8 +208,8 @@ function validateSkillVersion(skillPath, expectedSkillName) {
     if (installCommand && !/skills add/.test(installCommand)) {
         return fail("skill-version.json 的 installCommand 必须包含 skills add");
     }
-    if (rebuildCommand && !/rebuild_kbs\.js/.test(rebuildCommand)) {
-        return fail("skill-version.json 的 rebuildCommand 必须指向 rebuild_kbs.js");
+    if (rebuildCommand && !/src\/bin\/rebuild-kbs\.js/.test(rebuildCommand.replace(/\\/g, '/'))) {
+        return fail("skill-version.json 的 rebuildCommand 必须指向 src/bin/rebuild-kbs.js");
     }
     if (updateCommands && updateCommands.some(item => typeof item !== 'string' || !item.trim())) {
         return fail("skill-version.json 的 updateCommands 必须是字符串数组");

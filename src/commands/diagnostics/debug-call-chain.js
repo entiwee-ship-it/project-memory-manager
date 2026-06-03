@@ -3,7 +3,7 @@
  * 调试调用链问题
  * 
  * 使用方法:
- *   node scripts/debug_call_chain.js --feature <feature-key> --method <method-name>
+ *   node src/bin/debug-call-chain.js --feature <feature-key> --method <method-name>
  */
 
 const fs = require('fs');
@@ -41,8 +41,8 @@ function loadFeatureData(featureKey) {
     return result;
 }
 
-function main() {
-    const args = parseArgs(process.argv.slice(2));
+function run(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     
     if (!args.feature || !args.method) {
         console.log('Usage: node debug_call_chain.js --feature <key> --method <name>');
@@ -121,4 +121,12 @@ function main() {
     console.log('\n=== Debug Complete ===');
 }
 
-main();
+module.exports = {
+    loadFeatureData,
+    parseArgs,
+    run,
+};
+
+if (require.main === module) {
+    run();
+}

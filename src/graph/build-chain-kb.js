@@ -6,7 +6,7 @@ const { runExtract } = require('../extraction/extract-feature-facts');
 const { hasOwn, inferArea, inferStacks, normalize, pathExists, readJson, readJsonSafe, repoRelative, slugify, timestamp, writeJson, writeJsonAtomic } = require('../shared/common');
 const { normalizeConfig, normalizeFeatureRecord } = require('./feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
-const { loadSkillVersion } = require('../../scripts/show_skill_version');
+const { loadSkillVersion } = require('../maintenance/show-version');
 
 function loadCurrentSkillBuildInfo() {
     const versionInfo = loadSkillVersion(path.resolve(__dirname, '..', '..'));
@@ -44,7 +44,7 @@ function parseArgs(argv) {
         }
     }
     if (!args.config) {
-        throw new Error('用法: node build_chain_kb.js --config <path> [--root <repo-root>]');
+        throw new Error('用法: node src/bin/build-feature.js --workspace-root <repo-root> --feature-key <key>');
     }
     return args;
 }
@@ -489,7 +489,7 @@ function buildKbArtifactGuide(outputs = {}) {
         {
             key: 'lookup',
             file: outputs.lookup || '',
-            purpose: '查询索引，供 query_kb.js / query_chain_kb.js 读取。',
+            purpose: '查询索引，供 query-feature / query-chain 读取。',
             useWhen: '通常不要手读；只有调试查询脚本或排查索引异常时才打开。',
             priority: 3,
         },

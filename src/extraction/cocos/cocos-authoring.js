@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { normalize, pathExists, readJson, timestamp, writeJson } = require('../../src/shared/common');
-const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../../src/graph/feature-kb');
-const { createWorkspaceContext } = require('../../src/shared/workspace-layout');
-const { loadSkillVersion } = require('../show_skill_version');
+const { normalize, pathExists, readJson, timestamp, writeJson } = require('../../shared/common');
+const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../../graph/feature-kb');
+const { createWorkspaceContext } = require('../../shared/workspace-layout');
+const { loadSkillVersion } = require('../../maintenance/show-version');
 
 function normalizeText(value) {
     return String(value || '').trim().toLowerCase();
@@ -39,7 +39,7 @@ function slugifyValue(value = '') {
 
 function loadCurrentSkillBuildInfo() {
     try {
-        const versionInfo = loadSkillVersion(path.resolve(__dirname, '..', '..'));
+        const versionInfo = loadSkillVersion(path.resolve(__dirname, '..', '..', '..'));
         return {
             name: versionInfo.name || '',
             version: versionInfo.version || '',

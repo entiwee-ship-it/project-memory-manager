@@ -6,7 +6,7 @@
  * 减小体积并避免不必要的文件干扰。
  * 
  * 使用方式:
- *   node scripts/clean_for_production.js [--level=standard] [--dry-run]
+ *   node src/bin/clean-production.js [--level=standard] [--dry-run]
  * 
  * 清理级别:
  *   minimal  - 仅清理最大的非必要文件（.git、tests）
@@ -98,19 +98,19 @@ const CORE_FILES = [
     'SKILL.md',
     'skill-version.json',
     'package.json',
-    'scripts/init_project_memory.js',
-    'scripts/build_chain_kb.js',
-    'scripts/query_kb.js',
-    'scripts/query_project_kb.js',
-    'scripts/build_project_kb.js',
+    'src/bin/init-workspace.js',
+    'src/bin/build-feature.js',
+    'src/bin/query-feature.js',
+    'src/bin/query-project.js',
+    'src/bin/build-project.js',
     'references/core/kb-schema.md',
     'references/core/work-protocols.md',
     'agents/openai.yaml'
 ];
 
 // 主函数
-function main() {
-    const args = process.argv.slice(2);
+function run(argv = process.argv.slice(2)) {
+    const args = argv;
     const dryRun = args.includes('--dry-run');
     
     // 解析清理级别
@@ -126,7 +126,7 @@ function main() {
         process.exit(1);
     }
     
-    const skillRoot = path.resolve(__dirname, '..');
+    const skillRoot = path.resolve(__dirname, '..', '..');
     const rules = CLEANUP_RULES[level];
     
     console.log('='.repeat(60));
@@ -263,10 +263,11 @@ module.exports = {
     CLEANUP_RULES,
     CORE_FILES,
     formatSize,
-    getDirSize
+    getDirSize,
+    run,
 };
 
 // 直接运行
 if (require.main === module) {
-    main();
+    run();
 }
