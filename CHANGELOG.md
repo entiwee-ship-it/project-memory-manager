@@ -7,6 +7,17 @@
 
 ## [未发布]
 
+## [0.23.0] - 2026-06-03
+
+### 破坏性变更
+- 删除旧 `scripts/*.js` 入口，所有 CLI 和 MCP 启动路径统一切换为 `src/bin/*.js`。
+- 根目录不再保留运行态 `project-memory/`，项目记忆数据继续通过 `--data-root` 或 MCP 配置外置管理。
+
+### 改进
+- 源码按 `bin`、`commands`、`mcp`、`extraction`、`graph`、`query`、`discovery`、`adapters`、`maintenance`、`shared` 分层，降低命令入口和核心模块耦合。
+- 重写 README、SKILL 和分层文档，明确 MCP-first 使用方式、external-data 边界、CLI 命令和源码维护入口。
+- 新增源码布局回归测试，防止后续重新引入旧 `scripts` 入口或根运行态记忆目录。
+
 ## [0.22.0] - 2026-06-03
 
 ### 新增

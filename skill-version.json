@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "releaseDate": "2026-06-03",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -59,6 +59,7 @@
     "mcp-query-cache",
     "mcp-query-timeout-limit",
     "workspace-tooling-scan-guard",
-    "admin-fullstack-feature-discovery"
+    "admin-fullstack-feature-discovery",
+    "src-layout-restructure"
   ]
 }
