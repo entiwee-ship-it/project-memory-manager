@@ -13,7 +13,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 - 需要创建 feature KB 时，先通过 MCP `discover_features` 发现候选，再用 `build_feature_index` 对确认的候选生成并构建 KB；MCP 不可用时运行 `scripts/discover_features.js --workspace-root <repo-root>` 和 `scripts/build_feature_index.js --workspace-root <repo-root> --feature-key <key>`
 - 当问题本质是"为什么这个阶段太早/太晚切换""为什么动画没播完就进下一步"这类业务时序问题时，优先看 `timing / phase / transition` patterns
 - 构建或刷新链路 KB 时，先读 `references/core/kb-schema.md`，再按技术栈读取对应 `references/adapters/*.md`，准备配置后运行 `scripts/build_chain_kb.js --config ...`
-- 查询调用链、事件、request、state 时，优先通过 MCP `query_project_chain`，MCP 不可用时运行 `scripts/query_project_kb.js --workspace-root <repo-root>`；当范围已经缩到 feature 再用 `scripts/query_kb.js --feature ...`
+- 查询调用链、事件、request、state 时，优先通过 MCP `query_project_chain`；当范围已经缩到 feature，优先通过 MCP `query_feature_chain`；MCP 不可用时再运行 `scripts/query_project_kb.js --workspace-root <repo-root>` 或 `scripts/query_kb.js --feature ...`
 - 当任务是"给 Cocos 节点挂脚本、补点击事件、给脚本字段绑节点/组件/资源"时，先读 `references/adapters/cocos.md`，再运行 `scripts/cocos_authoring.js`
 - 校验技能包或在新环境自举依赖时，先读 `references/core/validation.md`，再在技能根目录运行 `python scripts/validate_skill_runtime.py . --mode auto`
 - 需要扩展新技术栈、补拓扑规则或制定前后端协同时，先读 `references/core/adapter-protocol.md` 与 `references/core/fullstack-coordination.md`
@@ -21,7 +21,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 
 ## 默认工作流
 
-- 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result`、`discover_features`、`build_feature_index` 和 `query_project_chain`
+- 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result`、`discover_features`、`build_feature_index`、`query_project_chain` 和 `query_feature_chain`
 - MCP 不可用时，再调用 CLI 脚本
 - CLI 默认使用 external-data layout，记忆、KB、状态、报告、锁和临时产物写入 PMM data root
 - legacy `project-memory/` 只在显式 `--layout legacy-project-memory` 时使用
@@ -144,7 +144,7 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
 - 全局时序查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --timing <query>`
 - 全局阶段查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --phase <query>`
 - 全局状态转换查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --transition <query>`
-- 当范围已经缩小到单一 feature，再运行 `node scripts/query_kb.js --feature <feature-key> ...`
+- 当范围已经缩小到单一 feature，优先通过 MCP `query_feature_chain` 查询；MCP 不可用时再运行 `node scripts/query_kb.js --feature <feature-key> ...`
 - 若已经在技能根目录，可直接运行 `node scripts/query_kb.js --feature <feature-key> ...`
 - 若不在技能根目录，再使用 `node <skill-path>/scripts/query_kb.js --feature <feature-key> ...`
 - 若只执行 `--feature <key>`，脚本会先返回 feature 摘要、默认排查顺序、推荐命令和各 KB 文件用途

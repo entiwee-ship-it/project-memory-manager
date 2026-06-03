@@ -235,6 +235,11 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 - `node scripts/query_project_kb.js --workspace-root <project-root>`
 - `node scripts/query_kb.js --feature <feature-key>`
 
+通过 MCP 使用时，对应入口是：
+
+- `query_project_chain`：查询 project-global KB
+- `query_feature_chain`：查询单个 feature KB，并保留 `recommendations.groups` 消歧推荐
+
 当你还不知道该读哪个 KB 文件时，不要先手翻 `chain.graph.json` 或 `chain.lookup.json`，先跑上面的命令看 project / feature 摘要。
 
 这也是这个技能存在的核心原因：避免 AI 一上来就退回到全仓库搜索。
@@ -247,6 +252,7 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 - 项目级协议学习（message / dispatcher / state pattern）
 - 项目级业务时序学习（timing / phase / transition pattern）
 - project 级查询入口
+- MCP feature 级查询入口
 - feature 候选自动发现
 - 候选驱动的 feature KB 配置生成
 - 歧义查询推荐入口分组

@@ -3,6 +3,8 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { handleMcpRequest } = require('../scripts/mcp_server');
+const { buildLookup } = require('../scripts/build_chain_kb');
+const { createWorkspaceContext } = require('../scripts/lib/workspace-layout');
 
 function makeWorkspace(prefix = 'pmm-mcp-workspace-') {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -68,6 +70,73 @@ function writeFeatureDiscoveryWorkspace(workspaceRoot) {
     ].join('\n'));
 }
 
+function writeAmbiguousFeatureKb(workspaceRoot, dataRoot) {
+    const context = createWorkspaceContext({
+        workspaceRoot,
+        dataRoot,
+        layout: 'external-data',
+    });
+    const featureKey = 'ambiguous-entrypoints';
+    const kbDir = path.join(context.paths.featuresDir, featureKey);
+    fs.mkdirSync(kbDir, { recursive: true });
+    fs.mkdirSync(context.paths.stateDir, { recursive: true });
+    const graph = {
+        featureKey,
+        featureName: 'Ambiguous Entrypoints',
+        nodes: [
+            {
+                id: 'endpoint:club:create',
+                type: 'endpoint',
+                name: 'POST /club/createClub',
+                file: 'app/http/routes/club.ts',
+                line: 12,
+                area: 'backend',
+                meta: { method: 'POST', path: '/club/createClub', tags: ['createclub', 'club'] },
+            },
+            {
+                id: 'route:club:create',
+                type: 'route',
+                name: 'pkplayer.Rpc.createClub',
+                file: 'app/servers/pkplayer/remote/Rpc.ts',
+                line: 31,
+                area: 'backend',
+                meta: { route: 'pkplayer.Rpc.createClub', kind: 'pinus-remote', protocol: 'pinus-rpc', tags: ['createclub', 'club'] },
+            },
+            {
+                id: 'method:club:handler',
+                type: 'method',
+                name: 'ClubService.handleCreateClub',
+                file: 'app/modules/club/ClubService.ts',
+                line: 50,
+                area: 'backend',
+                meta: { methodName: 'handleCreateClub', tags: ['createclub', 'club'] },
+            },
+        ],
+        edges: [],
+    };
+    const lookup = buildLookup(graph);
+    fs.writeFileSync(path.join(kbDir, 'chain.graph.json'), `${JSON.stringify(graph, null, 2)}\n`);
+    fs.writeFileSync(path.join(kbDir, 'chain.lookup.json'), `${JSON.stringify(lookup, null, 2)}\n`);
+    fs.writeFileSync(
+        context.paths.featureRegistry,
+        `${JSON.stringify({
+            generatedAt: '2026-06-03T00:00:00.000Z',
+            features: [
+                {
+                    featureKey,
+                    featureName: 'Ambiguous Entrypoints',
+                    kbDir,
+                    outputs: {
+                        graph: path.join(kbDir, 'chain.graph.json'),
+                        lookup: path.join(kbDir, 'chain.lookup.json'),
+                    },
+                },
+            ],
+        }, null, 2)}\n`
+    );
+    return featureKey;
+}
+
 async function testToolsList() {
     const response = await handleMcpRequest({
         jsonrpc: '2.0',
@@ -91,6 +160,7 @@ async function testToolsList() {
         'discover_features',
         'build_feature_index',
         'query_project_chain',
+        'query_feature_chain',
     ]) {
         assert.ok(names.includes(expectedName), `missing MCP tool: ${expectedName}`);
     }
@@ -270,6 +340,34 @@ async function testDiscoverAndBuildFeatureIndexDryRun() {
     assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
 }
 
+async function testQueryFeatureChainViaMcp() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    const feature = writeAmbiguousFeatureKb(workspaceRoot, dataRoot);
+
+    const summaryResponse = await callTool('query_feature_chain', {
+        workspaceRoot,
+        dataRoot,
+        feature,
+    });
+    const summary = parseTextResult(summaryResponse);
+    assert.equal(summary.kind, 'feature-summary');
+    assert.equal(summary.feature.featureKey, feature);
+
+    const chainResponse = await callTool('query_feature_chain', {
+        workspaceRoot,
+        dataRoot,
+        feature,
+        downstream: true,
+        from: 'createClub',
+    });
+    const chain = parseTextResult(chainResponse);
+    assert.ok(Array.isArray(chain.ambiguous));
+    assert.ok(chain.recommendations);
+    assert.ok(chain.recommendations.groups.some(group => group.key === 'http-endpoint'));
+    assert.ok(chain.recommendations.groups.some(group => group.key === 'pinus-route'));
+    assert.ok(chain.recommendations.groups.some(group => group.key === 'method'));
+}
+
 Promise.all([
     testInitialize(),
     testToolsList(),
@@ -279,6 +377,7 @@ Promise.all([
     testBuildProjectIndexAutoPreparesWorkspace(),
     testAsyncBuildJob(),
     testDiscoverAndBuildFeatureIndexDryRun(),
+    testQueryFeatureChainViaMcp(),
 ])
     .then(() => console.log('mcp-server validation passed'))
     .catch(error => {

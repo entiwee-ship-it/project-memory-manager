@@ -11,6 +11,7 @@ const { run: buildProjectKb } = require('./build_project_kb');
 const { run: discoverFeaturesCli } = require('./discover_features');
 const { run: buildFeatureIndexCli } = require('./build_feature_index');
 const { run: queryProjectKb } = require('./query_project_kb');
+const { run: queryFeatureKb } = require('./query_kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
 const jobs = new Map();
@@ -183,6 +184,34 @@ const TOOL_DEFINITIONS = [
                 depth: { type: 'number' },
             },
             required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'query_feature_chain',
+        description: 'Query a feature KB from PMM data root, including grouped ambiguous entrypoint recommendations.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                feature: { type: 'string' },
+                event: { type: 'string' },
+                message: { type: 'string' },
+                method: { type: 'string' },
+                request: { type: 'string' },
+                state: { type: 'string' },
+                type: { type: 'string' },
+                name: { type: 'string' },
+                tag: { type: 'string' },
+                file: { type: 'string' },
+                from: { type: 'string' },
+                direction: { type: 'string' },
+                upstream: { type: 'boolean' },
+                downstream: { type: 'boolean' },
+                limit: { type: 'number' },
+                depth: { type: 'number' },
+            },
+            required: ['workspaceRoot', 'feature'],
         },
     },
 ];
@@ -515,6 +544,28 @@ function queryProjectChain(args) {
     return textResult(captured.output);
 }
 
+function queryFeatureChain(args) {
+    const argv = [...layoutArgv(args), '--feature', args.feature, '--json'];
+    for (const key of ['event', 'message', 'method', 'request', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
+        if (args[key]) {
+            argv.push(`--${key}`, args[key]);
+        }
+    }
+    for (const key of ['limit', 'depth']) {
+        if (Number.isFinite(args[key])) {
+            argv.push(`--${key}`, String(args[key]));
+        }
+    }
+    if (args.upstream) {
+        argv.push('--upstream');
+    }
+    if (args.downstream) {
+        argv.push('--downstream');
+    }
+    const captured = captureConsoleLog(() => queryFeatureKb(argv));
+    return textResult(captured.output);
+}
+
 async function handleMcpRequest(request) {
     if (request.method === 'initialize') {
         const version = loadSkillVersion(path.resolve(__dirname, '..')).version;
@@ -558,7 +609,9 @@ async function handleMcpRequest(request) {
                                                     ? buildFeatureIndex(args)
                                                     : name === 'query_project_chain'
                                                         ? queryProjectChain(args)
-                                                        : textResult({ error: `Unknown tool: ${name}` });
+                                                        : name === 'query_feature_chain'
+                                                            ? queryFeatureChain(args)
+                                                            : textResult({ error: `Unknown tool: ${name}` });
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {
