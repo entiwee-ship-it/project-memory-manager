@@ -3,7 +3,7 @@
  * 结构化语义摘要提取器测试
  */
 
-const { extractStructuredSummary, simplifyExpression, calculateComplexity } = require('../scripts/extract_structured_summary');
+const { extractStructuredSummary, simplifyExpression, calculateComplexity } = require('../src/extraction/summary/extract-structured-summary');
 
 // 测试工具函数
 function assertEqual(actual, expected, message) {

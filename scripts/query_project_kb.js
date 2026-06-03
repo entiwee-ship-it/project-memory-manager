@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { readJson, resolveProjectRoot } = require('./lib/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { readJson, resolveProjectRoot } = require('../src/shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const { run: runFeatureQuery } = require('./query_chain_kb');
 
 function parseArgs(argv) {

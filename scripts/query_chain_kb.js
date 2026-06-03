@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { hasOwn, readJson, readJsonSafe } = require('./lib/common');
-const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./lib/feature-kb');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { hasOwn, readJson, readJsonSafe } = require('../src/shared/common');
+const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../src/graph/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const { loadSkillVersion } = require('./show_skill_version');
 
 function parseArgs(argv) {
@@ -244,7 +244,7 @@ function loadFeatureLookup(context, featureKey) {
             `\n\n修复命令:\n` +
             `  1. 检查 feature 名称是否正确\n` +
             `  2. 构建该 feature: node scripts/build_chain_kb.js --workspace-root <project-root> --config <config-path>\n` +
-            `  3. 或重建全部: node scripts/rebuild_kbs.js --workspace-root <project-root>`
+            `  3. 或重建全部: node src/bin/rebuild-kbs.js --workspace-root <project-root>`
         );
     }
 
@@ -280,7 +280,7 @@ function buildKbVersionStatus(graph) {
             : null,
         stale,
         recommendedAction: stale
-            ? 'node scripts/rebuild_kbs.js --workspace-root <project-root>'
+            ? 'node src/bin/rebuild-kbs.js --workspace-root <project-root>'
             : '',
     };
 }
@@ -863,7 +863,7 @@ function formatCommandArg(value) {
 }
 
 function buildQueryCommandBase(featureKey, options = {}) {
-    const parts = ['node scripts/query_kb.js'];
+    const parts = ['node src/bin/query-feature.js'];
     if (options.workspaceRoot) {
         parts.push('--workspace-root', quoteCommandArg(options.workspaceRoot));
     }
@@ -1231,19 +1231,19 @@ function printTraversal(result, asJson) {
 
 function buildRecommendedCommands(featureKey, lookup = {}) {
     const commands = [
-        `node scripts/query_kb.js --feature ${featureKey}`,
-        `node scripts/query_kb.js --feature ${featureKey} --downstream <query>`,
-        `node scripts/query_kb.js --feature ${featureKey} --method <name> --downstream`,
-        `node scripts/query_kb.js --feature ${featureKey} --type method --name <keyword>`,
+        `node src/bin/query-feature.js --feature ${featureKey}`,
+        `node src/bin/query-feature.js --feature ${featureKey} --downstream <query>`,
+        `node src/bin/query-feature.js --feature ${featureKey} --method <name> --downstream`,
+        `node src/bin/query-feature.js --feature ${featureKey} --type method --name <keyword>`,
         `node scripts/query_chain_kb.js --feature ${featureKey} --downstream <query>`,
     ];
 
     if (Array.isArray(lookup.nodesByType?.binding) && lookup.nodesByType.binding.length > 0) {
-        commands.push(`node scripts/query_kb.js --feature ${featureKey} --type binding --name <field|handler>`);
-        commands.push(`node scripts/cocos_authoring.js --feature ${featureKey} --prefab <prefab-name> --intent profile`);
+        commands.push(`node src/bin/query-feature.js --feature ${featureKey} --type binding --name <field|handler>`);
+        commands.push(`node src/bin/cocos-authoring.js --feature ${featureKey} --prefab <prefab-name> --intent profile`);
     }
     if (Array.isArray(lookup.nodesByType?.['ui-node']) && lookup.nodesByType['ui-node'].length > 0) {
-        commands.push(`node scripts/query_kb.js --feature ${featureKey} --type ui-node --name <node-path>`);
+        commands.push(`node src/bin/query-feature.js --feature ${featureKey} --type ui-node --name <node-path>`);
     }
     return commands;
 }
@@ -1253,7 +1253,7 @@ function buildArtifactGuide(feature) {
     return [
         {
             key: 'entrypoint',
-            file: 'scripts/query_kb.js',
+            file: 'src/bin/query-feature.js',
             purpose: '统一查询入口，优先用于 feature 摘要、链路遍历和节点检索。',
             useWhen: '遇到入口、关闭窗口链路、prefab 事件绑定、节点/资源引用、request、state 流转时先运行它。',
             priority: 1,

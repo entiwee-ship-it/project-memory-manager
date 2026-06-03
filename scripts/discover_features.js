@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const {
     discoverFeaturesForContext,
     writeFeatureCandidates,
-} = require('./lib/feature-discovery');
+} = require('../src/discovery/feature-discovery');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);

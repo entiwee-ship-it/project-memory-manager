@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-const { run: buildChainKb } = require('./build_chain_kb');
-const { writeJsonAtomic } = require('./lib/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { run: buildChainKb } = require('../src/graph/build-chain-kb');
+const { writeJsonAtomic } = require('../src/shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const {
     discoverFeaturesForContext,
     generateFeatureConfig,
     readFeatureCandidates,
     writeFeatureCandidates,
-} = require('./lib/feature-discovery');
+} = require('../src/discovery/feature-discovery');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);

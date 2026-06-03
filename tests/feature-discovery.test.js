@@ -2,11 +2,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createWorkspaceContext } = require('../scripts/lib/workspace-layout');
+const { createWorkspaceContext } = require('../src/shared/workspace-layout');
 const {
     discoverFeatureCandidates,
     generateFeatureConfig,
-} = require('../scripts/lib/feature-discovery');
+} = require('../src/discovery/feature-discovery');
 
 function makeContext() {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-feature-discovery-workspace-'));

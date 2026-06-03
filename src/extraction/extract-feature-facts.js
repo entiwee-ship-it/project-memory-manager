@@ -2,9 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createExtractContext } = require('./adapters/extract');
-const { hasDefaultIgnoredPathSegment } = require('./lib/common');
-const { extractVueScriptContent } = require('./lib/vue_sfc');
+const { createExtractContext } = require('../adapters/extract');
+const { hasDefaultIgnoredPathSegment } = require('../shared/common');
+const { extractVueScriptContent } = require('./vue/vue-sfc');
 
 const DEFAULT_METHOD_SKIP = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'constructor']);
 const STATE_MUTATION_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'set', 'delete', 'clear']);
@@ -15,13 +15,13 @@ const DRIZZLE_WRITE_METHODS = new Set(['insert', 'update', 'delete']);
 function loadTypeScriptRuntime() {
     const candidates = [
         // 1. 技能自己的 node_modules (优先)
-        path.resolve(__dirname, '..', 'node_modules', 'typescript'),
+        path.resolve(__dirname, '..', '..', 'node_modules', 'typescript'),
         // 2. 环境变量指定
         process.env.PMM_TYPESCRIPT_PATH || '',
         // 3. 全局 typescript (fallback)
         'typescript',
         // 4. 运行时目录
-        path.resolve(__dirname, '..', '.runtime', 'ts-runtime', 'node_modules', 'typescript'),
+        path.resolve(__dirname, '..', '..', '.runtime', 'ts-runtime', 'node_modules', 'typescript'),
     ].filter(Boolean);
 
     for (const candidate of candidates) {
@@ -3422,7 +3422,7 @@ function extractScriptSummary(source, scriptFile, exports) {
     return basenameWithoutExt(scriptFile);
 }
 
-const { extractStructuredSummary, setTypeScriptRuntime } = require('./extract_structured_summary');
+const { extractStructuredSummary, setTypeScriptRuntime } = require('./summary/extract-structured-summary');
 
 // 初始化结构化摘要提取器的 TypeScript 运行时
 if (TYPESCRIPT_RUNTIME) {

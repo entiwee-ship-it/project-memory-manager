@@ -11,7 +11,7 @@
  */
 
 const path = require('path');
-const { readJson, resolveProjectRoot, normalize } = require('./lib/common');
+const { readJson, resolveProjectRoot, normalize } = require('../src/shared/common');
 
 function parseArgs(argv) {
     const args = {

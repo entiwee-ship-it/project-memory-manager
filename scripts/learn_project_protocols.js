@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { normalize, readJson, resolveProjectRoot, timestamp, writeJson } = require('./lib/common');
+const { normalize, readJson, resolveProjectRoot, timestamp, writeJson } = require('../src/shared/common');
 const { loadSkillVersion } = require('./show_skill_version');
 
 function parseArgs(argv) {

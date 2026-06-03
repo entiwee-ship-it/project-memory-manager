@@ -16,7 +16,7 @@ function loadSkillTypeScript() {
     const path = require('path');
     const candidates = [
         // 1. 技能自己的 node_modules
-        path.resolve(__dirname, '..', 'node_modules', 'typescript'),
+        path.resolve(__dirname, '..', '..', '..', 'node_modules', 'typescript'),
         // 2. 环境变量指定
         process.env.PMM_TYPESCRIPT_PATH,
         // 3. 全局 typescript
@@ -515,8 +515,8 @@ function main() {
     const args = parseArgs(process.argv.slice(2));
     
     if (!args.code && !args.file) {
-        console.log('Usage: node extract_structured_summary.js --code "<method-body>" --method <name>');
-        console.log('       node extract_structured_summary.js --file <path> --method <name>');
+        console.log('Usage: node src/extraction/summary/extract-structured-summary.js --code "<method-body>" --method <name>');
+        console.log('       node src/extraction/summary/extract-structured-summary.js --file <path> --method <name>');
         process.exit(1);
     }
     

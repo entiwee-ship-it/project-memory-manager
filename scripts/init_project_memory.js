@@ -2,8 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ensureDir, pathExists, writeJsonAtomic, writeTextAtomic } = require('./lib/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { ensureDir, pathExists, writeJsonAtomic, writeTextAtomic } = require('../src/shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);

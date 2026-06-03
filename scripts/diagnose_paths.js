@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);

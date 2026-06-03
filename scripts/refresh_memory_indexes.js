@@ -2,9 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { readJson, timestamp, writeJson } = require('./lib/common');
-const { normalizeConfig, normalizeFeatureRecord, toPosixPath } = require('./lib/feature-kb');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { readJson, timestamp, writeJson } = require('../src/shared/common');
+const { normalizeConfig, normalizeFeatureRecord, toPosixPath } = require('../src/graph/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);

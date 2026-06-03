@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { resolveProjectRoot, readJson, validateProjectRoot } = require('./lib/common');
-const { normalizeFeatureRecord } = require('./lib/feature-kb');
+const { resolveProjectRoot, readJson, validateProjectRoot } = require('../src/shared/common');
+const { normalizeFeatureRecord } = require('../src/graph/feature-kb');
 const {
     buildAuthoringProfile,
     createAuthoringError,
@@ -14,7 +14,7 @@ const {
     planFieldBinding,
 } = require('./lib/cocos-authoring');
 const { applyClickEventChange, applyFieldBindingChange } = require('./lib/cocos-authoring-apply');
-const { run: buildChainKb } = require('./build_chain_kb');
+const { run: buildChainKb } = require('../src/graph/build-chain-kb');
 const { run: buildCocosAuthoringProfile } = require('./build_cocos_authoring_profile');
 
 function parseArgs(argv) {

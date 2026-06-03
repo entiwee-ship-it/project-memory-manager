@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { normalize, readJson } = require('./common');
+const { normalize, readJson } = require('../../src/shared/common');
 const { createAuthoringError, findAssetCandidates } = require('./cocos-authoring');
 
 function detectEol(text) {

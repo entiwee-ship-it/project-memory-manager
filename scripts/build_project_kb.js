@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { buildLookup, run: buildChainKb } = require('./build_chain_kb');
-const { ensureDir, hasDefaultIgnoredPathSegment, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('./lib/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { buildLookup, run: buildChainKb } = require('../src/graph/build-chain-kb');
+const { ensureDir, hasDefaultIgnoredPathSegment, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('../src/shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const { learnProjectProtocols } = require('./learn_project_protocols');
 
 function parseArgs(argv) {

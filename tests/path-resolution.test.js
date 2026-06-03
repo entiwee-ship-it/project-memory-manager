@@ -11,8 +11,8 @@ const os = require('os');
 const repoRoot = path.resolve(__dirname, '..');
 const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
-const { resolveProjectRoot, validateProjectRoot } = require('../scripts/lib/common');
-const { createWorkspaceContext } = require('../scripts/lib/workspace-layout');
+const { resolveProjectRoot, validateProjectRoot } = require('../src/shared/common');
+const { createWorkspaceContext } = require('../src/shared/workspace-layout');
 
 // 创建临时测试项目
 function createTempProject() {

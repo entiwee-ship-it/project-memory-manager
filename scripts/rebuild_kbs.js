@@ -10,11 +10,11 @@
 
 const fs = require('fs');
 const path = require('path');
-const { readJsonSafe, writeJsonAtomic } = require('./lib/common');
-const { normalizeFeatureRecord } = require('./lib/feature-kb');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
-const { run: buildChainKb } = require('./build_chain_kb');
-const { withLock } = require('./lib/lock');
+const { readJsonSafe, writeJsonAtomic } = require('../src/shared/common');
+const { normalizeFeatureRecord } = require('../src/graph/feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
+const { run: buildChainKb } = require('../src/graph/build-chain-kb');
+const { withLock } = require('../src/shared/lock');
 const { run: buildProjectKb } = require('./build_project_kb');
 const { run: buildCocosAuthoringProfile } = require('./build_cocos_authoring_profile');
 const { run: refreshMemoryIndexes } = require('./refresh_memory_indexes');

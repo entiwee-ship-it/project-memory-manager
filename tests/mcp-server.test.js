@@ -3,8 +3,8 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { handleMcpRequest } = require('../scripts/mcp_server');
-const { buildLookup } = require('../scripts/build_chain_kb');
-const { createWorkspaceContext } = require('../scripts/lib/workspace-layout');
+const { buildLookup } = require('../src/graph/build-chain-kb');
+const { createWorkspaceContext } = require('../src/shared/workspace-layout');
 
 function makeWorkspace(prefix = 'pmm-mcp-workspace-') {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

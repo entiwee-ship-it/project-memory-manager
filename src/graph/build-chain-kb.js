@@ -2,14 +2,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const { runExtract } = require('./extract_feature_facts');
-const { hasOwn, inferArea, inferStacks, normalize, pathExists, readJson, readJsonSafe, repoRelative, slugify, timestamp, writeJson, writeJsonAtomic } = require('./lib/common');
-const { normalizeConfig, normalizeFeatureRecord } = require('./lib/feature-kb');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
-const { loadSkillVersion } = require('./show_skill_version');
+const { runExtract } = require('../extraction/extract-feature-facts');
+const { hasOwn, inferArea, inferStacks, normalize, pathExists, readJson, readJsonSafe, repoRelative, slugify, timestamp, writeJson, writeJsonAtomic } = require('../shared/common');
+const { normalizeConfig, normalizeFeatureRecord } = require('./feature-kb');
+const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
+const { loadSkillVersion } = require('../../scripts/show_skill_version');
 
 function loadCurrentSkillBuildInfo() {
-    const versionInfo = loadSkillVersion(path.resolve(__dirname, '..'));
+    const versionInfo = loadSkillVersion(path.resolve(__dirname, '..', '..'));
     return {
         name: versionInfo.name || '',
         version: versionInfo.version || '',
@@ -194,7 +194,7 @@ function expandConfiguredTargets(root, inputs = []) {
 }
 
 function discoverPrefabsFromAssetRoots(assetRoots) {
-    const { listFilesRecursive } = require('./lib/common');
+    const { listFilesRecursive } = require('../shared/common');
     const discovered = [];
     for (const root of assetRoots || []) {
         if (!fs.existsSync(root)) {
@@ -474,7 +474,7 @@ function buildKbArtifactGuide(outputs = {}) {
     return [
         {
             key: 'entrypoint',
-            file: 'scripts/query_kb.js',
+            file: 'src/bin/query-feature.js',
             purpose: '统一知识库查询入口，优先用于 feature 摘要、链路遍历和节点检索。',
             useWhen: '遇到入口、关闭窗口链路、prefab 事件绑定、节点/资源引用、request、状态流转时先运行。',
             priority: 1,
@@ -522,15 +522,15 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
         report: repoRelative(outputPaths.report.canonicalPath, root),
     };
     const queryExamples = [
-        `node scripts/query_kb.js --feature ${config.featureKey}`,
-        `node scripts/query_kb.js --feature ${config.featureKey} --downstream <query>`,
-        `node scripts/query_kb.js --feature ${config.featureKey} --method <name> --downstream`,
-        `node scripts/query_kb.js --feature ${config.featureKey} --type method --name <keyword>`,
+        `node src/bin/query-feature.js --feature ${config.featureKey}`,
+        `node src/bin/query-feature.js --feature ${config.featureKey} --downstream <query>`,
+        `node src/bin/query-feature.js --feature ${config.featureKey} --method <name> --downstream`,
+        `node src/bin/query-feature.js --feature ${config.featureKey} --type method --name <keyword>`,
     ];
     if ((raw.prefabs || []).length > 0) {
-        queryExamples.push(`node scripts/query_kb.js --feature ${config.featureKey} --type binding --name <field|handler>`);
-        queryExamples.push(`node scripts/query_kb.js --feature ${config.featureKey} --type ui-node --name <node-path>`);
-        queryExamples.push(`node scripts/cocos_authoring.js --feature ${config.featureKey} --prefab <prefab-name> --intent profile`);
+        queryExamples.push(`node src/bin/query-feature.js --feature ${config.featureKey} --type binding --name <field|handler>`);
+        queryExamples.push(`node src/bin/query-feature.js --feature ${config.featureKey} --type ui-node --name <node-path>`);
+        queryExamples.push(`node src/bin/cocos-authoring.js --feature ${config.featureKey} --prefab <prefab-name> --intent profile`);
     }
 
     return {
@@ -551,12 +551,12 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
             nodesByType,
         },
         defaultWorkflow: [
-            '先运行 node scripts/query_kb.js --feature <feature-key> 查看 feature 摘要。',
+            '先运行 node src/bin/query-feature.js --feature <feature-key> 查看 feature 摘要。',
             '再用 --downstream / --upstream 或 --method / --event / --request / --state / --type binding 做精确查询。',
             '只有 KB 结果不足以回答问题时，再读 docs；最后才用 rg/grep 回源码确认。'
         ],
         queryExamples,
-        postSkillUpdateAction: 'node scripts/rebuild_kbs.js --workspace-root <project-root>',
+        postSkillUpdateAction: 'node src/bin/rebuild-kbs.js --workspace-root <project-root>',
         artifacts: buildKbArtifactGuide(outputs),
         legacyCompatibility: {
             oldOutputNamesSupported: ['graph.json', 'lookup.json', 'scan.json', 'report.json'],
@@ -2178,7 +2178,7 @@ function run(argv = process.argv.slice(2)) {
                 upsertFeatureRegistry(context, buildFeatureRecord(config, configPath));
             } catch (registryErr) {
                 console.warn(`[SKILL-WARN] KB 构建成功，但 registry 更新失败: ${registryErr.message}`);
-                console.warn(`[SKILL-WARN] 可手动运行重建: node scripts/rebuild_kbs.js --workspace-root ${root}`);
+                console.warn(`[SKILL-WARN] 可手动运行重建: node src/bin/rebuild-kbs.js --workspace-root ${root}`);
             }
         }
         

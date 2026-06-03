@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { normalize, pathExists, readJson, timestamp, writeJson } = require('./common');
-const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('./feature-kb');
-const { createWorkspaceContext } = require('./workspace-layout');
+const { normalize, pathExists, readJson, timestamp, writeJson } = require('../../src/shared/common');
+const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../../src/graph/feature-kb');
+const { createWorkspaceContext } = require('../../src/shared/workspace-layout');
 const { loadSkillVersion } = require('../show_skill_version');
 
 function normalizeText(value) {

@@ -9,9 +9,9 @@ const cocosFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-http-sample');
 const cocosPrefabFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-prefab-sample');
 const projectGlobalFixtureRoot = path.join(__dirname, 'fixtures', 'project-global-sample');
 const adminFullstackFixtureRoot = path.join(__dirname, 'fixtures', 'admin-fullstack-sample');
-const { run: buildChainKb } = require('../scripts/build_chain_kb');
+const { run: buildChainKb } = require('../src/graph/build-chain-kb');
 const { run: buildProjectKb } = require('../scripts/build_project_kb');
-const { buildLookup } = require('../scripts/build_chain_kb');
+const { buildLookup } = require('../src/graph/build-chain-kb');
 const { run: queryChainKb } = require('../scripts/query_chain_kb');
 const { run: queryKb } = require('../scripts/query_kb');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
@@ -345,23 +345,23 @@ function runFixtureAssertions() {
     assert.ok(featureSummary.counts.nodes > 0);
     assert.ok(featureSummary.purpose.includes('默认查询入口'));
     assert.ok(Array.isArray(featureSummary.defaultWorkflow) && featureSummary.defaultWorkflow.length >= 3);
-    assert.ok(Array.isArray(featureSummary.artifacts) && featureSummary.artifacts.some(item => item.key === 'entrypoint' && item.file === 'scripts/query_kb.js'));
+    assert.ok(Array.isArray(featureSummary.artifacts) && featureSummary.artifacts.some(item => item.key === 'entrypoint' && item.file === 'src/bin/query-feature.js'));
     assert.ok(Array.isArray(featureSummary.examples) && featureSummary.examples.length > 0);
-    assert.ok(featureSummary.examples.some(item => item.includes('scripts/query_kb.js')));
+    assert.ok(featureSummary.examples.some(item => item.includes('src/bin/query-feature.js')));
     const expectedVersion = loadSkillVersion(repoRoot).version;
     assert.equal(featureSummary.kbVersionStatus.builtWithSkill.version, expectedVersion);
     assert.equal(featureSummary.kbVersionStatus.stale, false);
 
     const featureSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
-    assert.ok(featureSummaryText.includes('scripts/query_kb.js'));
+    assert.ok(featureSummaryText.includes('src/bin/query-feature.js'));
     assert.ok(featureSummaryText.includes('build.report.json'));
     assert.ok(featureSummaryText.includes(`builtWithSkill: project-memory-manager@${expectedVersion}`));
 
     assert.equal(report.kind, 'kb-build-report');
     assert.ok(report.purpose.includes('构建汇总'));
     assert.equal(report.builtWithSkill.version, expectedVersion);
-    assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('scripts/query_kb.js')));
-    assert.ok(String(report.postSkillUpdateAction || '').includes('rebuild_kbs.js'));
+    assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('src/bin/query-feature.js')));
+    assert.ok(String(report.postSkillUpdateAction || '').includes('src/bin/rebuild-kbs.js'));
     assert.ok(Array.isArray(report.artifacts) && report.artifacts.some(item => item.key === 'lookup'));
     assert.ok(report.counts.nodesByType.method > 0);
 
@@ -881,7 +881,7 @@ function runRebuildAssertions() {
     const nestedCwd = path.join(tempRoot, 'app', 'http', 'routes', 'activity');
     const staleSummaryText = runWithCapturedOutput(queryKb, ['--feature', 'pinus-sample'], nestedCwd);
     assert.ok(staleSummaryText.includes('[stale-kb]'));
-    assert.ok(staleSummaryText.includes('rebuild_kbs.js'));
+    assert.ok(staleSummaryText.includes('src/bin/rebuild-kbs.js'));
 
     const rebuildLogs = runWithCapturedOutput(rebuildKbs, ['--root', tempRoot, '--layout', 'legacy-project-memory'], repoRoot);
     assert.ok(rebuildLogs.includes('[REBUILD]'));

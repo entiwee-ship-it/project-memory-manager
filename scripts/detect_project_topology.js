@@ -2,8 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ensureDir, listFilesRecursive, normalize, pathExists, readJsonSafe, writeJson } = require('./lib/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { ensureDir, listFilesRecursive, normalize, pathExists, readJsonSafe, writeJson } = require('../src/shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const { getTopologyAdapters } = require('./adapters/topology');
 
 const MANIFEST_BASENAMES = new Set([

@@ -7,11 +7,11 @@ const {
     defaultDataRoot,
     parseLayoutArgs,
     workspaceIdFromRoot,
-} = require('../scripts/lib/workspace-layout');
+} = require('../src/shared/workspace-layout');
 const { run: initProjectMemory } = require('../scripts/init_project_memory');
 const { run: detectProjectTopology } = require('../scripts/detect_project_topology');
 const { run: buildProjectKb } = require('../scripts/build_project_kb');
-const { run: buildChainKb } = require('../scripts/build_chain_kb');
+const { run: buildChainKb } = require('../src/graph/build-chain-kb');
 const { run: queryProjectKb } = require('../scripts/query_project_kb');
 const { run: queryKb } = require('../scripts/query_kb');
 const { run: refreshMemoryIndexes } = require('../scripts/refresh_memory_indexes');

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { normalize, repoRelative } = require('./lib/common');
-const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
+const { normalize, repoRelative } = require('../src/shared/common');
+const { createWorkspaceContext, parseLayoutArgs } = require('../src/shared/workspace-layout');
 const {
     buildProjectAuthoringProfile,
     loadProjectAuthoringProfile,
