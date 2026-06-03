@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createExtractContext } = require('./adapters/extract');
+const { hasDefaultIgnoredPathSegment } = require('./lib/common');
 
 const DEFAULT_METHOD_SKIP = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'constructor']);
 const STATE_MUTATION_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'set', 'delete', 'clear']);
@@ -273,6 +274,9 @@ function extractDirectBodyTextFromAst(functionNode, sourceFile, ts = TYPESCRIPT_
 
 function listFilesRecursive(rootPath, matcher, acc = [], options = {}) {
     const { maxDepth = 100, currentDepth = 0, visited = new Set() } = options;
+    const customIgnorePath = typeof options.ignorePath === 'function' ? options.ignorePath : () => false;
+    const useDefaultIgnore = options.defaultIgnore !== false;
+    const ignorePath = targetPath => (useDefaultIgnore && hasDefaultIgnoredPathSegment(targetPath)) || customIgnorePath(targetPath);
     
     // 深度限制，防止栈溢出
     if (currentDepth > maxDepth) {
@@ -281,6 +285,10 @@ function listFilesRecursive(rootPath, matcher, acc = [], options = {}) {
     }
     
     if (!fs.existsSync(rootPath)) {
+        return acc;
+    }
+
+    if (ignorePath(rootPath)) {
         return acc;
     }
 
@@ -307,7 +315,7 @@ function listFilesRecursive(rootPath, matcher, acc = [], options = {}) {
     }
     
     if (stat.isFile()) {
-        if (matcher(rootPath)) {
+        if (!ignorePath(rootPath) && matcher(rootPath)) {
             acc.push(rootPath);
         }
         return acc;
@@ -325,6 +333,10 @@ function listFilesRecursive(rootPath, matcher, acc = [], options = {}) {
         
         // 跳过符号链接（防止循环和意外行为）
         if (entry.isSymbolicLink()) {
+            continue;
+        }
+
+        if (ignorePath(fullPath)) {
             continue;
         }
         

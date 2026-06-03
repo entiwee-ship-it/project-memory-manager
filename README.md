@@ -310,6 +310,15 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 - `chain.graph.json`：图节点与边的底层事实，通常不要手读
 - `scan.raw.json`：原始抽取结果，只在怀疑 extractor 漏抓时回看
 
+默认扫描会跳过依赖和生成目录，避免 project-global KB 被环境文件污染：
+
+- `node_modules`
+- `.git`
+- `.runtime`
+- `dist` / `build` / `coverage` / `out`
+- `.next` / `.nuxt`
+- `project-memory` / `project-memory-data`
+
 当前规范注册表字段是：
 
 - `featureKey`

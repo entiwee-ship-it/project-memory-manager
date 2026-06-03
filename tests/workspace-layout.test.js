@@ -112,18 +112,48 @@ function captureOutput(fn, args, cwd) {
 function testProjectKbExternalData() {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-global-workspace-'));
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-global-data-'));
-    const serviceRoot = path.join(workspaceRoot, 'server', 'api');
+    const groupRoot = path.join(workspaceRoot, 'qyproject');
+    const serviceRoot = path.join(groupRoot, 'cms-server');
     fs.mkdirSync(path.join(serviceRoot, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(serviceRoot, 'node_modules', 'noisy-lib'), { recursive: true });
     fs.writeFileSync(path.join(serviceRoot, 'package.json'), '{"dependencies":{"typescript":"latest","express":"latest"}}\n');
     fs.writeFileSync(path.join(serviceRoot, 'src', 'sample.ts'), 'export function ping(){ return "pong"; }\n');
+    fs.writeFileSync(path.join(serviceRoot, 'node_modules', 'noisy-lib', 'index.ts'), 'export function dependencyNoise(){ return "noise"; }\n');
 
     initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'global-sample']);
     detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    fs.writeFileSync(context.paths.projectProfile, JSON.stringify({
+        projectName: 'global-sample',
+        projectType: 'multi-repo',
+        areas: {
+            frontend: [],
+            backend: ['qyproject', 'qyproject/cms-server'],
+            shared: [],
+            contract: [],
+            data: [],
+            ops: [],
+        },
+        stacks: {
+            frontend: [],
+            backend: ['node', 'typescript'],
+            shared: [],
+            contract: [],
+            data: [],
+            ops: [],
+        },
+        integration: {
+            primary: ['qyproject/cms-server'],
+            secondary: [],
+        },
+    }, null, 2));
     buildProjectKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
 
-    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
     assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
     assert.equal(fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')), true);
+    const graph = JSON.parse(fs.readFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), 'utf8'));
+    assert.equal(graph.nodes.some(node => String(node.file || '').includes('node_modules')), false);
+    assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('dependencyNoise')), false);
     const projectGlobalConfig = JSON.parse(fs.readFileSync(path.join(context.paths.configsDir, 'project-global.json'), 'utf8'));
     assert.equal(projectGlobalConfig.registerFeature, true);
 

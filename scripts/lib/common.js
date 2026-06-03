@@ -2,8 +2,29 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+const DEFAULT_SCAN_IGNORE_SEGMENTS = new Set([
+    '.git',
+    '.runtime',
+    '.next',
+    '.nuxt',
+    'build',
+    'coverage',
+    'dist',
+    'node_modules',
+    'out',
+    'project-memory',
+    'project-memory-data',
+]);
+
 function normalize(filePath) {
     return String(filePath || '').split(path.sep).join('/');
+}
+
+function hasDefaultIgnoredPathSegment(filePath) {
+    return String(filePath || '')
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .some(segment => DEFAULT_SCAN_IGNORE_SEGMENTS.has(segment.toLowerCase()));
 }
 
 function ensureDir(dirPath) {
@@ -196,7 +217,9 @@ function hasOwn(object, key) {
 }
 
 function listFilesRecursive(rootPath, matcher = () => true, acc = [], options = {}) {
-    const ignorePath = typeof options.ignorePath === 'function' ? options.ignorePath : () => false;
+    const customIgnorePath = typeof options.ignorePath === 'function' ? options.ignorePath : () => false;
+    const useDefaultIgnore = options.defaultIgnore !== false;
+    const ignorePath = targetPath => (useDefaultIgnore && hasDefaultIgnoredPathSegment(targetPath)) || customIgnorePath(targetPath);
     const { maxDepth = 100, currentDepth = 0 } = options;
     
     if (currentDepth > maxDepth) {
@@ -413,9 +436,11 @@ function timestamp() {
 }
 
 module.exports = {
+    DEFAULT_SCAN_IGNORE_SEGMENTS,
     createDiagnosticError,
     ensureDir,
     findProjectRoot,
+    hasDefaultIgnoredPathSegment,
     hasOwn,
     inferArea,
     inferStacks,

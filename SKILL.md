@@ -135,6 +135,7 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
   - `<memory-root>/kb/project-global/build.report.json`
   - `<memory-root>/state/project-protocols.json`
 - 这一步不是替代 feature KB，而是提供全局入口、消息协议学习和跨区域链路基座
+- 默认跳过 `node_modules`、`.git`、`.runtime`、`dist`、`build`、`coverage`、`out`、`.next`、`.nuxt`、`project-memory` 和 `project-memory-data`
 - 每个 workspace 只应该有一个 `project-global`；它是全局基座，feature KB 只有在为具体功能创建配置并构建后才会额外出现
 - 当升级技能版本后，优先重建 `project-global KB`，再重建 feature KB
 
