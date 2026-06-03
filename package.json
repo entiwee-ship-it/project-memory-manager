@@ -10,6 +10,7 @@
     "test:feature": "node tests/feature-discovery.test.js",
     "test:path": "node tests/path-resolution.test.js",
     "test:summary": "node tests/structured-summary.test.js",
+    "test:source-layout": "node tests/source-layout.test.js",
     "mcp": "node scripts/mcp_server.js"
   },
   "dependencies": {
