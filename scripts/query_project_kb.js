@@ -27,6 +27,7 @@ function parseArgs(argv) {
         '--event',
         '--method',
         '--request',
+        '--endpoint',
         '--state',
         '--type',
         '--name',

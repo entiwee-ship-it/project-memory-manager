@@ -278,6 +278,55 @@ async function testBuildProjectIndexAutoPreparesWorkspace() {
     assert.equal(summary.project.layout, 'external-data');
 }
 
+async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+
+    const firstResponse = await callTool('query_project_chain', {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'mountApp',
+        limit: 5000,
+    });
+    const first = parseTextResult(firstResponse);
+    assert.equal(first._mcpCache.hit, false);
+    assert.equal(first._mcpQuery.limit, 100);
+
+    const secondResponse = await callTool('query_project_chain', {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'mountApp',
+        limit: 5000,
+    });
+    const second = parseTextResult(secondResponse);
+    assert.equal(second._mcpCache.hit, true);
+    assert.equal(second._mcpQuery.limit, 100);
+
+    const context = createWorkspaceContext({
+        workspaceRoot,
+        dataRoot,
+        layout: 'external-data',
+    });
+    const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
+    const later = new Date(Date.now() + 5000);
+    fs.utimesSync(graphPath, later, later);
+
+    const thirdResponse = await callTool('query_project_chain', {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'mountApp',
+        limit: 5000,
+    });
+    const third = parseTextResult(thirdResponse);
+    assert.equal(third._mcpCache.hit, false);
+    assert.equal(third._mcpCache.invalidatedByMtime, true);
+}
+
 async function waitForJob(jobId, maxAttempts = 40) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const response = await callTool('get_job_status', { jobId });
@@ -375,6 +424,7 @@ Promise.all([
     testInitAndDetectTopologyViaMcp(),
     testDetectTopologyKeepsManualAreaRoots(),
     testBuildProjectIndexAutoPreparesWorkspace(),
+    testQueryProjectChainCacheInvalidatesOnKbMtime(),
     testAsyncBuildJob(),
     testDiscoverAndBuildFeatureIndexDryRun(),
     testQueryFeatureChainViaMcp(),

@@ -3,19 +3,24 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { createWorkspaceContext } = require('./lib/workspace-layout');
 const { run: initProjectMemory } = require('./init_project_memory');
 const { run: detectProjectTopology } = require('./detect_project_topology');
 const { run: buildProjectKb } = require('./build_project_kb');
 const { run: discoverFeaturesCli } = require('./discover_features');
 const { run: buildFeatureIndexCli } = require('./build_feature_index');
-const { run: queryProjectKb } = require('./query_project_kb');
-const { run: queryFeatureKb } = require('./query_kb');
 const { loadSkillVersion } = require('./show_skill_version');
 
 const jobs = new Map();
 let nextJobId = 1;
+
+const DEFAULT_MCP_QUERY_LIMIT = 20;
+const MAX_MCP_QUERY_LIMIT = 100;
+const DEFAULT_MCP_QUERY_TIMEOUT_MS = 8000;
+const MAX_MCP_QUERY_TIMEOUT_MS = 30000;
+const MAX_PROJECT_QUERY_CACHE_ENTRIES = 100;
+const projectQueryCache = new Map();
 
 const TOOL_DEFINITIONS = [
     {
@@ -171,6 +176,7 @@ const TOOL_DEFINITIONS = [
                 event: { type: 'string' },
                 method: { type: 'string' },
                 request: { type: 'string' },
+                endpoint: { type: 'string' },
                 state: { type: 'string' },
                 type: { type: 'string' },
                 name: { type: 'string' },
@@ -182,6 +188,7 @@ const TOOL_DEFINITIONS = [
                 downstream: { type: 'boolean' },
                 limit: { type: 'number' },
                 depth: { type: 'number' },
+                timeoutMs: { type: 'number' },
             },
             required: ['workspaceRoot'],
         },
@@ -199,6 +206,7 @@ const TOOL_DEFINITIONS = [
                 message: { type: 'string' },
                 method: { type: 'string' },
                 request: { type: 'string' },
+                endpoint: { type: 'string' },
                 state: { type: 'string' },
                 type: { type: 'string' },
                 name: { type: 'string' },
@@ -210,6 +218,7 @@ const TOOL_DEFINITIONS = [
                 downstream: { type: 'boolean' },
                 limit: { type: 'number' },
                 depth: { type: 'number' },
+                timeoutMs: { type: 'number' },
             },
             required: ['workspaceRoot', 'feature'],
         },
@@ -263,6 +272,108 @@ function captureConsoleLog(fn) {
     } finally {
         console.log = oldLog;
     }
+}
+
+function clampInteger(value, fallback, max) {
+    if (!Number.isFinite(value)) {
+        return fallback;
+    }
+    const integer = Math.max(1, Math.floor(value));
+    return Math.min(integer, max);
+}
+
+function resolveMcpQueryOptions(args = {}) {
+    return {
+        limit: clampInteger(args.limit, DEFAULT_MCP_QUERY_LIMIT, MAX_MCP_QUERY_LIMIT),
+        depth: Number.isFinite(args.depth) ? Math.max(1, Math.floor(args.depth)) : null,
+        timeoutMs: clampInteger(args.timeoutMs, DEFAULT_MCP_QUERY_TIMEOUT_MS, MAX_MCP_QUERY_TIMEOUT_MS),
+    };
+}
+
+function hasQuerySelector(args = {}) {
+    return [
+        'message',
+        'timing',
+        'phase',
+        'transition',
+        'event',
+        'method',
+        'request',
+        'endpoint',
+        'state',
+        'type',
+        'name',
+        'tag',
+        'file',
+        'from',
+        'direction',
+    ].some(key => Boolean(args[key])) || Boolean(args.upstream || args.downstream);
+}
+
+function statSignature(filePath) {
+    try {
+        const stat = fs.statSync(filePath);
+        return {
+            file: filePath,
+            exists: true,
+            mtimeMs: stat.mtimeMs,
+            size: stat.size,
+        };
+    } catch {
+        return {
+            file: filePath,
+            exists: false,
+            mtimeMs: 0,
+            size: 0,
+        };
+    }
+}
+
+function buildProjectArtifactState(args) {
+    const context = createWorkspaceContext({
+        workspaceRoot: args.workspaceRoot,
+        dataRoot: args.dataRoot,
+        layout: 'external-data',
+    });
+    const artifacts = [
+        statSignature(path.join(context.paths.projectGlobalDir, 'chain.graph.json')),
+        statSignature(path.join(context.paths.projectGlobalDir, 'chain.lookup.json')),
+        statSignature(context.paths.projectProtocols),
+    ];
+    return {
+        context,
+        artifacts,
+        signature: JSON.stringify(artifacts.map(artifact => ({
+            file: artifact.file,
+            exists: artifact.exists,
+            mtimeMs: artifact.mtimeMs,
+            size: artifact.size,
+        }))),
+    };
+}
+
+function evictOldestProjectQueryCacheEntry() {
+    const oldestKey = projectQueryCache.keys().next().value;
+    if (oldestKey) {
+        projectQueryCache.delete(oldestKey);
+    }
+}
+
+function parseJsonOutput(output) {
+    return JSON.parse(String(output || '').trim() || '{}');
+}
+
+function cloneJson(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function withMcpQueryMetadata(payload, cacheMeta, queryMeta) {
+    const result = payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? cloneJson(payload)
+        : { result: payload };
+    result._mcpCache = cacheMeta;
+    result._mcpQuery = queryMeta;
+    return result;
 }
 
 function buildWorkspaceState(args) {
@@ -522,17 +633,66 @@ function buildFeatureIndex(args) {
     });
 }
 
-function queryProjectChain(args) {
-    const argv = [...layoutArgv(args), '--json'];
-    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
+function runQueryScript(scriptName, argv, timeoutMs) {
+    const startedAt = Date.now();
+    const child = spawnSync(process.execPath, [path.join(__dirname, scriptName), ...argv], {
+        cwd: path.resolve(__dirname, '..'),
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: timeoutMs,
+        maxBuffer: 20 * 1024 * 1024,
+    });
+    const elapsedMs = Date.now() - startedAt;
+    if (child.error?.code === 'ETIMEDOUT') {
+        return {
+            ok: false,
+            timedOut: true,
+            elapsedMs,
+            stdout: child.stdout || '',
+            stderr: child.stderr || '',
+            error: `Query timed out after ${timeoutMs}ms`,
+        };
+    }
+    if (child.error) {
+        return {
+            ok: false,
+            timedOut: false,
+            elapsedMs,
+            stdout: child.stdout || '',
+            stderr: child.stderr || '',
+            error: child.error.message,
+        };
+    }
+    if (child.status !== 0) {
+        return {
+            ok: false,
+            timedOut: false,
+            elapsedMs,
+            stdout: child.stdout || '',
+            stderr: child.stderr || '',
+            error: (child.stderr || child.stdout || `Query exited with code ${child.status}`).trim(),
+        };
+    }
+    return {
+        ok: true,
+        timedOut: false,
+        elapsedMs,
+        stdout: child.stdout || '',
+        stderr: child.stderr || '',
+    };
+}
+
+function appendQuerySelectorArgs(argv, args, options) {
+    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'endpoint', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
         if (args[key]) {
             argv.push(`--${key}`, args[key]);
         }
     }
-    for (const key of ['limit', 'depth']) {
-        if (Number.isFinite(args[key])) {
-            argv.push(`--${key}`, String(args[key]));
-        }
+    if (hasQuerySelector(args)) {
+        argv.push('--limit', String(options.limit));
+    }
+    if (options.depth) {
+        argv.push('--depth', String(options.depth));
     }
     if (args.upstream) {
         argv.push('--upstream');
@@ -540,30 +700,113 @@ function queryProjectChain(args) {
     if (args.downstream) {
         argv.push('--downstream');
     }
-    const captured = captureConsoleLog(() => queryProjectKb(argv));
-    return textResult(captured.output);
+}
+
+function queryProjectChain(args) {
+    const options = resolveMcpQueryOptions(args);
+    const argv = [...layoutArgv(args), '--json'];
+    appendQuerySelectorArgs(argv, args, options);
+
+    const artifactState = buildProjectArtifactState(args);
+    const queryMeta = {
+        limit: hasQuerySelector(args) ? options.limit : null,
+        depth: options.depth,
+        timeoutMs: options.timeoutMs,
+    };
+    const baseKey = JSON.stringify({
+        tool: 'query_project_chain',
+        workspaceRoot: artifactState.context.workspaceRoot,
+        dataRoot: artifactState.context.dataRoot,
+        layout: artifactState.context.layout,
+        argv,
+    });
+    const cacheKey = JSON.stringify({ baseKey, signature: artifactState.signature });
+    let invalidatedByMtime = false;
+    for (const [key, entry] of projectQueryCache.entries()) {
+        if (entry.baseKey === baseKey && entry.signature !== artifactState.signature) {
+            projectQueryCache.delete(key);
+            invalidatedByMtime = true;
+        }
+    }
+
+    const cached = projectQueryCache.get(cacheKey);
+    if (cached) {
+        return textResult(withMcpQueryMetadata(cached.payload, {
+            hit: true,
+            invalidatedByMtime: false,
+            cachedAt: cached.cachedAt,
+            elapsedMs: 0,
+            artifacts: artifactState.artifacts,
+        }, queryMeta));
+    }
+
+    const result = runQueryScript('query_project_kb.js', argv, options.timeoutMs);
+    if (!result.ok) {
+        return textResult({
+            ok: false,
+            error: result.error,
+            timedOut: result.timedOut,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            _mcpCache: {
+                hit: false,
+                invalidatedByMtime,
+                elapsedMs: result.elapsedMs,
+                artifacts: artifactState.artifacts,
+            },
+            _mcpQuery: queryMeta,
+        });
+    }
+
+    const payload = parseJsonOutput(result.stdout);
+    while (projectQueryCache.size >= MAX_PROJECT_QUERY_CACHE_ENTRIES) {
+        evictOldestProjectQueryCacheEntry();
+    }
+    const cachedAt = new Date().toISOString();
+    projectQueryCache.set(cacheKey, {
+        baseKey,
+        signature: artifactState.signature,
+        payload,
+        cachedAt,
+    });
+    return textResult(withMcpQueryMetadata(payload, {
+        hit: false,
+        invalidatedByMtime,
+        cachedAt,
+        elapsedMs: result.elapsedMs,
+        artifacts: artifactState.artifacts,
+    }, queryMeta));
 }
 
 function queryFeatureChain(args) {
+    const options = resolveMcpQueryOptions(args);
     const argv = [...layoutArgv(args), '--feature', args.feature, '--json'];
-    for (const key of ['event', 'message', 'method', 'request', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
-        if (args[key]) {
-            argv.push(`--${key}`, args[key]);
-        }
+    appendQuerySelectorArgs(argv, args, options);
+    const result = runQueryScript('query_kb.js', argv, options.timeoutMs);
+    if (!result.ok) {
+        return textResult({
+            ok: false,
+            error: result.error,
+            timedOut: result.timedOut,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            _mcpQuery: {
+                limit: hasQuerySelector(args) ? options.limit : null,
+                depth: options.depth,
+                timeoutMs: options.timeoutMs,
+            },
+        });
     }
-    for (const key of ['limit', 'depth']) {
-        if (Number.isFinite(args[key])) {
-            argv.push(`--${key}`, String(args[key]));
-        }
-    }
-    if (args.upstream) {
-        argv.push('--upstream');
-    }
-    if (args.downstream) {
-        argv.push('--downstream');
-    }
-    const captured = captureConsoleLog(() => queryFeatureKb(argv));
-    return textResult(captured.output);
+    const payload = parseJsonOutput(result.stdout);
+    return textResult(withMcpQueryMetadata(payload, {
+        hit: false,
+        supported: false,
+        elapsedMs: result.elapsedMs,
+    }, {
+        limit: hasQuerySelector(args) ? options.limit : null,
+        depth: options.depth,
+        timeoutMs: options.timeoutMs,
+    }));
 }
 
 async function handleMcpRequest(request) {

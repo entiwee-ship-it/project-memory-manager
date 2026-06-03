@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { buildLookup, run: buildChainKb } = require('./build_chain_kb');
-const { ensureDir, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('./lib/common');
+const { ensureDir, hasDefaultIgnoredPathSegment, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('./lib/common');
 const { createWorkspaceContext, parseLayoutArgs } = require('./lib/workspace-layout');
 const { learnProjectProtocols } = require('./learn_project_protocols');
 
@@ -59,8 +59,26 @@ function collectProjectScanRoots(projectProfile, root) {
     const assetRoots = [];
     const methodRoots = [];
     const prefabs = [];
+    const projectGlobalExcludedRoots = [
+        'codex-work',
+        'codex-tools',
+        'codex-tools/project-memory-data',
+        'codex-tools/project-memory-manager',
+    ];
+
+    const shouldIgnoreScanRoot = targetPath => {
+        const relativeTarget = normalize(path.relative(root, path.resolve(targetPath)));
+        return (
+            projectGlobalExcludedRoots.some(excluded => relativeTarget === excluded || relativeTarget.startsWith(`${excluded}/`)) ||
+            hasDefaultIgnoredPathSegment(relativeTarget) ||
+            hasDefaultIgnoredPathSegment(targetPath)
+        );
+    };
 
     const pushIfExists = (bucket, targetPath) => {
+        if (shouldIgnoreScanRoot(targetPath)) {
+            return false;
+        }
         if (pathExists(targetPath)) {
             bucket.push(toConfigPath(root, targetPath));
             return true;
@@ -84,7 +102,7 @@ function collectProjectScanRoots(projectProfile, root) {
             foundKnownRoot = pushIfExists(methodRoots, path.join(absoluteRoot, 'lib')) || foundKnownRoot;
             foundKnownRoot = pushIfExists(methodRoots, path.join(absoluteRoot, 'server')) || foundKnownRoot;
 
-            if (!foundKnownRoot && pathExists(absoluteRoot)) {
+            if (!foundKnownRoot && pathExists(absoluteRoot) && !shouldIgnoreScanRoot(absoluteRoot)) {
                 methodRoots.push(toConfigPath(root, absoluteRoot));
             }
         }

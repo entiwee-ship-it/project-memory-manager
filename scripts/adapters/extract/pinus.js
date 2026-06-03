@@ -11,6 +11,7 @@ function resolveFromProjectRoot(specifier, context) {
         `${basePath}.tsx`,
         `${basePath}.js`,
         `${basePath}.jsx`,
+        `${basePath}.vue`,
         path.join(basePath, 'index.ts'),
         path.join(basePath, 'index.tsx'),
         path.join(basePath, 'index.js'),

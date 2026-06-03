@@ -8,6 +8,7 @@ const pinusFixtureRoot = path.join(__dirname, 'fixtures', 'pinus-sample');
 const cocosFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-http-sample');
 const cocosPrefabFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-prefab-sample');
 const projectGlobalFixtureRoot = path.join(__dirname, 'fixtures', 'project-global-sample');
+const adminFullstackFixtureRoot = path.join(__dirname, 'fixtures', 'admin-fullstack-sample');
 const { run: buildChainKb } = require('../scripts/build_chain_kb');
 const { run: buildProjectKb } = require('../scripts/build_project_kb');
 const { buildLookup } = require('../scripts/build_chain_kb');
@@ -414,6 +415,105 @@ function runFrontendHttpAssertions() {
         runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-http-sample', '--type', 'request', '--name', 'getOrderPayment', '--json'], nestedCwd)
     );
     assert.ok(Array.isArray(requestSearch) && requestSearch.some(item => item.requestHttpMethod === 'POST' && item.requestTransport === 'http-client'));
+}
+
+function runAdminFullstackAssertions() {
+    const tempRoot = copyFixtureToTemp(adminFullstackFixtureRoot, 'pmm-admin-fullstack-');
+    const { graph, report } = buildFixture(tempRoot, 'admin-fullstack-kb.json', 'admin-fullstack-sample');
+    const scan = readJson(path.join(tempRoot, 'project-memory', 'kb', 'features', 'admin-fullstack-sample', 'scan.raw.json'));
+
+    const scriptNames = graph.nodes.filter(node => node.type === 'script').map(node => node.name);
+    assert.ok(scriptNames.includes('Login.vue'), 'indexes Vue SFC scripts');
+    assert.ok(scriptNames.includes('authApi.js'), 'indexes frontend JS API modules');
+    assert.ok(scan.scripts.some(script => script.scriptPath.endsWith('/Login.vue')));
+    assert.ok(scan.scripts.some(script => script.scriptPath.endsWith('/authApi.js')));
+
+    const methodNames = graph.nodes.filter(node => node.type === 'method').map(node => node.name);
+    assert.ok(methodNames.includes('Login.handleLogin'));
+    assert.ok(methodNames.includes('Login.initCaptcha'));
+    assert.ok(methodNames.includes('AuthApi.getCaptcha'));
+    assert.ok(methodNames.includes('AuthApi.login'));
+    assert.ok(methodNames.includes('AuthController.getClassCaptcha'));
+    assert.ok(methodNames.includes('authController.getCaptcha'));
+    assert.ok(methodNames.some(name => name === 'generateCaptcha' || name.endsWith('.generateCaptcha')));
+    assert.ok(methodNames.some(name => name === 'saveCaptcha' || name.endsWith('.saveCaptcha')));
+
+    const requestNames = graph.nodes.filter(node => node.type === 'request').map(node => node.name);
+    assert.ok(requestNames.includes('GET /auth/captcha'), 'indexes frontend captcha request');
+    assert.ok(requestNames.includes('POST /auth/login'), 'indexes frontend login request');
+
+    const endpointNames = graph.nodes.filter(node => node.type === 'endpoint').map(node => node.name);
+    assert.ok(endpointNames.includes('GET /api/auth/captcha'), 'indexes mounted Express captcha endpoint');
+    assert.ok(endpointNames.includes('GET /api/auth/classCaptcha'), 'indexes class instance Express captcha endpoint');
+    assert.ok(endpointNames.includes('POST /api/auth/login'), 'indexes mounted Express login endpoint');
+
+    const hasEdge = (fromName, toName, edgeType) => {
+        const fromNode = graph.nodes.find(node => node.name === fromName);
+        const toNode = graph.nodes.find(node => node.name === toName);
+        return Boolean(fromNode && toNode && graph.edges.some(edge => edge.from === fromNode.id && edge.to === toNode.id && edge.type === edgeType));
+    };
+
+    assert.ok(hasEdge('Login.handleLogin', 'AuthApi.login', 'calls'));
+    assert.ok(hasEdge('Login.initCaptcha', 'AuthApi.getCaptcha', 'calls'));
+    assert.ok(hasEdge('GET /auth/captcha', 'GET /api/auth/captcha', 'matches_endpoint'));
+    assert.ok(hasEdge('GET /api/auth/captcha', 'authController.getCaptcha', 'binds'));
+    assert.ok(hasEdge('GET /api/auth/classCaptcha', 'AuthController.getClassCaptcha', 'binds'));
+    assert.ok(graph.edges.some(edge => {
+        const fromNode = graph.nodes.find(node => node.id === edge.from);
+        const toNode = graph.nodes.find(node => node.id === edge.to);
+        return fromNode?.name === 'authController.getCaptcha' && edge.type === 'calls' && String(toNode?.name || '').endsWith('.generateCaptcha');
+    }));
+    assert.ok(graph.edges.some(edge => {
+        const fromNode = graph.nodes.find(node => node.id === edge.from);
+        const toNode = graph.nodes.find(node => node.id === edge.to);
+        return fromNode?.name === 'authController.getCaptcha' && edge.type === 'calls' && String(toNode?.name || '').endsWith('.saveCaptcha');
+    }));
+
+    const nestedCwd = path.join(tempRoot, 'cms-client', 'src', 'views', 'login');
+    const requestTraversal = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--request', 'captcha', '--downstream', '--depth', '4', '--json'], nestedCwd)
+    );
+    assert.ok(requestTraversal.includes('GET /api/auth/captcha'));
+    assert.ok(requestTraversal.includes('authController.getCaptcha'));
+    assert.ok(requestTraversal.some(name => String(name || '').endsWith('.generateCaptcha')));
+    assert.ok(requestTraversal.some(name => String(name || '').endsWith('.saveCaptcha')));
+
+    const endpointUpstream = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--endpoint', 'GET /api/auth/captcha', '--upstream', '--depth', '4', '--json'], nestedCwd)
+    );
+    assert.ok(endpointUpstream.includes('GET /auth/captcha'));
+    assert.ok(endpointUpstream.includes('AuthApi.getCaptcha'));
+
+    const requestDetail = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--request', 'captcha', '--json'], nestedCwd)
+    );
+    assert.equal(requestDetail.type, 'request');
+    assert.equal(requestDetail.node.name, 'GET /auth/captcha');
+
+    const endpointDetail = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--endpoint', 'GET /api/auth/captcha', '--json'], nestedCwd)
+    );
+    assert.equal(endpointDetail.type, 'endpoint');
+    assert.equal(endpointDetail.httpPath, '/api/auth/captcha');
+    assert.ok(endpointDetail.handlers.includes('authController.getCaptcha'));
+
+    const controllerTraversal = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--method', 'authController.getCaptcha', '--downstream', '--depth', '3', '--json'], nestedCwd)
+    );
+    assert.ok(controllerTraversal.some(name => String(name || '').endsWith('.generateCaptcha')));
+    assert.ok(controllerTraversal.some(name => String(name || '').endsWith('.saveCaptcha')));
+
+    const missingMessage = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--message', 'login', '--json'], nestedCwd)
+    );
+    assert.equal(missingMessage.ok, false);
+    assert.ok(Array.isArray(missingMessage.suggestions));
+    assert.ok(missingMessage.suggestions.some(item => String(item.query || '').includes('--type request --name login')));
+    assert.ok(missingMessage.suggestions.some(item => String(item.query || '').includes('--type endpoint --name login')));
+
+    assert.equal(report.counts.nodesByType.script >= 4, true);
+    assert.equal(report.counts.nodesByType.request >= 2, true);
+    assert.equal(report.counts.nodesByType.endpoint >= 2, true);
 }
 
 function runCocosPrefabAssertions() {
@@ -953,6 +1053,7 @@ try {
     runQueryDisambiguationAssertions();
     runFixtureAssertions();
     runFrontendHttpAssertions();
+    runAdminFullstackAssertions();
     runCocosPrefabAssertions();
     runCocosAuthoringAssertions();
     runProjectGlobalAssertions();

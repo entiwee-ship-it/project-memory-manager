@@ -55,6 +55,49 @@ function sampleGraph() {
     };
 }
 
+function adminFullstackGraph() {
+    return {
+        nodes: [
+            {
+                id: 'script:cms-login',
+                type: 'script',
+                name: 'Login.vue',
+                file: 'E:/xile-workspace/qyProject/cms-client/src/views/login/Login.vue',
+                area: 'frontend',
+                meta: { tags: ['login', 'vue', 'admin'] },
+            },
+            {
+                id: 'request:auth-captcha',
+                type: 'request',
+                name: 'GET /auth/captcha',
+                file: 'E:/xile-workspace/qyProject/cms-client/src/api/authApi.js',
+                area: 'frontend',
+                meta: { tags: ['captcha', 'auth', 'admin'] },
+            },
+            {
+                id: 'endpoint:auth-captcha',
+                type: 'endpoint',
+                name: 'GET /api/auth/captcha',
+                file: 'E:/xile-workspace/qyProject/cms-server/src/routes/authRoutes.ts',
+                area: 'backend',
+                meta: {
+                    path: '/api/auth/captcha',
+                    tags: ['captcha', 'auth', 'admin'],
+                },
+            },
+            {
+                id: 'method:auth-controller',
+                type: 'method',
+                name: 'authController.getCaptcha',
+                file: 'E:/xile-workspace/qyProject/cms-server/src/controllers/authController.ts',
+                area: 'backend',
+                meta: { tags: ['captcha', 'auth', 'admin'] },
+            },
+        ],
+        edges: [],
+    };
+}
+
 function testDiscoversCandidatesFromGraphSignals() {
     const candidates = discoverFeatureCandidates({
         graph: sampleGraph(),
@@ -73,6 +116,37 @@ function testDiscoversCandidatesFromGraphSignals() {
     assert.equal(activity.methodRoots.includes('qy-server/game-server/app/http/routes/activity'), true);
     assert.equal(activity.confidence, 'high');
     assert.equal(activity.evidence.length > 0, true);
+}
+
+function testDiscoversAdminFullstackCandidate() {
+    const candidates = discoverFeatureCandidates({
+        graph: adminFullstackGraph(),
+        workspaceRoot: 'E:/xile-workspace',
+        limit: 10,
+    });
+
+    const admin = candidates.find(candidate => candidate.featureKey === 'qyproject-admin');
+    assert.ok(admin, 'expected qyproject-admin feature candidate');
+    assert.equal(admin.confidence, 'high');
+    assert.equal(admin.areas.includes('frontend'), true);
+    assert.equal(admin.areas.includes('backend'), true);
+    assert.equal(admin.methodRoots.includes('qyProject/cms-client/src'), true);
+    assert.equal(admin.methodRoots.includes('qyProject/cms-server/src'), true);
+    assert.equal(admin.evidence.some(item => item.file.includes('cms-client/src/views/login/Login.vue')), true);
+    assert.equal(admin.evidence.some(item => item.file.includes('cms-server/src/routes/authRoutes.ts')), true);
+}
+
+function testDiscoversAdminCandidateInsideProjectRoot() {
+    const candidates = discoverFeatureCandidates({
+        graph: adminFullstackGraph(),
+        workspaceRoot: 'E:/xile-workspace/qyProject',
+        limit: 10,
+    });
+
+    const admin = candidates.find(candidate => candidate.featureKey === 'qyproject-admin');
+    assert.ok(admin, 'expected qyproject-admin feature candidate when qyProject is workspace root');
+    assert.equal(admin.methodRoots.includes('cms-client/src'), true);
+    assert.equal(admin.methodRoots.includes('cms-server/src'), true);
 }
 
 function testGeneratesFeatureConfigInExternalDataRoot() {
@@ -100,5 +174,7 @@ function testGeneratesFeatureConfigInExternalDataRoot() {
 }
 
 testDiscoversCandidatesFromGraphSignals();
+testDiscoversAdminFullstackCandidate();
+testDiscoversAdminCandidateInsideProjectRoot();
 testGeneratesFeatureConfigInExternalDataRoot();
 console.log('feature-discovery validation passed');

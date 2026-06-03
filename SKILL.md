@@ -58,6 +58,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 - 自动发现候选：`discover_features`，或 CLI `node scripts/discover_features.js --workspace-root <repo-root>`
 - 从候选构建：`build_feature_index`，或 CLI `node scripts/build_feature_index.js --workspace-root <repo-root> --feature-key <key>`
 - 候选文件位于 `<memory-root>/state/feature-candidates.json`
+- 后台全栈结构会自动识别 `cms-client` + `cms-server`，例如生成 `qyproject-admin` 候选并覆盖前端 API、后端 route、controller 和 service 链路
 - 先准备 KB 配置 JSON，明确 `featureKey`、入口文件、关注目录与语义标签
 - **标准构建**: `node scripts/build_chain_kb.js --config <config-path>`
 - **启用结构化摘要**（推荐，支持语义查询）: `node scripts/build_chain_kb.js --config <config-path> --enable-structured-summary`
@@ -135,7 +136,7 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
   - `<memory-root>/kb/project-global/build.report.json`
   - `<memory-root>/state/project-protocols.json`
 - 这一步不是替代 feature KB，而是提供全局入口、消息协议学习和跨区域链路基座
-- 默认跳过 `node_modules`、`.git`、`.runtime`、`dist`、`build`、`coverage`、`out`、`.next`、`.nuxt`、`project-memory` 和 `project-memory-data`
+- 默认跳过 `node_modules`、`.git`、`.runtime`、`dist`、`build`、`coverage`、`out`、`.next`、`.nuxt`、`project-memory`、`project-memory-data`、`codex-work/work/tmp`、`legacy-root-backups` 和 `codex-tools`
 - 每个 workspace 只应该有一个 `project-global`；它是全局基座，feature KB 只有在为具体功能创建配置并构建后才会额外出现
 - 当升级技能版本后，优先重建 `project-global KB`，再重建 feature KB
 
@@ -146,6 +147,8 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
 - 全局时序查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --timing <query>`
 - 全局阶段查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --phase <query>`
 - 全局状态转换查询：`node scripts/query_project_kb.js --workspace-root <repo-root> --transition <query>`
+- 后台接口链路可用 `--request <query>`、`--endpoint <query>`、`--method <query> --downstream|--upstream`
+- 通过 MCP 查询 project-global 时，重复查询会命中缓存；KB 文件 mtime 变化会自动失效，具体查询默认 `limit=20`、最大 `limit=100`，可传 `timeoutMs`
 - 当范围已经缩小到单一 feature，优先通过 MCP `query_feature_chain` 查询；MCP 不可用时再运行 `node scripts/query_kb.js --feature <feature-key> ...`
 - 若已经在技能根目录，可直接运行 `node scripts/query_kb.js --feature <feature-key> ...`
 - 若不在技能根目录，再使用 `node <skill-path>/scripts/query_kb.js --feature <feature-key> ...`

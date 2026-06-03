@@ -15,12 +15,23 @@ const DEFAULT_SCAN_IGNORE_SEGMENTS = new Set([
     'project-memory',
     'project-memory-data',
 ]);
+const DEFAULT_SCAN_IGNORE_PATH_PARTS = [
+    'codex-work/work/tmp',
+    'codex-work/work/active/legacy-root-backups',
+    'legacy-root-backups',
+    'codex-tools/project-memory-data',
+    'codex-tools/project-memory-manager',
+];
 
 function normalize(filePath) {
     return String(filePath || '').split(path.sep).join('/');
 }
 
 function hasDefaultIgnoredPathSegment(filePath) {
+    const normalized = normalize(filePath).toLowerCase();
+    if (DEFAULT_SCAN_IGNORE_PATH_PARTS.some(part => normalized.includes(part))) {
+        return true;
+    }
     return String(filePath || '')
         .split(/[\\/]+/)
         .filter(Boolean)
@@ -437,6 +448,7 @@ function timestamp() {
 
 module.exports = {
     DEFAULT_SCAN_IGNORE_SEGMENTS,
+    DEFAULT_SCAN_IGNORE_PATH_PARTS,
     createDiagnosticError,
     ensureDir,
     findProjectRoot,

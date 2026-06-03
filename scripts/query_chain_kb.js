@@ -11,6 +11,7 @@ function parseArgs(argv) {
     const args = {
         feature: '',
         event: '',
+        endpoint: '',
         message: '',
         method: '',
         request: '',
@@ -50,6 +51,10 @@ function parseArgs(argv) {
         }
         if (token === '--event') {
             args.event = argv[++index];
+            continue;
+        }
+        if (token === '--endpoint') {
+            args.endpoint = argv[++index];
             continue;
         }
         if (token === '--message') {
@@ -194,6 +199,7 @@ function collectTypedSelectors(args) {
     return [
         ['method', args.method],
         ['event', args.event],
+        ['endpoint', args.endpoint],
         ['message', args.message],
         ['request', args.request],
         ['state', args.state],
@@ -851,6 +857,11 @@ function quoteCommandArg(value) {
     return `"${String(value || '').replace(/"/g, '\\"')}"`;
 }
 
+function formatCommandArg(value) {
+    const text = String(value || '');
+    return /^[A-Za-z0-9_./:@-]+$/.test(text) ? text : quoteCommandArg(text);
+}
+
 function buildQueryCommandBase(featureKey, options = {}) {
     const parts = ['node scripts/query_kb.js'];
     if (options.workspaceRoot) {
@@ -950,6 +961,66 @@ function withAmbiguousRecommendations(result, graph, lookup, options = {}) {
         ...result,
         recommendations,
     };
+}
+
+function buildTypeAwareNotFoundResult(graph, featureKey, selectorType, query, options = {}) {
+    const candidateTypes = selectorType === 'message'
+        ? ['method', 'request', 'endpoint', 'route', 'script']
+        : ['method', 'request', 'endpoint', 'route', 'script', 'message'];
+    const base = buildQueryCommandBase(featureKey, options);
+    const suggestions = [];
+
+    for (const type of candidateTypes) {
+        const matches = searchNodes(graph, { adjacency: { outgoing: {}, incoming: {} } }, {
+            type,
+            name: query,
+            limit: 3,
+        });
+        const reason = type === 'method'
+            ? `${query} may be a function or controller method`
+            : type === 'request'
+              ? `${query} may be a frontend HTTP request`
+              : type === 'endpoint'
+                ? `${query} may be a backend HTTP endpoint`
+                : type === 'route'
+                  ? `${query} may be a route or protocol entry`
+                  : type === 'script'
+                    ? `${query} may appear in a source file name`
+                    : `${query} may be a protocol message`;
+        suggestions.push({
+            query: `${base} --type ${type} --name ${formatCommandArg(query)} --json`,
+            reason,
+            matches: matches.slice(0, 3).map(item => ({
+                name: item.name,
+                type: item.type,
+                file: item.file || '',
+                line: item.line ?? null,
+            })),
+        });
+    }
+
+    return {
+        ok: false,
+        error: `No nodes matched ${selectorType}=${query}`,
+        selectorType,
+        query,
+        suggestions,
+    };
+}
+
+function printNotFoundResult(result, asJson) {
+    if (asJson) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+    }
+    console.log(result.error);
+    if (Array.isArray(result.suggestions) && result.suggestions.length > 0) {
+        console.log('可尝试的查询:');
+        for (const suggestion of result.suggestions) {
+            console.log(`- ${suggestion.query}`);
+            console.log(`  reason: ${suggestion.reason}`);
+        }
+    }
 }
 
 function printAmbiguous(result) {
@@ -1291,6 +1362,24 @@ function printFeatureSummary(summary, asJson) {
 }
 
 function resolveTypedStart(graph, lookup, selectorType, query) {
+    const resolveNodeByType = (type, label) => {
+        const exact = graph.nodes.filter(node => node.type === type && (node.name === query || node.id === query));
+        if (exact.length === 1) {
+            return { id: exact[0].id };
+        }
+        if (exact.length > 1) {
+            return { ambiguous: exact.map(node => `${node.type}:${node.name}`) };
+        }
+        const matches = findMatchingNodes(graph, query).filter(node => node.type === type);
+        if (matches.length === 1) {
+            return { id: matches[0].id };
+        }
+        if (matches.length > 1) {
+            return { ambiguous: matches.map(node => `${node.type}:${node.name}`) };
+        }
+        throw new Error(`未找到 ${label}: ${query}`);
+    };
+
     if (selectorType === 'method') {
         const method = resolveMethod(lookup, query);
         if (!method) {
@@ -1315,9 +1404,16 @@ function resolveTypedStart(graph, lookup, selectorType, query) {
     if (selectorType === 'request') {
         const request = getOwnEntry(lookup.requests, query);
         if (!request) {
-            throw new Error(`未找到 request: ${query}`);
+            return resolveNodeByType('request', 'request');
         }
         return request;
+    }
+    if (selectorType === 'endpoint') {
+        const endpoint = getOwnEntry(lookup.endpoints, query);
+        if (!endpoint) {
+            return resolveNodeByType('endpoint', 'endpoint');
+        }
+        return endpoint;
     }
     if (selectorType === 'state') {
         const state = resolveState(lookup, query);
@@ -1453,7 +1549,15 @@ function run(argv = process.argv.slice(2)) {
     if (args.message) {
         const message = getOwnEntry(lookup.messages, args.message);
         if (!message) {
-            throw new Error(`未找到消息: ${args.message}`);
+            printNotFoundResult(
+                buildTypeAwareNotFoundResult(graph, feature.featureKey, 'message', args.message, {
+                    workspaceRoot: context.workspaceRoot,
+                    dataRoot: context.dataRoot,
+                    layout: context.layout,
+                }),
+                args.json
+            );
+            return;
         }
         printDetailedResult(
             {
@@ -1494,21 +1598,66 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
     if (args.request) {
-        const request = getOwnEntry(lookup.requests, args.request);
-        if (!request) {
-            throw new Error(`未找到 request: ${args.request}`);
+        const request = resolveTypedStart(graph, lookup, 'request', args.request);
+        if (request?.ambiguous) {
+            printSummary(
+                withAmbiguousRecommendations(request, graph, lookup, {
+                    featureKey: feature.featureKey,
+                    query: args.request,
+                    direction: 'downstream',
+                    workspaceRoot: context.workspaceRoot,
+                    dataRoot: context.dataRoot,
+                    layout: context.layout,
+                }),
+                args.json
+            );
+            return;
         }
+        const requestNode = getOwnEntry(lookup.nodesById, request.id);
+        const requestInfo = getOwnEntry(lookup.requests, requestNode?.name) || request;
         printDetailedResult(
             {
                 type: 'request',
-                name: args.request,
-                callee: request.callee || '',
+                name: requestNode?.name || args.request,
+                callee: requestInfo.callee || '',
                 kbVersionStatus,
-                callers: request.callers || [],
-                protocol: request.protocol || '',
-                httpMethod: request.httpMethod || '',
-                transport: request.transport || '',
-                node: summarizeNode(getOwnEntry(lookup.nodesById, request.id), lookup),
+                callers: requestInfo.callers || [],
+                protocol: requestInfo.protocol || '',
+                httpMethod: requestInfo.httpMethod || '',
+                transport: requestInfo.transport || '',
+                node: summarizeNode(requestNode, lookup),
+            },
+            args.json
+        );
+        return;
+    }
+    if (args.endpoint) {
+        const endpoint = resolveTypedStart(graph, lookup, 'endpoint', args.endpoint);
+        if (endpoint?.ambiguous) {
+            printSummary(
+                withAmbiguousRecommendations(endpoint, graph, lookup, {
+                    featureKey: feature.featureKey,
+                    query: args.endpoint,
+                    direction: 'downstream',
+                    workspaceRoot: context.workspaceRoot,
+                    dataRoot: context.dataRoot,
+                    layout: context.layout,
+                }),
+                args.json
+            );
+            return;
+        }
+        const endpointNode = getOwnEntry(lookup.nodesById, endpoint.id);
+        const endpointInfo = getOwnEntry(lookup.endpoints, endpointNode?.name) || endpoint;
+        printDetailedResult(
+            {
+                type: 'endpoint',
+                name: endpointNode?.name || args.endpoint,
+                httpMethod: endpointInfo.method || endpointNode?.meta?.method || '',
+                httpPath: endpointInfo.path || endpointNode?.meta?.path || '',
+                handlers: endpointInfo.handlers || [],
+                kbVersionStatus,
+                node: summarizeNode(endpointNode, lookup),
             },
             args.json
         );

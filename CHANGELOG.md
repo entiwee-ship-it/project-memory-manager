@@ -7,6 +7,20 @@
 
 ## [未发布]
 
+## [0.22.0] - 2026-06-03
+
+### 新增
+- Vue SFC、普通 JS API 类、Express Router mount、controller/service 方法的后台全栈链路抽取。
+- HTTP request 到后端 endpoint 的 `matches_endpoint` 关系，支持 `--request`、`--endpoint`、`--method` 串联查询。
+- MCP `query_project_chain` 查询缓存，KB 文件 mtime 改变后自动失效，并内置查询 `limit` 与 `timeoutMs` 保护。
+- `qyproject-admin` 后台全栈 feature 候选自动发现，识别 `cms-client` + `cms-server` 结构并生成跨前后端 KB 配置。
+- 查询类型选错时返回可继续执行的 typed selector 建议，避免把业务词误当 message 后直接中断。
+
+### 改进
+- project-global 默认扫描排除 `codex-work/work/tmp`、`legacy-root-backups`、`project-memory-data` 和插件源码目录，降低临时文件与工具源码污染。
+- method 节点显示优先使用类名或对象名，例如 `AuthApi.getCaptcha`、`authController.getCaptcha`。
+- feature discovery 增强后台结构型候选，避免只按单个接口路径拆出低质量 feature。
+
 ## [0.17.0] - 2026-04-01
 
 ### 新增

@@ -249,6 +249,102 @@ function seedsForNode(node) {
     return [pathSeed(node)].filter(Boolean);
 }
 
+function adminRootInfo(node, workspaceRoot) {
+    const relativeDir = relativeFileDir(workspaceRoot, node.file);
+    const segments = normalizePathSegments(relativeDir);
+    const cmsIndex = segments.findIndex(segment => segment === 'cms-client' || segment === 'cms-server');
+    if (cmsIndex < 0) {
+        return null;
+    }
+    const appSegment = segments[cmsIndex];
+    const rootSegments = segments.slice(0, cmsIndex + 1);
+    if (segments[cmsIndex + 1] === 'src') {
+        rootSegments.push('src');
+    }
+    const projectSegment = segments[cmsIndex - 1] || path.basename(workspaceRoot);
+    return {
+        appSegment,
+        projectSegment,
+        area: appSegment === 'cms-client' ? 'frontend' : 'backend',
+        methodRoot: normalize(rootSegments.join('/')),
+        relativeDir,
+    };
+}
+
+function projectFeaturePrefix(projectSegment = '') {
+    const normalized = String(projectSegment || '')
+        .trim()
+        .replace(/[^A-Za-z0-9]+/g, '')
+        .toLowerCase();
+    if (!normalized || normalized === 'workspace') {
+        return '';
+    }
+    return normalized;
+}
+
+function projectFeatureName(prefix = '') {
+    if (prefix === 'qyproject') {
+        return 'QY Project Admin';
+    }
+    return titleizeKey(`${prefix ? `${prefix}-` : ''}admin`);
+}
+
+function addAdminFullstackCandidates(candidatesByKey, graph, workspaceRoot) {
+    const adminNodes = [];
+    const roots = new Set();
+    const areas = new Set();
+    const projectPrefixes = [];
+
+    for (const node of graph.nodes || []) {
+        const info = adminRootInfo(node, workspaceRoot);
+        if (!info) {
+            continue;
+        }
+        adminNodes.push({ node, info });
+        roots.add(info.methodRoot);
+        areas.add(info.area);
+        const prefix = projectFeaturePrefix(info.projectSegment);
+        if (prefix) {
+            projectPrefixes.push(prefix);
+        }
+    }
+
+    if (!adminNodes.some(item => item.info.appSegment === 'cms-client')
+        || !adminNodes.some(item => item.info.appSegment === 'cms-server')) {
+        return;
+    }
+
+    const prefix = projectPrefixes[0] || '';
+    const featureKey = prefix ? `${prefix}-admin` : 'admin';
+    const candidate = candidatesByKey.get(featureKey) || createCandidate(featureKey);
+    candidate.featureName = candidate.featureName === titleizeKey(featureKey)
+        ? projectFeatureName(prefix)
+        : candidate.featureName;
+    candidate.summary = candidate.summary || 'Discovered CMS admin fullstack candidate from cms-client and cms-server roots.';
+    candidate.reason = candidate.reason || 'cms-client and cms-server root pair';
+    candidate.score += 80 + Math.min(adminNodes.length, 20);
+
+    for (const area of areas) {
+        addUnique(candidate.areas, area);
+    }
+    for (const root of roots) {
+        addUnique(candidate.methodRoots, root);
+    }
+    for (const { node } of adminNodes) {
+        if (candidate.evidence.length >= 12) {
+            break;
+        }
+        candidate.evidence.push({
+            type: node.type,
+            name: node.name,
+            file: normalize(node.file || ''),
+            reason: 'cms-client/cms-server admin fullstack structure',
+        });
+    }
+
+    candidatesByKey.set(featureKey, candidate);
+}
+
 function addUnique(target, value) {
     if (value && !target.includes(value)) {
         target.push(value);
@@ -327,6 +423,7 @@ function discoverFeatureCandidates(options = {}) {
             candidatesByKey.set(seed.featureKey, candidate);
         }
     }
+    addAdminFullstackCandidates(candidatesByKey, graph, workspaceRoot);
 
     return Array.from(candidatesByKey.values())
         .map(finalizeCandidate)

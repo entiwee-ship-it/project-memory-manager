@@ -130,6 +130,8 @@ Codex 的标准调用顺序：
 8. `build_feature_index`：从已确认候选生成并构建 feature KB
 9. `query_project_chain`：查询入口、消息、状态、上下游链路
 
+`query_project_chain` 会对同一 KB mtime 下的重复查询做 MCP 级缓存；当 `chain.graph.json`、`chain.lookup.json` 或 `project-protocols.json` 更新时间变化时自动失效。具体查询默认收窄到 `limit=20`，最大 `limit=100`，可用 `timeoutMs` 控制单次查询超时。
+
 CLI 仍保留给人工或 MCP 不可用时使用：
 
 ```powershell
@@ -211,7 +213,7 @@ node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 
 `project-global` 是每个 workspace 固定只有一个的全局 KB。它负责回答“这个项目整体有哪些入口、事件、状态流转、跨区域调用链”。feature KB 是按具体功能再细分的局部 KB，只有显式创建 feature 配置并构建后才会出现。因此刚接入一个项目时只看到一个 `project-global` 是正常状态。
 
-feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory-root>/state/feature-candidates.json`，确认候选后再运行 `build_feature_index`。这样避免按目录批量创建低质量 KB，同时保留跨前端、后端、消息和状态链路的业务边界。
+feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory-root>/state/feature-candidates.json`，确认候选后再运行 `build_feature_index`。这样避免按目录批量创建低质量 KB，同时保留跨前端、后端、消息和状态链路的业务边界。后台全栈项目会识别 `cms-client` + `cms-server` 结构，例如在 `qyProject` 下自动生成 `qyproject-admin` 候选。
 
 ## 这个技能如何工作
 
@@ -255,6 +257,9 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 - MCP feature 级查询入口
 - feature 候选自动发现
 - 候选驱动的 feature KB 配置生成
+- Vue SFC / JS API / Express Router / controller-service 后台全栈链路抽取
+- HTTP request 到 endpoint 的链路匹配
+- MCP 查询缓存、mtime 自动失效、limit 和 timeout 保护
 - 歧义查询推荐入口分组
 - 方法上下游查询
 - 组件与 handler 绑定查询
@@ -318,6 +323,9 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 - `dist` / `build` / `coverage` / `out`
 - `.next` / `.nuxt`
 - `project-memory` / `project-memory-data`
+- `codex-work/work/tmp`
+- `legacy-root-backups`
+- `codex-tools`
 
 当前规范注册表字段是：
 

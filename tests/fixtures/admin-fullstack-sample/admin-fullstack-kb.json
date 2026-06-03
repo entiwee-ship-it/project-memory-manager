@@ -1,0 +1,23 @@
+{
+  "featureKey": "admin-fullstack-sample",
+  "featureName": "Admin Fullstack Sample",
+  "summary": "Fixture for Vue login, frontend API wrapper, Express routes, and controller call chain extraction",
+  "areas": [
+    "frontend",
+    "backend"
+  ],
+  "methodRoots": [
+    "cms-client/src",
+    "cms-server/src"
+  ],
+  "outputs": {
+    "scan": "project-memory/kb/features/admin-fullstack-sample/scan.raw.json",
+    "graph": "project-memory/kb/features/admin-fullstack-sample/chain.graph.json",
+    "lookup": "project-memory/kb/features/admin-fullstack-sample/chain.lookup.json",
+    "report": "project-memory/kb/features/admin-fullstack-sample/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/admin-fullstack-sample",
+    "featureIndex": "project-memory/docs/features/admin-fullstack-sample/FEATURE.md"
+  }
+}

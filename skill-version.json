@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.21.2",
+  "version": "0.22.0",
   "releaseDate": "2026-06-03",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -51,6 +51,14 @@
     "candidate-driven-feature-kb",
     "query-disambiguation",
     "mcp-feature-query",
-    "default-scan-ignore"
+    "default-scan-ignore",
+    "vue-sfc-js-express-fullstack-kb",
+    "http-request-endpoint-linking",
+    "endpoint-selector-query",
+    "type-aware-query-suggestions",
+    "mcp-query-cache",
+    "mcp-query-timeout-limit",
+    "workspace-tooling-scan-guard",
+    "admin-fullstack-feature-discovery"
   ]
 }

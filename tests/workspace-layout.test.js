@@ -116,9 +116,19 @@ function testProjectKbExternalData() {
     const serviceRoot = path.join(groupRoot, 'cms-server');
     fs.mkdirSync(path.join(serviceRoot, 'src'), { recursive: true });
     fs.mkdirSync(path.join(serviceRoot, 'node_modules', 'noisy-lib'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'codex-work', 'work', 'tmp', '2026-06-03-noise'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'codex-work', 'work', 'active', 'legacy-root-backups', 'old-login'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'codex-tools', 'project-memory-data', 'workspaces', 'sample'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'codex-tools', 'project-memory-manager', 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'codex-tools', 'other-tool'), { recursive: true });
     fs.writeFileSync(path.join(serviceRoot, 'package.json'), '{"dependencies":{"typescript":"latest","express":"latest"}}\n');
     fs.writeFileSync(path.join(serviceRoot, 'src', 'sample.ts'), 'export function ping(){ return "pong"; }\n');
     fs.writeFileSync(path.join(serviceRoot, 'node_modules', 'noisy-lib', 'index.ts'), 'export function dependencyNoise(){ return "noise"; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'codex-work', 'work', 'tmp', '2026-06-03-noise', 'LoginViewComp.ts'), 'export function handleLogin(){ return "tmp-noise"; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'codex-work', 'work', 'active', 'legacy-root-backups', 'old-login', 'LegacyLogin.ts'), 'export function legacyLoginNoise(){ return "legacy-noise"; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'codex-tools', 'project-memory-data', 'workspaces', 'sample', 'DataNoise.ts'), 'export function dataRootNoise(){ return "data-noise"; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'codex-tools', 'project-memory-manager', 'scripts', 'ToolNoise.ts'), 'export function toolSourceNoise(){ return "tool-noise"; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'codex-tools', 'other-tool', 'OtherToolNoise.ts'), 'export function otherToolNoise(){ return "tool-noise"; }\n');
 
     initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'global-sample']);
     detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
@@ -128,7 +138,7 @@ function testProjectKbExternalData() {
         projectType: 'multi-repo',
         areas: {
             frontend: [],
-            backend: ['qyproject', 'qyproject/cms-server'],
+            backend: ['qyproject', 'qyproject/cms-server', 'codex-work', 'codex-tools', 'codex-tools/project-memory-data', 'codex-tools/project-memory-manager'],
             shared: [],
             contract: [],
             data: [],
@@ -153,9 +163,23 @@ function testProjectKbExternalData() {
     assert.equal(fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')), true);
     const graph = JSON.parse(fs.readFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), 'utf8'));
     assert.equal(graph.nodes.some(node => String(node.file || '').includes('node_modules')), false);
+    assert.equal(graph.nodes.some(node => String(node.file || '').includes('codex-work/work/tmp')), false);
+    assert.equal(graph.nodes.some(node => String(node.file || '').includes('legacy-root-backups')), false);
+    assert.equal(graph.nodes.some(node => String(node.file || '').includes('project-memory-data')), false);
+    assert.equal(graph.nodes.some(node => String(node.file || '').includes('project-memory-manager')), false);
+    assert.equal(graph.nodes.some(node => String(node.file || '').includes('codex-tools/other-tool')), false);
     assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('dependencyNoise')), false);
+    assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('handleLogin')), false);
+    assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('legacyLoginNoise')), false);
+    assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('dataRootNoise')), false);
+    assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('toolSourceNoise')), false);
+    assert.equal(graph.nodes.some(node => node.type === 'method' && node.name.includes('otherToolNoise')), false);
     const projectGlobalConfig = JSON.parse(fs.readFileSync(path.join(context.paths.configsDir, 'project-global.json'), 'utf8'));
     assert.equal(projectGlobalConfig.registerFeature, true);
+    assert.equal(projectGlobalConfig.methodRoots.some(root => root.includes('codex-work')), false);
+    assert.equal(projectGlobalConfig.methodRoots.some(root => root.includes('codex-tools')), false);
+    assert.equal(projectGlobalConfig.methodRoots.some(root => root.includes('project-memory-data')), false);
+    assert.equal(projectGlobalConfig.methodRoots.some(root => root.includes('project-memory-manager')), false);
 
     const registry = JSON.parse(fs.readFileSync(context.paths.featureRegistry, 'utf8'));
     assert.equal(registry.features.some(feature => feature.featureKey === 'project-global'), true);

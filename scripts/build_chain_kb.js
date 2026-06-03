@@ -410,6 +410,66 @@ function formatRequestNodeName(request = {}) {
     return target || String(request.callee || '').trim();
 }
 
+function joinHttpPath(basePath, subPath) {
+    const base = String(basePath || '').trim();
+    const sub = String(subPath || '').trim();
+    if (!base && !sub) {
+        return '/';
+    }
+    if (!sub || sub === '/') {
+        return base || '/';
+    }
+    const left = base.replace(/\/+$/, '');
+    const right = sub.replace(/^\/+/, '');
+    const combined = `${left}/${right}`.replace(/\/{2,}/g, '/');
+    return combined.startsWith('/') ? combined : `/${combined}`;
+}
+
+function normalizeHttpPathForMatch(pathValue) {
+    let value = String(pathValue || '').trim().toLowerCase();
+    if (!value) {
+        return '';
+    }
+    value = value.replace(/\/{2,}/g, '/');
+    value = value.startsWith('/') ? value : `/${value}`;
+    value = value.replace(/\/$/, '') || '/';
+    return value.replace(/^\/api(?=\/)/, '');
+}
+
+function buildHttpMountMap(raw) {
+    const mountsByScript = new Map();
+
+    for (const script of raw.scripts || []) {
+        const importsByIdentifier = new Map();
+        for (const importInfo of script.imports || []) {
+            for (const identifier of importInfo.identifiers || []) {
+                importsByIdentifier.set(identifier, importInfo);
+            }
+        }
+
+        for (const method of script.methods || []) {
+            for (const mount of method.httpMounts || []) {
+                const targetImport = importsByIdentifier.get(mount.targetIdentifier) || null;
+                const targetPath = normalize(mount.targetPath || targetImport?.resolvedPath || '');
+                const basePath = String(mount.basePath || '').trim();
+                if (!targetPath || !basePath) {
+                    continue;
+                }
+                if (!mountsByScript.has(targetPath)) {
+                    mountsByScript.set(targetPath, []);
+                }
+                mountsByScript.get(targetPath).push(basePath);
+            }
+        }
+    }
+
+    for (const [scriptPath, mountPaths] of mountsByScript.entries()) {
+        mountsByScript.set(scriptPath, unique(mountPaths).sort((left, right) => left.localeCompare(right)));
+    }
+
+    return mountsByScript;
+}
+
 function buildKbArtifactGuide(outputs = {}) {
     return [
         {
@@ -726,6 +786,7 @@ function buildGraph(raw, config, projectProfile, root) {
     const featureId = makeNodeId('module', config.featureKey);
     const methodMap = buildMethodMap(raw);
     const methodRouteMap = buildMethodRouteMap(methodMap);
+    const httpMountMap = buildHttpMountMap(raw);
     const componentNodeMap = new Map();
 
     const addNode = node => {
@@ -822,11 +883,15 @@ function buildGraph(raw, config, projectProfile, root) {
         const paramNames = options.paramNames || methodInfo?.paramNames || [];
         const bodySnippet = options.bodySnippet || methodInfo?.bodySnippet || '';
         const bodySummary = options.bodySummary || methodInfo?.bodySummary || null;
+        const ownerName = options.ownerName || methodInfo?.ownerName || '';
+        const displayName = ownerName
+            ? `${ownerName}.${methodName}`
+            : `${path.basename(scriptPath, path.extname(scriptPath))}.${methodName}`;
         
         const methodNode = addNode({
             id: makeNodeId('method', scriptPath, methodName),
             type: 'method',
-            name: `${path.basename(scriptPath, path.extname(scriptPath))}.${methodName}`,
+            name: displayName,
             file: scriptNode.file || normalize(path.resolve(root, scriptPath)),
             line: options.line != null ? options.line : (methodInfo?.line ?? null),
             area,
@@ -840,6 +905,7 @@ function buildGraph(raw, config, projectProfile, root) {
                 params,
                 returnType,
                 paramNames,
+                ownerName,
                 bodySnippet,
                 // 修饰符
                 access: options.access || methodInfo?.access || 'public',
@@ -891,11 +957,33 @@ function buildGraph(raw, config, projectProfile, root) {
                 method: endpointInfo.method,
                 path: endpointInfo.path,
                 handlerName: endpointInfo.handlerName || '',
+                handlerIdentifier: endpointInfo.handlerIdentifier || '',
+                handlerMethod: endpointInfo.handlerMethod || '',
+                handlerSourcePath: endpointInfo.handlerSourcePath || '',
+                middlewares: endpointInfo.middlewares || [],
+                mountBasePath: endpointInfo.mountBasePath || '',
+                originalPath: endpointInfo.originalPath || '',
             },
         });
         appendNodeTags(endpointNode, endpointInfo.method, endpointInfo.path, endpointInfo.handlerName || '', 'endpoint');
         addEdge({ from: scriptNode.id, to: endpointNode.id, type: 'contains', sourceKind: 'endpoint', area });
         return endpointNode;
+    };
+
+    const expandMountedEndpointInfos = (scriptPath, endpointInfo) => {
+        const mountPaths = httpMountMap.get(normalize(scriptPath)) || [];
+        if (mountPaths.length <= 0) {
+            return [endpointInfo];
+        }
+        return mountPaths.map(basePath => {
+            const pathAlreadyMounted = normalizeHttpPathForMatch(endpointInfo.path) === normalizeHttpPathForMatch(joinHttpPath(basePath, endpointInfo.path));
+            return {
+                ...endpointInfo,
+                path: pathAlreadyMounted ? endpointInfo.path : joinHttpPath(basePath, endpointInfo.path),
+                originalPath: endpointInfo.path,
+                mountBasePath: basePath,
+            };
+        });
     };
 
     const ensureRouteNode = (scriptPath, routeInfo, line = null, area = inferNodeArea(scriptPath)) => {
@@ -1351,24 +1439,43 @@ function buildGraph(raw, config, projectProfile, root) {
                 access: method.access || 'public',
                 isAsync: method.async || false,
                 isStatic: method.static || false,
+                ownerName: method.ownerName || '',
             });
             const currentMethodId = currentMethodNode.id;
             addEdge({ from: scriptNode.id, to: currentMethodId, type: 'contains', sourceKind: 'script', area: methodArea });
 
             for (const endpointInfo of method.httpEndpoints || []) {
-                const endpointNode = ensureEndpointNode(script.scriptPath, endpointInfo, method.line, methodArea);
-                addEdge({
-                    from: endpointNode.id,
-                    to: currentMethodId,
-                    type: 'binds',
-                    sourceKind: 'endpoint',
-                    area: methodArea,
-                    meta: {
-                        method: endpointInfo.method,
-                        path: endpointInfo.path,
-                        handlerName: endpointInfo.handlerName || '',
-                    },
-                });
+                for (const mountedEndpointInfo of expandMountedEndpointInfos(script.scriptPath, endpointInfo)) {
+                    const endpointNode = ensureEndpointNode(script.scriptPath, mountedEndpointInfo, method.line, methodArea);
+                    addEdge({
+                        from: endpointNode.id,
+                        to: currentMethodId,
+                        type: 'binds',
+                        sourceKind: 'endpoint',
+                        area: methodArea,
+                        meta: {
+                            method: mountedEndpointInfo.method,
+                            path: mountedEndpointInfo.path,
+                            handlerName: mountedEndpointInfo.handlerName || '',
+                        },
+                    });
+
+                    if (mountedEndpointInfo.handlerSourcePath && mountedEndpointInfo.handlerMethod) {
+                        const handlerMethodNode = ensureMethodNode(mountedEndpointInfo.handlerSourcePath, mountedEndpointInfo.handlerMethod);
+                        addEdge({
+                            from: endpointNode.id,
+                            to: handlerMethodNode.id,
+                            type: 'binds',
+                            sourceKind: 'endpoint-handler',
+                            area: handlerMethodNode.area || methodArea,
+                            meta: {
+                                method: mountedEndpointInfo.method,
+                                path: mountedEndpointInfo.path,
+                                handlerName: mountedEndpointInfo.handlerName || '',
+                            },
+                        });
+                    }
+                }
             }
 
             for (const routeInfo of method.messageRoutes || []) {
@@ -1539,6 +1646,8 @@ function buildGraph(raw, config, projectProfile, root) {
                     stack: inferStacks(methodArea, projectProfile),
                     meta: {
                         callee: request.callee,
+                        target: request.target || '',
+                        path: request.target || requestRoute || '',
                         callbackKind: request.callbackKind,
                         route: requestRoute,
                         protocol: request.protocol || '',
@@ -1747,6 +1856,35 @@ function buildGraph(raw, config, projectProfile, root) {
                     meta: { statePath },
                 });
             }
+        }
+    }
+
+    const httpRequests = nodes.filter(node => node.type === 'request' && String(node.meta?.protocol || '') === 'http');
+    const httpEndpoints = nodes.filter(node => node.type === 'endpoint');
+    for (const requestNode of httpRequests) {
+        const requestMethod = String(requestNode.meta?.httpMethod || '').toUpperCase();
+        const requestPath = normalizeHttpPathForMatch(requestNode.meta?.target || requestNode.meta?.path || requestNode.name.replace(/^[A-Z]+\s+/, ''));
+        if (!requestMethod || !requestPath) {
+            continue;
+        }
+        for (const endpointNode of httpEndpoints) {
+            const endpointMethod = String(endpointNode.meta?.method || '').toUpperCase();
+            const endpointPath = normalizeHttpPathForMatch(endpointNode.meta?.path || endpointNode.name.replace(/^[A-Z]+\s+/, ''));
+            if (requestMethod !== endpointMethod || requestPath !== endpointPath) {
+                continue;
+            }
+            addEdge({
+                from: requestNode.id,
+                to: endpointNode.id,
+                type: 'matches_endpoint',
+                sourceKind: 'http',
+                area: endpointNode.area || requestNode.area,
+                meta: {
+                    confidence: 'high',
+                    requestPath: requestNode.meta?.target || '',
+                    endpointPath: endpointNode.meta?.path || '',
+                },
+            });
         }
     }
 

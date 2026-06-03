@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { createExtractContext } = require('./adapters/extract');
 const { hasDefaultIgnoredPathSegment } = require('./lib/common');
+const { extractVueScriptContent } = require('./lib/vue_sfc');
 
 const DEFAULT_METHOD_SKIP = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'constructor']);
 const STATE_MUTATION_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'set', 'delete', 'clear']);
@@ -38,6 +39,24 @@ function loadTypeScriptRuntime() {
 }
 
 const TYPESCRIPT_RUNTIME = loadTypeScriptRuntime();
+
+function getScriptKind(scriptFile) {
+    const ts = TYPESCRIPT_RUNTIME;
+    if (!ts) {
+        return null;
+    }
+    const lower = String(scriptFile || '').toLowerCase();
+    if (lower.endsWith('.tsx')) {
+        return ts.ScriptKind.TSX;
+    }
+    if (lower.endsWith('.jsx')) {
+        return ts.ScriptKind.JSX;
+    }
+    if (lower.endsWith('.js')) {
+        return ts.ScriptKind.JS;
+    }
+    return ts.ScriptKind.TS;
+}
 
 function parseArgs(argv) {
     const args = {
@@ -763,7 +782,7 @@ function extractFieldTypesFromAst(source, scriptFile, imports) {
         return new Map();
     }
 
-    const scriptKind = scriptFile.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const scriptKind = getScriptKind(scriptFile);
     const sourceFile = ts.createSourceFile(scriptFile, source, ts.ScriptTarget.Latest, true, scriptKind);
     const fieldTypes = new Map();
     const importMap = new Map();
@@ -1379,9 +1398,44 @@ function extractMethodDefinitionsFromAst(source, scriptFile) {
         return null;
     }
 
-    const scriptKind = scriptFile.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const scriptKind = getScriptKind(scriptFile);
     const sourceFile = ts.createSourceFile(scriptFile, source, ts.ScriptTarget.Latest, true, scriptKind);
     const definitions = [];
+
+    const readLiteralText = node => {
+        if (!node) {
+            return '';
+        }
+        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+            return node.text;
+        }
+        return '';
+    };
+
+    const inferClassBasePath = classNode => {
+        for (const member of classNode.members || []) {
+            if (!ts.isConstructorDeclaration(member) || !member.body) {
+                continue;
+            }
+            for (const statement of member.body.statements || []) {
+                if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) {
+                    continue;
+                }
+                const expression = statement.expression.expression;
+                const expressionPath = getExpressionPathFromAst(expression, ts);
+                const isSuperCall = expressionPath === 'super' || expression.kind === ts.SyntaxKind.SuperKeyword;
+                if (!isSuperCall) {
+                    continue;
+                }
+                const firstArg = statement.expression.arguments?.[0] || null;
+                const basePath = readLiteralText(firstArg);
+                if (basePath) {
+                    return basePath;
+                }
+            }
+        }
+        return '';
+    };
 
     const pushDefinition = (name, node, options = {}) => {
         if (!name || DEFAULT_METHOD_SKIP.has(name)) {
@@ -1405,11 +1459,15 @@ function extractMethodDefinitionsFromAst(source, scriptFile) {
             astNode: options.astNode || node,
             astSourceFile: sourceFile,
             astKind: options.astKind || 'method',
+            ownerName: options.ownerName || '',
+            ownerBasePath: options.ownerBasePath || '',
         });
     };
 
     const visit = node => {
         if (ts.isClassLike(node)) {
+            const ownerName = node.name?.text || '';
+            const ownerBasePath = inferClassBasePath(node);
             for (const member of node.members || []) {
                 if (ts.isMethodDeclaration(member)) {
                     const name = getPropertyNameText(member.name, ts);
@@ -1428,6 +1486,8 @@ function extractMethodDefinitionsFromAst(source, scriptFile) {
                         bodyText: extractMethodBodyTextFromAst(member.body, sourceFile, ts),
                         directBodyText: extractDirectBodyTextFromAst(member, sourceFile, ts),
                         astKind: 'method',
+                        ownerName,
+                        ownerBasePath,
                     });
                     continue;
                 }
@@ -1455,6 +1515,8 @@ function extractMethodDefinitionsFromAst(source, scriptFile) {
                         directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
                         astKind: ts.isArrowFunction(initializer) ? 'arrow-property' : 'function-property',
                         astNode: initializer,
+                        ownerName,
+                        ownerBasePath,
                     });
                 }
             }
@@ -1479,6 +1541,51 @@ function extractMethodDefinitionsFromAst(source, scriptFile) {
         if (ts.isVariableStatement(node)) {
             for (const declaration of node.declarationList?.declarations || []) {
                 if (!ts.isIdentifier(declaration.name) || !declaration.initializer) {
+                    continue;
+                }
+                if (ts.isObjectLiteralExpression(declaration.initializer)) {
+                    const ownerName = declaration.name.text;
+                    for (const property of declaration.initializer.properties || []) {
+                        if (ts.isMethodDeclaration(property)) {
+                            const propertyName = getPropertyNameText(property.name, ts);
+                            pushDefinition(propertyName, property, {
+                                access: 'public',
+                                static: false,
+                                async: hasModifier(property, 'AsyncKeyword', ts),
+                                paramsNode: property.parameters || [],
+                                returnType: property.type ? property.type.getText(sourceFile) : '',
+                                paramNames: extractAstParamNames(property.parameters || [], ts),
+                                openBraceIndex: property.body ? property.body.pos - 1 : -1,
+                                bodyText: extractMethodBodyTextFromAst(property.body, sourceFile, ts),
+                                directBodyText: extractDirectBodyTextFromAst(property, sourceFile, ts),
+                                astKind: 'object-method',
+                                ownerName,
+                            });
+                            continue;
+                        }
+                        if (
+                            ts.isPropertyAssignment(property) &&
+                            property.initializer &&
+                            (ts.isArrowFunction(property.initializer) || ts.isFunctionExpression(property.initializer))
+                        ) {
+                            const initializer = property.initializer;
+                            const propertyName = getPropertyNameText(property.name, ts);
+                            pushDefinition(propertyName, property, {
+                                access: 'public',
+                                static: false,
+                                async: hasModifier(initializer, 'AsyncKeyword', ts),
+                                paramsNode: initializer.parameters || [],
+                                returnType: initializer.type ? initializer.type.getText(sourceFile) : '',
+                                paramNames: extractAstParamNames(initializer.parameters || [], ts),
+                                openBraceIndex: ts.isBlock(initializer.body) ? initializer.body.pos - 1 : -1,
+                                bodyText: extractMethodBodyTextFromAst(initializer.body, sourceFile, ts),
+                                directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
+                                astKind: ts.isArrowFunction(initializer) ? 'object-arrow-property' : 'object-function-property',
+                                astNode: initializer,
+                                ownerName,
+                            });
+                        }
+                    }
                     continue;
                 }
                 if (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer)) {
@@ -1575,6 +1682,7 @@ function createEmptyCallInfo() {
         stateWrites: [],
         timingSignals: [],
         httpEndpoints: [],
+        httpMounts: [],
         messageRoutes: [],
         notifyRoutes: [],
         dbReads: [],
@@ -1605,6 +1713,27 @@ function buildPinusRpcRequest(routeInfo, callbackDetails = {}) {
         callbackFieldCalls: callbackDetails.callbackFieldCalls || [],
         callbackEventDispatches: callbackDetails.callbackEventDispatches || [],
         callbackInvocations: callbackDetails.callbackInvocations || [],
+    };
+}
+
+function buildHttpWrapperRequest(methodDef, httpMethod, targetPath, callee) {
+    const basePath = String(methodDef?.ownerBasePath || '').trim();
+    const joinedPath = joinHttpRoutePath(basePath, targetPath);
+    return {
+        callee: callee || String(httpMethod || '').toLowerCase(),
+        target: joinedPath,
+        route: joinedPath,
+        protocol: 'http',
+        httpMethod: String(httpMethod || '').toUpperCase(),
+        transport: 'http-client',
+        sourceMethod: methodDef?.ownerName ? `${methodDef.ownerName}.${methodDef.name}` : methodDef?.name || '',
+        callbackKind: 'none',
+        callbackRef: '',
+        callbackLocalCalls: [],
+        callbackImportedCalls: [],
+        callbackFieldCalls: [],
+        callbackEventDispatches: [],
+        callbackInvocations: [],
     };
 }
 
@@ -1700,11 +1829,32 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                 pushLocalCall(expression.text, node);
             }
 
+            if (ts.isIdentifier(expression) && importMap.has(expression.text)) {
+                importedCalls.push(buildImportedCall(importMap.get(expression.text), expression.text, expression.text, {
+                    callKind: 'function',
+                }));
+            }
+
             if (isPropertyAccessLike(expression, ts)) {
                 const thisPath = readThisAccessPathFromAst(expression, ts);
+                const wrapperMethod = String(thisPath || '').toLowerCase();
+                const wrapperHttpMethods = new Map([
+                    ['get', 'GET'],
+                    ['post', 'POST'],
+                    ['put', 'PUT'],
+                    ['delete', 'DELETE'],
+                    ['patch', 'PATCH'],
+                ]);
+                const wrapperHttpMethod = wrapperHttpMethods.get(wrapperMethod) || '';
+                if (wrapperHttpMethod && methodDef.ownerBasePath) {
+                    const targetPath = normalizeInlineExpression(argTexts[0] || '');
+                    if (targetPath) {
+                        networkRequests.push(buildHttpWrapperRequest(methodDef, wrapperHttpMethod, targetPath, normalizedPath));
+                    }
+                }
                 if (thisPath) {
                     const parts = thisPath.split('.');
-                    if (parts.length === 1) {
+                    if (parts.length === 1 && !wrapperHttpMethod) {
                         pushLocalCall(parts[0], node);
                     } else {
                         const [fieldName] = parts;
@@ -1940,6 +2090,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
             item => `${item.kind || ''}::${item.callee || ''}::${item.delayMs || ''}::${item.callbackKind || ''}::${item.callbackRef || ''}::${(item.callbackLocalCalls || []).join(',')}`
         ),
         httpEndpoints: [],
+        httpMounts: [],
         messageRoutes: [],
         notifyRoutes: [],
         dbReads: [],
@@ -2137,11 +2288,109 @@ function extractDbAccesses(methodBody, imports = []) {
 
 function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames = []) {
     const routeBasePath = buildHttpRouteBasePath(scriptFile);
-    if (!routeBasePath && !normalize(scriptFile).includes('/app/http/routes/')) {
+    const normalizedScriptFile = normalize(scriptFile);
+    const isRouteFile = /(?:^|\/)(?:app\/http\/routes|src\/routes|routes)\//.test(normalizedScriptFile);
+    if (!routeBasePath && !isRouteFile) {
         return [];
     }
 
     const syntheticMethods = [];
+    const importMap = buildImportIdentifierMap(imports);
+    const instanceImportMap = new Map();
+    const instancePattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+([A-Za-z_$][\w$]*)\s*\(/g;
+    let instanceMatch = null;
+    while ((instanceMatch = instancePattern.exec(source))) {
+        const instanceName = instanceMatch[1];
+        const className = instanceMatch[2];
+        const importInfo = importMap.get(className);
+        if (!importInfo) {
+            continue;
+        }
+        instanceImportMap.set(instanceName, {
+            ...importInfo,
+            instanceName,
+            className,
+        });
+    }
+    const buildHandlerRef = handlerArg => {
+        const handlerText = String(handlerArg || '').trim();
+        const parts = handlerText.split('.').filter(Boolean);
+        if (parts.length < 1) {
+            return null;
+        }
+        const identifier = parts[0];
+        const method = parts[parts.length - 1] || '';
+        const importInfo = importMap.get(identifier) || instanceImportMap.get(identifier) || null;
+        return {
+            handlerName: handlerText,
+            handlerIdentifier: identifier,
+            handlerMethod: method,
+            handlerSourcePath: importInfo?.resolvedPath || null,
+            handlerSourceSpecifier: importInfo?.specifier || '',
+        };
+    };
+
+    const mountPattern = /\b([A-Za-z_$][\w$]*)\.use\s*\(/g;
+    let mountMatch = null;
+    while ((mountMatch = mountPattern.exec(source))) {
+        const openParenIndex = mountPattern.lastIndex - 1;
+        const argsRange = extractWrappedRange(source, openParenIndex, '(', ')');
+        if (!argsRange) {
+            continue;
+        }
+
+        const args = splitTopLevelArgs(argsRange.content);
+        const mountPath = joinHttpRoutePath('', args[0] || '');
+        const targetIdentifier = String(args[1] || '').trim();
+        const targetImport = importMap.get(targetIdentifier) || null;
+        if (!mountPath || !targetIdentifier || /=>|function\b/.test(targetIdentifier)) {
+            mountPattern.lastIndex = argsRange.closeIndex + 1;
+            continue;
+        }
+
+        const line = source.slice(0, mountMatch.index).split(/\r?\n/).length;
+        syntheticMethods.push({
+            name: toSyntheticMethodName('http_mount', mountPath),
+            access: 'public',
+            static: false,
+            async: false,
+            params: '',
+            returnType: '',
+            paramNames: [],
+            line,
+            summary: `HTTP mount ${mountPath}`,
+            localCalls: [],
+            localCallSites: [],
+            importedCalls: [],
+            apiCalls: [],
+            fieldCalls: [],
+            eventSubscriptions: [],
+            eventDispatches: [],
+            networkRequests: [],
+            callbackInvocations: [],
+            stateReads: [],
+            stateWrites: [],
+            timingSignals: [],
+            notifyRoutes: [],
+            dbReads: [],
+            dbWrites: [],
+            httpEndpoints: [],
+            httpMounts: [
+                {
+                    basePath: mountPath,
+                    routerName: mountMatch[1],
+                    targetIdentifier,
+                    targetPath: targetImport?.resolvedPath || null,
+                    targetSpecifier: targetImport?.specifier || '',
+                },
+            ],
+            messageRoutes: [],
+            syntheticKind: 'http-mount',
+        });
+
+        mountPattern.lastIndex = argsRange.closeIndex + 1;
+    }
+
     const routePattern = /\b([A-Za-z_$][\w$]*)\.(get|post|put|delete)\s*\(/g;
     let match = null;
 
@@ -2160,21 +2409,33 @@ function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, han
         const args = splitTopLevelArgs(argsRange.content);
         const pathArg = args[0] || '';
         const callbackArg = [...args].reverse().find(arg => /=>|function\b/.test(arg)) || '';
+        const handlerArg = [...args.slice(1)].reverse().find(arg => !/=>|function\b/.test(arg)) || '';
         const callbackBody = callbackArg ? extractInlineCallbackBody(callbackArg) : '';
-        if (!pathArg || !callbackBody) {
+        const handlerRef = callbackBody ? null : buildHandlerRef(handlerArg);
+        if (!pathArg || (!callbackBody && !handlerRef)) {
             routePattern.lastIndex = argsRange.closeIndex + 1;
             continue;
         }
 
         const fullPath = joinHttpRoutePath(routeBasePath, pathArg);
-        const paramNames = extractCallableParamNames(callbackArg);
-        const callInfo = normalizeFinalCallInfo(
-            extractMethodCalls(callbackBody, '__http_endpoint__', imports, fieldTypes, handlerMaps, paramNames, knownMethodNames, callbackBody),
-            knownMethodNames
-        );
+        const paramNames = callbackArg ? extractCallableParamNames(callbackArg) : [];
+        const callInfo = callbackBody
+            ? normalizeFinalCallInfo(
+                extractMethodCalls(callbackBody, '__http_endpoint__', imports, fieldTypes, handlerMaps, paramNames, knownMethodNames, callbackBody),
+                knownMethodNames
+            )
+            : {
+                ...createEmptyCallInfo(),
+                importedCalls: handlerRef?.handlerSourcePath
+                    ? [buildImportedCall(importMap.get(handlerRef.handlerIdentifier) || instanceImportMap.get(handlerRef.handlerIdentifier), handlerRef.handlerIdentifier, handlerRef.handlerMethod, {
+                        callKind: 'handler-reference',
+                    })]
+                    : [],
+            };
         const line = source.slice(0, match.index).split(/\r?\n/).length;
         const endpointMethod = httpMethod.toUpperCase();
         const syntheticMethodName = toSyntheticMethodName(`http_${httpMethod}`, fullPath);
+        const middlewares = args.slice(1, -1).map(item => String(item || '').trim()).filter(Boolean);
 
         syntheticMethods.push({
             name: syntheticMethodName,
@@ -2205,12 +2466,18 @@ function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, han
                 {
                     method: endpointMethod,
                     path: fullPath,
-                    handlerName: `${match[1]}.${httpMethod}`,
+                    handlerName: handlerRef?.handlerName || `${match[1]}.${httpMethod}`,
+                    handlerIdentifier: handlerRef?.handlerIdentifier || '',
+                    handlerMethod: handlerRef?.handlerMethod || '',
+                    handlerSourcePath: handlerRef?.handlerSourcePath || null,
+                    handlerSourceSpecifier: handlerRef?.handlerSourceSpecifier || '',
+                    middlewares,
                     localCalls: callInfo.localCalls,
                     importedCalls: callInfo.importedCalls,
                     fieldCalls: callInfo.fieldCalls,
                 },
             ],
+            httpMounts: [],
             messageRoutes: [],
             syntheticKind: 'http-endpoint',
         });
@@ -2996,6 +3263,10 @@ function mergeCallInfo(regexInfo, astInfo) {
             [...(regexInfo.httpEndpoints || []), ...(astInfo.httpEndpoints || [])],
             item => `${item.method || ''}::${item.path || ''}::${item.handlerName || ''}`
         ),
+        httpMounts: dedupeBy(
+            [...(regexInfo.httpMounts || []), ...(astInfo.httpMounts || [])],
+            item => `${item.basePath || ''}::${item.targetIdentifier || ''}::${item.targetPath || ''}`
+        ),
         messageRoutes: dedupeBy(
             [...(regexInfo.messageRoutes || []), ...(astInfo.messageRoutes || [])],
             item => `${item.kind || ''}::${item.route || ''}::${item.handler || ''}::${item.role || ''}`
@@ -3028,6 +3299,10 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
         httpEndpoints: dedupeBy(
             [...(callInfo.httpEndpoints || [])],
             item => `${item.method || ''}::${item.path || ''}::${item.handlerName || ''}`
+        ),
+        httpMounts: dedupeBy(
+            [...(callInfo.httpMounts || [])],
+            item => `${item.basePath || ''}::${item.targetIdentifier || ''}::${item.targetPath || ''}`
         ),
         messageRoutes: dedupeBy(
             [...(callInfo.messageRoutes || [])],
@@ -3159,20 +3434,27 @@ function extractScriptInsights(methodRoots, context, options = {}) {
     const result = [];
 
     for (const root of methodRoots) {
-        const scriptFiles = listFilesRecursive(root, filePath => /\.tsx?$/.test(filePath) && !filePath.endsWith('.d.ts'));
+        const scriptFiles = listFilesRecursive(root, filePath => /\.(ts|tsx|js|jsx|vue)$/i.test(filePath) && !filePath.endsWith('.d.ts'));
         for (const scriptFile of scriptFiles) {
             const normalizedScript = normalize(scriptFile);
-            let source;
+            let originalSource;
             try {
-                source = fs.readFileSync(scriptFile, 'utf8');
+                originalSource = fs.readFileSync(scriptFile, 'utf8');
             } catch (err) {
                 console.warn(`[SKILL-WARN] 无法读取脚本文件，将跳过: ${scriptFile}`);
                 console.warn(`  错误: ${err.message}`);
                 continue;
             }
-            const astContext = extractMethodDefinitionsFromAst(source, scriptFile);
+            const isVueFile = /\.vue$/i.test(scriptFile);
+            const vueScript = isVueFile ? extractVueScriptContent(originalSource) : null;
+            const source = isVueFile ? vueScript.content : originalSource;
+            if (!source.trim()) {
+                continue;
+            }
+            const parseScriptFile = isVueFile ? `${scriptFile}.ts` : scriptFile;
+            const astContext = extractMethodDefinitionsFromAst(source, parseScriptFile);
             const imports = extractImports(source, scriptFile, context);
-            const fieldTypes = extractFieldTypes(source, scriptFile, imports);
+            const fieldTypes = extractFieldTypes(source, parseScriptFile, imports);
             const handlerMaps = extractHandlerMaps(source);
             const exports = extractExports(source);
             const methods = [];
@@ -3255,11 +3537,14 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                     stateWrites: callInfo.stateWrites,
                     timingSignals: callInfo.timingSignals,
                     httpEndpoints: callInfo.httpEndpoints,
+                    httpMounts: callInfo.httpMounts,
                     messageRoutes: callInfo.messageRoutes,
                     notifyRoutes: callInfo.notifyRoutes,
                     dbReads: callInfo.dbReads,
                     dbWrites: callInfo.dbWrites,
                     syntheticKind: methodDef.syntheticKind || '',
+                    ownerName: methodDef.ownerName || '',
+                    ownerBasePath: methodDef.ownerBasePath || '',
                 });
             }
 
