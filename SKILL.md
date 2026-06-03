@@ -149,6 +149,7 @@ node scripts/query_chain_kb.js --feature <key> --data-flow-to <variable>
 - 若不在技能根目录，再使用 `node <skill-path>/scripts/query_kb.js --feature <feature-key> ...`
 - 若只执行 `--feature <key>`，脚本会先返回 feature 摘要、默认排查顺序、推荐命令和各 KB 文件用途
 - 优先用 `--downstream <query>`、`--upstream <query>`，或 `--method/--event/--request/--state <query> --downstream|--upstream`
+- 如果查询返回 `ambiguous`，优先查看同一结果里的 `recommendations.groups`；它会把候选按 HTTP 接口、Pinus 路由、请求、方法、UI/Prefab、状态/数据等入口分组，并给出可继续执行的推荐命令
 - `scripts/query_chain_kb.js` 仍保留兼容，但默认推荐入口改为 `scripts/query_kb.js`
 - 兼容旧写法 `--from <query> --direction <upstream|downstream>`
 - `build.report.json` 是给人看的说明文件；`chain.lookup.json` / `chain.graph.json` / `scan.raw.json` 默认都不建议直接手读

@@ -733,8 +733,239 @@ function formatNodeLabel(node) {
     return `${node.name} [${node.type}]`;
 }
 
+function splitAmbiguousCandidate(candidate) {
+    const text = String(candidate || '').trim();
+    const separator = text.indexOf(':');
+    if (separator <= 0) {
+        return { raw: text, type: '', name: text };
+    }
+    return {
+        raw: text,
+        type: text.slice(0, separator),
+        name: text.slice(separator + 1),
+    };
+}
+
+function resolveAmbiguousCandidateNode(graph, lookup, candidate) {
+    const parsed = splitAmbiguousCandidate(candidate);
+    if (getOwnEntry(lookup.nodesById, parsed.raw)) {
+        return getOwnEntry(lookup.nodesById, parsed.raw);
+    }
+    const directMatches = (graph.nodes || []).filter(node => {
+        if (parsed.type && node.type !== parsed.type) {
+            return false;
+        }
+        return (
+            node.name === parsed.name ||
+            node.id === parsed.raw ||
+            node.meta?.route === parsed.name ||
+            node.meta?.statePath === parsed.name ||
+            `${node.type}:${node.name}` === parsed.raw
+        );
+    });
+    if (directMatches.length > 0) {
+        return directMatches[0];
+    }
+
+    const normalizedName = normalizeText(parsed.name);
+    return (graph.nodes || []).find(node => {
+        if (parsed.type && node.type !== parsed.type) {
+            return false;
+        }
+        return (
+            normalizeText(node.name) === normalizedName ||
+            normalizeText(node.meta?.route) === normalizedName ||
+            normalizeText(node.meta?.statePath) === normalizedName
+        );
+    }) || null;
+}
+
+function getRecommendationGroup(node) {
+    if (node.type === 'endpoint') {
+        return {
+            key: 'http-endpoint',
+            title: 'HTTP 接口入口',
+            priority: 1,
+            reason: '适合从外部 API 或后台接口入口继续追下游链路。',
+        };
+    }
+    if (node.type === 'route') {
+        const isPinus = matchContains(node.meta?.protocol, 'pinus') || matchContains(node.meta?.kind, 'pinus');
+        return {
+            key: isPinus ? 'pinus-route' : 'route',
+            title: isPinus ? 'Pinus RPC/消息入口' : '路由入口',
+            priority: isPinus ? 2 : 3,
+            reason: '适合从服务端消息、remote 或 handler 路由继续追链路。',
+        };
+    }
+    if (node.type === 'request') {
+        const isFrontend = node.area === 'frontend' || matchContains(node.meta?.transport, 'http') || matchContains(node.meta?.httpMethod, 'GET') || matchContains(node.meta?.httpMethod, 'POST');
+        return {
+            key: isFrontend ? 'frontend-request' : 'network-request',
+            title: isFrontend ? '前端请求入口' : '网络/RPC 调用入口',
+            priority: isFrontend ? 4 : 5,
+            reason: '适合从调用方请求继续追上游或下游。',
+        };
+    }
+    if (node.type === 'method') {
+        return {
+            key: 'method',
+            title: '方法入口',
+            priority: 6,
+            reason: '适合已经知道具体实现函数时直接追调用链。',
+        };
+    }
+    if (['binding', 'ui-node', 'component', 'asset'].includes(node.type)) {
+        return {
+            key: 'ui-binding',
+            title: 'UI/Prefab 入口',
+            priority: 7,
+            reason: '适合定位 Cocos 界面节点、组件、资源或事件绑定。',
+        };
+    }
+    if (['event', 'message'].includes(node.type)) {
+        return {
+            key: 'event-message',
+            title: '事件/消息入口',
+            priority: 8,
+            reason: '适合追事件派发、订阅、消息处理和协议流转。',
+        };
+    }
+    if (['state', 'table'].includes(node.type)) {
+        return {
+            key: 'state-data',
+            title: '状态/数据入口',
+            priority: 9,
+            reason: '适合追状态读写或数据表访问。',
+        };
+    }
+    return {
+        key: 'other',
+        title: '其他入口',
+        priority: 99,
+        reason: '未归入常见入口类型，建议按节点类型继续精确查询。',
+    };
+}
+
+function quoteCommandArg(value) {
+    return `"${String(value || '').replace(/"/g, '\\"')}"`;
+}
+
+function buildQueryCommandBase(featureKey, options = {}) {
+    const parts = ['node scripts/query_kb.js'];
+    if (options.workspaceRoot) {
+        parts.push('--workspace-root', quoteCommandArg(options.workspaceRoot));
+    }
+    if (options.dataRoot) {
+        parts.push('--data-root', quoteCommandArg(options.dataRoot));
+    }
+    if (options.layout) {
+        parts.push('--layout', quoteCommandArg(options.layout));
+    }
+    parts.push('--feature', quoteCommandArg(featureKey));
+    return parts.join(' ');
+}
+
+function buildCandidateCommand(featureKey, node, direction = 'downstream', options = {}) {
+    const dir = direction === 'upstream' ? 'upstream' : 'downstream';
+    const base = buildQueryCommandBase(featureKey, options);
+    if (node.type === 'method') {
+        return `${base} --method ${quoteCommandArg(node.name)} --${dir}`;
+    }
+    if (['event', 'message', 'request', 'state'].includes(node.type)) {
+        return `${base} --${node.type} ${quoteCommandArg(node.name)} --${dir}`;
+    }
+    if (node.type === 'endpoint') {
+        return `${base} --${dir} ${quoteCommandArg(node.name)}`;
+    }
+    return `${base} --${dir} ${quoteCommandArg(node.id)}`;
+}
+
+function buildAmbiguousRecommendations(graph, lookup, ambiguous = [], options = {}) {
+    const featureKey = options.featureKey || graph.featureKey || lookup.featureKey || '<feature-key>';
+    const direction = options.direction || 'downstream';
+    const seen = new Set();
+    const nodes = [];
+    for (const candidate of ambiguous) {
+        const node = resolveAmbiguousCandidateNode(graph, lookup, candidate);
+        if (!node || seen.has(node.id)) {
+            continue;
+        }
+        seen.add(node.id);
+        nodes.push(node);
+    }
+    if (nodes.length === 0) {
+        return null;
+    }
+
+    const groupsByKey = new Map();
+    for (const node of nodes) {
+        const groupInfo = getRecommendationGroup(node);
+        if (!groupsByKey.has(groupInfo.key)) {
+            groupsByKey.set(groupInfo.key, {
+                key: groupInfo.key,
+                title: groupInfo.title,
+                priority: groupInfo.priority,
+                reason: groupInfo.reason,
+                candidates: [],
+            });
+        }
+        groupsByKey.get(groupInfo.key).candidates.push({
+            id: node.id,
+            type: node.type,
+            name: node.name,
+            file: node.file || '',
+            line: node.line ?? null,
+            area: node.area || 'unknown',
+            command: buildCandidateCommand(featureKey, node, direction, options),
+        });
+    }
+
+    const groups = [...groupsByKey.values()]
+        .sort((left, right) => left.priority - right.priority)
+        .map(group => ({
+            ...group,
+            candidates: group.candidates
+                .sort((left, right) => left.name.localeCompare(right.name))
+                .slice(0, 5),
+        }));
+
+    return {
+        query: options.query || '',
+        direction,
+        totalCandidates: nodes.length,
+        groups,
+    };
+}
+
+function withAmbiguousRecommendations(result, graph, lookup, options = {}) {
+    if (!result?.ambiguous || result.recommendations) {
+        return result;
+    }
+    const recommendations = buildAmbiguousRecommendations(graph, lookup, result.ambiguous, options);
+    if (!recommendations) {
+        return result;
+    }
+    return {
+        ...result,
+        recommendations,
+    };
+}
+
 function printAmbiguous(result) {
     console.log('查询存在歧义:');
+    if (result.recommendations?.groups?.length) {
+        console.log('推荐入口:');
+        result.recommendations.groups.forEach(group => {
+            console.log(`- ${group.title} (${group.key})`);
+            group.candidates.forEach(candidate => {
+                const location = candidate.file ? ` ${candidate.file}${candidate.line ? `:${candidate.line}` : ''}` : '';
+                console.log(`  - ${candidate.name} [${candidate.type}]${location}`);
+                console.log(`    ${candidate.command}`);
+            });
+        });
+        console.log('原始候选:');
+    }
     result.ambiguous.forEach(item => console.log(`- ${item}`));
 }
 
@@ -1162,7 +1393,17 @@ function run(argv = process.argv.slice(2)) {
     if (traversalSpec) {
         const resolved = resolveTypedStart(graph, lookup, traversalSpec.selectorType, traversalSpec.inputQuery);
         if (resolved?.ambiguous) {
-            printTraversal(resolved, args.json);
+            printTraversal(
+                withAmbiguousRecommendations(resolved, graph, lookup, {
+                    featureKey: feature.featureKey,
+                    query: traversalSpec.inputQuery,
+                    direction: traversalSpec.direction,
+                    workspaceRoot: context.workspaceRoot,
+                    dataRoot: context.dataRoot,
+                    layout: context.layout,
+                }),
+                args.json
+            );
             return;
         }
 
@@ -1236,7 +1477,17 @@ function run(argv = process.argv.slice(2)) {
             throw new Error(`未找到方法: ${args.method}`);
         }
         if (method.ambiguous) {
-            printSummary(method, args.json);
+            printSummary(
+                withAmbiguousRecommendations(method, graph, lookup, {
+                    featureKey: feature.featureKey,
+                    query: args.method,
+                    direction: 'downstream',
+                    workspaceRoot: context.workspaceRoot,
+                    dataRoot: context.dataRoot,
+                    layout: context.layout,
+                }),
+                args.json
+            );
             return;
         }
         printSummary(summarizeNode(getOwnEntry(lookup.nodesById, method.id), lookup), args.json);

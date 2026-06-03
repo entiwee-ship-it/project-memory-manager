@@ -249,6 +249,7 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 - project 级查询入口
 - feature 候选自动发现
 - 候选驱动的 feature KB 配置生成
+- 歧义查询推荐入口分组
 - 方法上下游查询
 - 组件与 handler 绑定查询
 - 事件 subscribers / emitters 查询
@@ -297,7 +298,7 @@ feature KB 可以半自动生成：先运行 `discover_features` 生成 `<memory
 
 - `scripts/query_project_kb.js`：全局查询入口，先看 project summary、message、state、跨区域链路
 - `project-protocols.json`：项目协议与业务时序学习结果，包含 message / timing / phase / transition patterns
-- `scripts/query_kb.js`：统一查询入口，先看 feature 摘要、再做上下游和节点查询
+- `scripts/query_kb.js`：统一查询入口，先看 feature 摘要、再做上下游和节点查询；当查询命中多个节点时会按 HTTP 接口、Pinus 路由、请求、方法、UI/Prefab、状态/数据等类型返回推荐入口
 - `build.report.json`：给人看的构建汇总与使用说明
 - `chain.lookup.json`：查询脚本使用的索引，通常不要手读
 - `chain.graph.json`：图节点与边的底层事实，通常不要手读

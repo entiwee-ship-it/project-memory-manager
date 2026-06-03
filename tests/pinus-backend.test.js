@@ -65,6 +65,32 @@ function buildFixture(tempRoot, configName, featureKey) {
     };
 }
 
+function writeMinimalFeatureKb(tempRoot, featureKey, graph) {
+    const kbDir = path.join(tempRoot, 'project-memory', 'kb', 'features', featureKey);
+    fs.mkdirSync(kbDir, { recursive: true });
+    fs.mkdirSync(path.join(tempRoot, 'project-memory', 'state'), { recursive: true });
+    const lookup = buildLookup(graph);
+    fs.writeFileSync(path.join(kbDir, 'chain.graph.json'), `${JSON.stringify(graph, null, 2)}\n`);
+    fs.writeFileSync(path.join(kbDir, 'chain.lookup.json'), `${JSON.stringify(lookup, null, 2)}\n`);
+    fs.writeFileSync(
+        path.join(tempRoot, 'project-memory', 'state', 'feature-registry.json'),
+        `${JSON.stringify({
+            generatedAt: '2026-06-03T00:00:00.000Z',
+            features: [
+                {
+                    featureKey,
+                    featureName: 'Ambiguous Entrypoints',
+                    kbDir: `project-memory/kb/features/${featureKey}`,
+                    outputs: {
+                        graph: `project-memory/kb/features/${featureKey}/chain.graph.json`,
+                        lookup: `project-memory/kb/features/${featureKey}/chain.lookup.json`,
+                    },
+                },
+            ],
+        }, null, 2)}\n`
+    );
+}
+
 function namesFromTraversal(output) {
     const parsed = JSON.parse(output);
     return parsed.traversal.map(item => item.node?.name).filter(Boolean);
@@ -175,6 +201,67 @@ function runPrototypePollutionAssertions() {
         () => runWithCapturedOutput(queryChainKb, ['--feature', 'prototype-safety', '--method', 'hasOwnProperty', '--json'], tempRoot),
         /未找到方法/
     );
+}
+
+function runQueryDisambiguationAssertions() {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-disambiguation-'));
+    const featureKey = 'ambiguous-entrypoints';
+    writeMinimalFeatureKb(tempRoot, featureKey, {
+        featureKey,
+        featureName: 'Ambiguous Entrypoints',
+        nodes: [
+            {
+                id: 'endpoint:club:create',
+                type: 'endpoint',
+                name: 'POST /club/createClub',
+                file: 'app/http/routes/club.ts',
+                line: 12,
+                area: 'backend',
+                meta: { method: 'POST', path: '/club/createClub', tags: ['createclub', 'club'] },
+            },
+            {
+                id: 'route:club:create',
+                type: 'route',
+                name: 'pkplayer.Rpc.createClub',
+                file: 'app/servers/pkplayer/remote/Rpc.ts',
+                line: 31,
+                area: 'backend',
+                meta: { route: 'pkplayer.Rpc.createClub', kind: 'pinus-remote', protocol: 'pinus-rpc', tags: ['createclub', 'club'] },
+            },
+            {
+                id: 'request:club:create',
+                type: 'request',
+                name: 'pkplayer.Rpc.createClub',
+                file: 'app/modules/club/ClubService.ts',
+                line: 44,
+                area: 'backend',
+                meta: { transport: 'pinus-rpc', protocol: 'pinus-rpc', callee: 'pinus.rpc', tags: ['createclub', 'club'] },
+            },
+            {
+                id: 'method:club:handler',
+                type: 'method',
+                name: 'ClubService.handleCreateClub',
+                file: 'app/modules/club/ClubService.ts',
+                line: 50,
+                area: 'backend',
+                meta: { methodName: 'handleCreateClub', tags: ['createclub', 'club'] },
+            },
+        ],
+        edges: [],
+    });
+
+    const result = parseTraversal(
+        runWithCapturedOutput(queryKb, ['--root', tempRoot, '--feature', featureKey, '--downstream', 'createClub', '--json'], tempRoot)
+    );
+    assert.ok(Array.isArray(result.ambiguous));
+    assert.ok(result.recommendations);
+    assert.ok(Array.isArray(result.recommendations.groups));
+    assert.ok(result.recommendations.groups.some(group => group.key === 'http-endpoint'));
+    assert.ok(result.recommendations.groups.some(group => group.key === 'pinus-route'));
+    const methodGroup = result.recommendations.groups.find(group => group.key === 'method');
+    assert.ok(methodGroup);
+    assert.ok(methodGroup.candidates.some(candidate => candidate.name === 'ClubService.handleCreateClub'));
+    assert.ok(methodGroup.candidates.every(candidate => candidate.command.includes('--downstream')));
 }
 
 function runFixtureAssertions() {
@@ -863,6 +950,7 @@ function runQyserverAssertions() {
 try {
     runVersionAssertions();
     runPrototypePollutionAssertions();
+    runQueryDisambiguationAssertions();
     runFixtureAssertions();
     runFrontendHttpAssertions();
     runCocosPrefabAssertions();

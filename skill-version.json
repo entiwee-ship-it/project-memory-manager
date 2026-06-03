@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "releaseDate": "2026-06-03",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -48,6 +48,7 @@
     "mcp-async-build-job",
     "external-data-governance",
     "feature-discovery",
-    "candidate-driven-feature-kb"
+    "candidate-driven-feature-kb",
+    "query-disambiguation"
   ]
 }
