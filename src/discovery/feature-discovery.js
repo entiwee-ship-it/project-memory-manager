@@ -1,5 +1,5 @@
 const path = require('path');
-const { normalize, readJsonSafe, timestamp, writeJsonAtomic } = require('./common');
+const { normalize, readJsonSafe, timestamp, writeJsonAtomic } = require('../shared/common');
 
 const STOP_WORDS = new Set([
     'app',

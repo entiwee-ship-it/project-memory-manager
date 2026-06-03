@@ -1,5 +1,5 @@
 const path = require('path');
-const { pathExists, readJson, readJsonSafe, slugify } = require('./common');
+const { pathExists, readJson, readJsonSafe, slugify } = require('../shared/common');
 
 function toPosixPath(value = '') {
     return String(value || '').replace(/\\/g, '/');

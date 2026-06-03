@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { listFilesRecursive, normalize, readJson } = require('../../lib/common');
+const { listFilesRecursive, normalize, readJson } = require('../../shared/common');
 
 const BASE64_KEYS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 

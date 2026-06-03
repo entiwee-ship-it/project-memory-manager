@@ -1,4 +1,4 @@
-const { normalize } = require('../../lib/common');
+const { normalize } = require('../../shared/common');
 
 const COLLECTION_ROOTS = new Set([
     'app',
