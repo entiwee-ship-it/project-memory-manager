@@ -24,6 +24,7 @@ description: 'KB-first AI project memory manager for full-stack repositories wit
 - 优先通过 MCP server 调用 `inspect_workspace`、`diagnose_workspace`、`init_workspace`、`detect_topology`、`start_build_project_index`、`get_job_status`、`get_job_result`、`discover_features`、`build_feature_index`、`query_project_chain` 和 `query_feature_chain`
 - MCP 不可用时，再调用 CLI 脚本
 - CLI 默认使用 external-data layout，记忆、KB、状态、报告、锁和临时产物写入 PMM data root
+- PMM data root 默认是技能源码/安装目录同级的 `project-memory-data`，可用 `PMM_DATA_ROOT` 或 `--data-root` 覆盖
 - legacy `project-memory/` 只在显式 `--layout legacy-project-memory` 时使用
 - 业务源码目录默认只读，不创建 `project-memory/`
 

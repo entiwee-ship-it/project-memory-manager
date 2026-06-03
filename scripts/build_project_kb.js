@@ -126,7 +126,7 @@ function buildProjectGlobalConfig(root, projectProfile, context = null) {
         summary: 'Full-project global knowledge graph',
         type: 'project-global',
         kbDir: normalize(context?.paths?.projectGlobalDir || 'project-memory/kb/project-global'),
-        registerFeature: context?.layout === 'legacy-project-memory',
+        registerFeature: true,
         areas: Object.keys(projectProfile?.areas || {}),
         componentRoots: scanRoots.componentRoots,
         assetRoots: scanRoots.assetRoots,
@@ -344,7 +344,12 @@ function run(argv = process.argv.slice(2)) {
     ensureDir(path.dirname(configPath));
     writeJsonAtomic(configPath, config);
 
-    buildChainKb(['--root', root, '--config', configPath]);
+    buildChainKb([
+        '--workspace-root', root,
+        '--data-root', context.dataRoot,
+        '--layout', context.layout,
+        '--config', configPath,
+    ]);
 
     const scanPath = path.resolve(root, config.outputs.scan);
     const graphPath = path.resolve(root, config.outputs.graph);

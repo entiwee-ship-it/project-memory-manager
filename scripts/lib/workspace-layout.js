@@ -14,7 +14,7 @@ function toolRoot() {
 }
 
 function defaultDataRoot() {
-    return path.join(toolRoot(), '.runtime', 'data');
+    return path.join(path.dirname(toolRoot()), 'project-memory-data');
 }
 
 function workspaceIdFromRoot(root) {

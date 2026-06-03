@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const {
     createWorkspaceContext,
+    defaultDataRoot,
     parseLayoutArgs,
     workspaceIdFromRoot,
 } = require('../scripts/lib/workspace-layout');
@@ -72,6 +73,12 @@ function testParseArgs() {
     assert.equal(parsed.layout, 'external-data');
 }
 
+function testDefaultDataRootIsOutsideToolSource() {
+    const repoRoot = path.resolve(__dirname, '..');
+    assert.equal(defaultDataRoot(), path.join(path.dirname(repoRoot), 'project-memory-data'));
+    assert.equal(defaultDataRoot().startsWith(path.join(repoRoot, '.runtime')), false);
+}
+
 function testInitAndTopologyUseExternalData() {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-workspace-'));
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-data-'));
@@ -117,10 +124,20 @@ function testProjectKbExternalData() {
     const context = createWorkspaceContext({ workspaceRoot, dataRoot });
     assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
     assert.equal(fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')), true);
+    const projectGlobalConfig = JSON.parse(fs.readFileSync(path.join(context.paths.configsDir, 'project-global.json'), 'utf8'));
+    assert.equal(projectGlobalConfig.registerFeature, true);
+
+    const registry = JSON.parse(fs.readFileSync(context.paths.featureRegistry, 'utf8'));
+    assert.equal(registry.features.some(feature => feature.featureKey === 'project-global'), true);
 
     const output = captureOutput(queryProjectKb, ['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--json'], workspaceRoot);
     const parsed = JSON.parse(output);
     assert.equal(parsed.kind, 'project-summary');
+
+    const featureOutput = captureOutput(queryKb, ['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--feature', 'project-global', '--json'], workspaceRoot);
+    const featureSummary = JSON.parse(featureOutput);
+    assert.equal(featureSummary.kind, 'feature-summary');
+    assert.equal(featureSummary.feature.featureKey, 'project-global');
 }
 
 function testFeatureKbExternalData() {
@@ -175,6 +192,7 @@ testExternalDataContext();
 testLegacyContext();
 testLegacyContextFindsAncestorProjectMemory();
 testParseArgs();
+testDefaultDataRootIsOutsideToolSource();
 testInitAndTopologyUseExternalData();
 testProjectKbExternalData();
 testFeatureKbExternalData();

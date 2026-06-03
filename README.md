@@ -141,7 +141,7 @@ node scripts/build_feature_index.js --workspace-root E:/xile-workspace --feature
 node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 ```
 
-默认布局是 `external-data`，这些命令写入 `.runtime/data` 或 `PMM_DATA_ROOT`，不会在目标业务项目下创建 `project-memory/`。
+默认布局是 `external-data`，这些命令写入插件源码/安装目录同级的 `project-memory-data`，也可以用 `PMM_DATA_ROOT` 或 `--data-root` 覆盖；不会在目标业务项目下创建 `project-memory/`。
 
 ## 这个技能解决什么问题
 
@@ -155,7 +155,7 @@ node scripts/query_project_kb.js --workspace-root E:/xile-workspace
 它同时补齐项目开发需要的几个入口：
 
 - 轻入口控制台：`AGENTS.md`
-- PMM data root：默认位于技能源码或安装包的 `.runtime/data`
+- PMM data root：默认位于技能源码或安装包同级的 `project-memory-data`
 - 工作状态：`active work`
 - feature 级链路知识库
 - 面向前后端协同的工作协议
