@@ -33,6 +33,8 @@ function parseArgs(argv) {
         '--name',
         '--tag',
         '--file',
+        '--exclude-file',
+        '--exclude-prefab',
         '--from',
         '--direction',
         '--upstream',

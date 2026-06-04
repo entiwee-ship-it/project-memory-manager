@@ -22,4 +22,11 @@ Query:
 - `query_project_chain`
 - `query_feature_chain`
 
+Query selectors include `type`, `file`, `name`, `request`, `endpoint`, `method`, `upstream`, and `downstream`.
+For Cocos prefab work, use:
+
+- `type=prefab-component` with `file=<prefab path>` to get grouped component attachments.
+- `type=script-usage` with `file=<script path>` to find prefab/nodePath usage.
+- `excludeFile=<prefab path>` or `excludePrefab=<prefab path>` to remove the current prefab from script usage results.
+
 All tools accept `workspaceRoot`; most accept `dataRoot` for external data layout.

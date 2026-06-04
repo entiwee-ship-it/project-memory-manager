@@ -182,6 +182,8 @@ const TOOL_DEFINITIONS = [
                 name: { type: 'string' },
                 tag: { type: 'string' },
                 file: { type: 'string' },
+                excludeFile: { type: 'string' },
+                excludePrefab: { type: 'string' },
                 from: { type: 'string' },
                 direction: { type: 'string' },
                 upstream: { type: 'boolean' },
@@ -212,6 +214,8 @@ const TOOL_DEFINITIONS = [
                 name: { type: 'string' },
                 tag: { type: 'string' },
                 file: { type: 'string' },
+                excludeFile: { type: 'string' },
+                excludePrefab: { type: 'string' },
                 from: { type: 'string' },
                 direction: { type: 'string' },
                 upstream: { type: 'boolean' },
@@ -305,6 +309,8 @@ function hasQuerySelector(args = {}) {
         'name',
         'tag',
         'file',
+        'excludeFile',
+        'excludePrefab',
         'from',
         'direction',
     ].some(key => Boolean(args[key])) || Boolean(args.upstream || args.downstream);
@@ -687,6 +693,12 @@ function appendQuerySelectorArgs(argv, args, options) {
         if (args[key]) {
             argv.push(`--${key}`, args[key]);
         }
+    }
+    if (args.excludeFile) {
+        argv.push('--exclude-file', args.excludeFile);
+    }
+    if (args.excludePrefab) {
+        argv.push('--exclude-prefab', args.excludePrefab);
     }
     if (hasQuerySelector(args)) {
         argv.push('--limit', String(options.limit));

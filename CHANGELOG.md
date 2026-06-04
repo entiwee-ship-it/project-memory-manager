@@ -7,6 +7,16 @@
 
 ## [未发布]
 
+## [0.24.0] - 2026-06-04
+
+### 新增
+- Cocos prefab 组件挂载专用查询：`--type prefab-component --file <prefab>`，按自定义脚本、内置组件和未解析组件分组。
+- Cocos 脚本反查 prefab 使用方：`--type script-usage --file <script>`，按 prefab 和 nodePath 聚合，并支持 `--exclude-file <prefab>` 排除当前 prefab。
+
+### 改进
+- MCP 查询参数透传支持 `excludeFile` / `excludePrefab`，方便 Codex 直接回答“这个脚本是否还被其它 prefab 使用”。
+- 将旧的 `E:/xile-workspace` 全局运行态 KB 归档隔离，避免继续命中 `codex-work/work/tmp` 和历史备份路径；当前有效入口应使用具体项目根，例如 `E:/xile-workspace/qyProject`。
+
 ## [0.23.0] - 2026-06-03
 
 ### 破坏性变更

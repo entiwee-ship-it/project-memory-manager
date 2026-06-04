@@ -16,6 +16,14 @@ node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```
 
+Cocos prefab query examples:
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type prefab-component --file E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file E:/xile-workspace/qyProject/xy-client/assets/script/game/redDot/view/RedDotView.ts --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file E:/xile-workspace/qyProject/xy-client/assets/script/game/redDot/view/RedDotView.ts --exclude-file E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --json
+```
+
 Additional commands:
 
 ```text

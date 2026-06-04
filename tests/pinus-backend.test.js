@@ -570,6 +570,135 @@ function runCocosPrefabAssertions() {
     assert.ok(Array.isArray(report.queryExamples) && report.queryExamples.some(item => item.includes('--type binding')));
 }
 
+function runCocosQuerySummaryAssertions() {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-cocos-query-summary-'));
+    const lobbyPrefab = path.join(tempRoot, 'assets', 'ui', 'prefabs', 'Lobby.prefab').replace(/\\/g, '/');
+    const mailPrefab = path.join(tempRoot, 'assets', 'ui', 'prefabs', 'Mail.prefab').replace(/\\/g, '/');
+    const redDotScript = path.join(tempRoot, 'assets', 'script', 'game', 'redDot', 'view', 'RedDotView.ts').replace(/\\/g, '/');
+    const lobbyViewScript = path.join(tempRoot, 'assets', 'script', 'game', 'lobby', 'LobbyView.ts').replace(/\\/g, '/');
+    const graph = {
+        featureKey: 'cocos-query-summary',
+        featureName: 'Cocos Query Summary',
+        nodes: [
+            {
+                id: 'component:lobby:root:lobbyview',
+                type: 'component',
+                name: 'LobbyView@LobbyRoot',
+                file: lobbyViewScript,
+                line: null,
+                area: 'frontend',
+                stack: ['cocos'],
+                meta: {
+                    prefabPath: lobbyPrefab,
+                    nodePath: 'LobbyRoot',
+                    rawType: '11111111-1111-1111-1111-111111111111',
+                    category: 'prefab-component',
+                    bindingKind: 'component-attachment',
+                    editTarget: 'prefab-component-list',
+                },
+            },
+            {
+                id: 'component:lobby:red-dot',
+                type: 'component',
+                name: 'RedDotView@LobbyRoot/RedDot',
+                file: redDotScript,
+                line: null,
+                area: 'frontend',
+                stack: ['cocos'],
+                meta: {
+                    prefabPath: lobbyPrefab,
+                    nodePath: 'LobbyRoot/RedDot',
+                    rawType: '22222222-2222-2222-2222-222222222222',
+                    category: 'prefab-component',
+                    bindingKind: 'component-attachment',
+                    editTarget: 'prefab-component-list',
+                },
+            },
+            {
+                id: 'component:mail:red-dot',
+                type: 'component',
+                name: 'RedDotView@MailRoot/RedDot',
+                file: redDotScript,
+                line: null,
+                area: 'frontend',
+                stack: ['cocos'],
+                meta: {
+                    prefabPath: mailPrefab,
+                    nodePath: 'MailRoot/RedDot',
+                    rawType: '22222222-2222-2222-2222-222222222222',
+                    category: 'prefab-component',
+                    bindingKind: 'component-attachment',
+                    editTarget: 'prefab-component-list',
+                },
+            },
+            {
+                id: 'component:lobby:skeleton',
+                type: 'component',
+                name: 'sp.Skeleton@LobbyRoot/Effect',
+                file: lobbyPrefab,
+                line: null,
+                area: 'frontend',
+                stack: ['cocos'],
+                meta: {
+                    prefabPath: lobbyPrefab,
+                    nodePath: 'LobbyRoot/Effect',
+                    rawType: 'sp.Skeleton',
+                    category: 'prefab-component',
+                    bindingKind: 'component-attachment',
+                    editTarget: 'prefab-component-list',
+                },
+            },
+            {
+                id: 'component:lobby:unresolved',
+                type: 'component',
+                name: 'c238ewfJ2VJnZ8Gb8YQs5Ts@LobbyRoot/Unknown',
+                file: lobbyPrefab,
+                line: null,
+                area: 'frontend',
+                stack: ['cocos'],
+                meta: {
+                    prefabPath: lobbyPrefab,
+                    nodePath: 'LobbyRoot/Unknown',
+                    rawType: 'c238ewfJ2VJnZ8Gb8YQs5Ts',
+                    category: 'prefab-component',
+                    bindingKind: 'component-attachment',
+                    editTarget: 'prefab-component-list',
+                },
+            },
+        ],
+        edges: [],
+    };
+    writeMinimalFeatureKb(tempRoot, 'cocos-query-summary', graph);
+
+    const prefabSummary = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'prefab-component', '--file', lobbyPrefab, '--json'], tempRoot)
+    );
+    assert.equal(prefabSummary.kind, 'prefab-component-summary');
+    assert.equal(prefabSummary.prefabPath, lobbyPrefab);
+    assert.equal(prefabSummary.counts.customScripts, 2);
+    assert.equal(prefabSummary.counts.builtinComponents, 1);
+    assert.equal(prefabSummary.counts.unresolvedComponents, 1);
+    assert.ok(prefabSummary.customScripts.some(item => item.scriptPath === redDotScript && item.nodePaths.includes('LobbyRoot/RedDot')));
+    assert.ok(prefabSummary.builtinComponents.some(item => item.rawType === 'sp.Skeleton'));
+    assert.ok(prefabSummary.unresolvedComponents.some(item => item.rawType === 'c238ewfJ2VJnZ8Gb8YQs5Ts'));
+
+    const scriptUsage = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'script-usage', '--file', redDotScript, '--json'], tempRoot)
+    );
+    assert.equal(scriptUsage.kind, 'script-usage-summary');
+    assert.equal(scriptUsage.scriptPath, redDotScript);
+    assert.equal(scriptUsage.counts.uniquePrefabs, 2);
+    assert.equal(scriptUsage.counts.componentInstances, 2);
+    assert.ok(scriptUsage.prefabs.some(item => item.prefabPath === lobbyPrefab && item.nodePaths.includes('LobbyRoot/RedDot')));
+    assert.ok(scriptUsage.prefabs.some(item => item.prefabPath === mailPrefab && item.nodePaths.includes('MailRoot/RedDot')));
+
+    const externalUsage = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'script-usage', '--file', redDotScript, '--exclude-file', lobbyPrefab, '--json'], tempRoot)
+    );
+    assert.equal(externalUsage.counts.uniquePrefabs, 1);
+    assert.equal(externalUsage.prefabs[0].prefabPath, mailPrefab);
+}
+
 function runCocosAuthoringAssertions() {
     const tempRoot = copyFixtureToTemp(cocosPrefabFixtureRoot, 'pmm-cocos-authoring-');
     buildFixture(tempRoot, 'cocos-prefab-kb.json', 'cocos-prefab-sample');
@@ -1055,6 +1184,7 @@ try {
     runFrontendHttpAssertions();
     runAdminFullstackAssertions();
     runCocosPrefabAssertions();
+    runCocosQuerySummaryAssertions();
     runCocosAuthoringAssertions();
     runProjectGlobalAssertions();
     runRebuildAssertions();

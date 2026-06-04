@@ -26,6 +26,8 @@ function parseArgs(argv) {
         name: '',
         tag: '',
         file: '',
+        excludeFile: '',
+        excludePrefab: '',
         hasHandler: '',
         root: layoutArgs.workspaceRoot || '',
         dataRoot: layoutArgs.dataRoot || '',
@@ -111,6 +113,14 @@ function parseArgs(argv) {
         }
         if (token === '--file') {
             args.file = argv[++index];
+            continue;
+        }
+        if (token === '--exclude-file') {
+            args.excludeFile = argv[++index];
+            continue;
+        }
+        if (token === '--exclude-prefab') {
+            args.excludePrefab = argv[++index];
             continue;
         }
         if (token === '--has-handler') {
@@ -305,6 +315,23 @@ function matchContains(value, needle) {
         return true;
     }
     return normalizeText(value).includes(normalizeText(needle));
+}
+
+function normalizePathText(value) {
+    return normalizeText(value).replace(/\\/g, '/').replace(/\/+/g, '/');
+}
+
+function matchPath(value, query) {
+    if (!query) {
+        return true;
+    }
+    const normalizedValue = normalizePathText(value);
+    const normalizedQuery = normalizePathText(query);
+    return normalizedValue === normalizedQuery || normalizedValue.includes(normalizedQuery);
+}
+
+function samePath(left, right) {
+    return Boolean(left && right && normalizePathText(left) === normalizePathText(right));
 }
 
 function getOwnEntry(bucket, key) {
@@ -677,6 +704,208 @@ function summarizeNode(node, lookup) {
     }
 
     return summary;
+}
+
+function isPrefabComponentAttachment(node) {
+    if (!node || node.type !== 'component') {
+        return false;
+    }
+    const meta = node.meta || {};
+    return (
+        meta.bindingKind === 'component-attachment' ||
+        meta.editTarget === 'prefab-component-list' ||
+        meta.category === 'prefab-component'
+    );
+}
+
+function componentNameOf(node) {
+    return String(node?.name || '').split('@')[0] || String(node?.meta?.rawType || '');
+}
+
+function isBuiltinCocosComponent(rawType) {
+    const text = String(rawType || '');
+    return (
+        text.startsWith('cc.') ||
+        text.startsWith('sp.') ||
+        text.startsWith('dragonBones.') ||
+        text.startsWith('jsb.') ||
+        text.startsWith('ccui.')
+    );
+}
+
+function isScriptPath(value) {
+    return /\.(tsx?|jsx?|mjs|cjs)$/i.test(String(value || ''));
+}
+
+function classifyPrefabComponent(node) {
+    const meta = node.meta || {};
+    const prefabPath = meta.prefabPath || '';
+    const scriptPath = node.file || meta.scriptPath || meta.targetScriptPath || '';
+    const rawType = meta.rawType || componentNameOf(node);
+    if (scriptPath && !samePath(scriptPath, prefabPath) && isScriptPath(scriptPath)) {
+        return 'custom-script';
+    }
+    if (isBuiltinCocosComponent(rawType) || isBuiltinCocosComponent(componentNameOf(node))) {
+        return 'builtin';
+    }
+    return 'unresolved';
+}
+
+function compactComponentNode(node) {
+    const meta = node.meta || {};
+    return {
+        id: node.id,
+        name: node.name,
+        componentName: componentNameOf(node),
+        rawType: meta.rawType || componentNameOf(node),
+        prefabPath: meta.prefabPath || '',
+        nodePath: meta.nodePath || '',
+        scriptPath: classifyPrefabComponent(node) === 'custom-script' ? node.file || '' : '',
+        file: node.file || '',
+        bindingKind: meta.bindingKind || '',
+        editTarget: meta.editTarget || '',
+    };
+}
+
+function pushGroupedComponent(groupMap, key, node) {
+    const item = compactComponentNode(node);
+    if (!groupMap.has(key)) {
+        groupMap.set(key, {
+            componentName: item.componentName,
+            rawType: item.rawType,
+            scriptPath: item.scriptPath,
+            componentInstances: 0,
+            nodePaths: [],
+            instances: [],
+        });
+    }
+    const group = groupMap.get(key);
+    group.componentInstances += 1;
+    if (item.nodePath && !group.nodePaths.includes(item.nodePath)) {
+        group.nodePaths.push(item.nodePath);
+    }
+    group.instances.push(item);
+}
+
+function groupedComponentsToArray(groupMap) {
+    return [...groupMap.values()].map(group => ({
+        ...group,
+        nodePaths: group.nodePaths.sort((left, right) => left.localeCompare(right)),
+        instances: group.instances.sort((left, right) => String(left.nodePath).localeCompare(String(right.nodePath))),
+    })).sort((left, right) => {
+        const leftKey = left.scriptPath || left.rawType || left.componentName;
+        const rightKey = right.scriptPath || right.rawType || right.componentName;
+        return String(leftKey).localeCompare(String(rightKey));
+    });
+}
+
+function buildPrefabComponentSummary(graph, args) {
+    const prefabPath = args.file || args.name || '';
+    const componentNodes = (graph.nodes || []).filter(node => {
+        if (!isPrefabComponentAttachment(node)) {
+            return false;
+        }
+        return matchPath(node.meta?.prefabPath || node.file, prefabPath);
+    });
+    const customScripts = new Map();
+    const builtinComponents = new Map();
+    const unresolvedComponents = new Map();
+
+    for (const node of componentNodes) {
+        const kind = classifyPrefabComponent(node);
+        const compact = compactComponentNode(node);
+        if (kind === 'custom-script') {
+            pushGroupedComponent(customScripts, compact.scriptPath || compact.rawType || compact.componentName, node);
+        } else if (kind === 'builtin') {
+            pushGroupedComponent(builtinComponents, compact.rawType || compact.componentName, node);
+        } else {
+            pushGroupedComponent(unresolvedComponents, compact.rawType || compact.componentName, node);
+        }
+    }
+
+    const customScriptGroups = groupedComponentsToArray(customScripts);
+    const builtinGroups = groupedComponentsToArray(builtinComponents);
+    const unresolvedGroups = groupedComponentsToArray(unresolvedComponents);
+    return {
+        kind: 'prefab-component-summary',
+        prefabPath,
+        counts: {
+            componentInstances: componentNodes.length,
+            customScripts: customScriptGroups.length,
+            customScriptInstances: customScriptGroups.reduce((sum, item) => sum + item.componentInstances, 0),
+            builtinComponents: builtinGroups.length,
+            builtinInstances: builtinGroups.reduce((sum, item) => sum + item.componentInstances, 0),
+            unresolvedComponents: unresolvedGroups.length,
+            unresolvedInstances: unresolvedGroups.reduce((sum, item) => sum + item.componentInstances, 0),
+        },
+        customScripts: customScriptGroups,
+        builtinComponents: builtinGroups,
+        unresolvedComponents: unresolvedGroups,
+    };
+}
+
+function buildScriptUsageSummary(graph, args) {
+    const scriptPath = args.file || args.name || '';
+    const excludePath = args.excludePrefab || args.excludeFile || '';
+    const componentNodes = (graph.nodes || []).filter(node => {
+        if (!isPrefabComponentAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
+            return false;
+        }
+        if (!matchPath(node.file, scriptPath)) {
+            return false;
+        }
+        if (excludePath && matchPath(node.meta?.prefabPath, excludePath)) {
+            return false;
+        }
+        return true;
+    });
+
+    const prefabMap = new Map();
+    for (const node of componentNodes) {
+        const item = compactComponentNode(node);
+        const prefabPath = item.prefabPath || '(unknown-prefab)';
+        if (!prefabMap.has(prefabPath)) {
+            prefabMap.set(prefabPath, {
+                prefabPath,
+                componentInstances: 0,
+                componentNames: [],
+                rawTypes: [],
+                nodePaths: [],
+                instances: [],
+            });
+        }
+        const group = prefabMap.get(prefabPath);
+        group.componentInstances += 1;
+        if (item.componentName && !group.componentNames.includes(item.componentName)) {
+            group.componentNames.push(item.componentName);
+        }
+        if (item.rawType && !group.rawTypes.includes(item.rawType)) {
+            group.rawTypes.push(item.rawType);
+        }
+        if (item.nodePath && !group.nodePaths.includes(item.nodePath)) {
+            group.nodePaths.push(item.nodePath);
+        }
+        group.instances.push(item);
+    }
+
+    const prefabs = [...prefabMap.values()].map(item => ({
+        ...item,
+        componentNames: item.componentNames.sort((left, right) => left.localeCompare(right)),
+        rawTypes: item.rawTypes.sort((left, right) => left.localeCompare(right)),
+        nodePaths: item.nodePaths.sort((left, right) => left.localeCompare(right)),
+        instances: item.instances.sort((left, right) => String(left.nodePath).localeCompare(String(right.nodePath))),
+    })).sort((left, right) => left.prefabPath.localeCompare(right.prefabPath));
+
+    return {
+        kind: 'script-usage-summary',
+        scriptPath,
+        excludedPrefabPath: excludePath,
+        counts: {
+            uniquePrefabs: prefabs.length,
+            componentInstances: componentNodes.length,
+        },
+        prefabs,
+    };
 }
 
 function searchNodes(graph, lookup, args) {
@@ -1679,6 +1908,14 @@ function run(argv = process.argv.slice(2)) {
             },
             args.json
         );
+        return;
+    }
+    if (args.type === 'prefab-component') {
+        printDetailedResult(buildPrefabComponentSummary(graph, args), args.json);
+        return;
+    }
+    if (args.type === 'script-usage') {
+        printDetailedResult(buildScriptUsageSummary(graph, args), args.json);
         return;
     }
     if (args.type || args.name || args.tag || args.file || args.hasHandler) {

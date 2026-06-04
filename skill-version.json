@@ -1,7 +1,7 @@
 {
   "name": "project-memory-manager",
-  "version": "0.23.0",
-  "releaseDate": "2026-06-03",
+  "version": "0.24.0",
+  "releaseDate": "2026-06-04",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
   "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
@@ -60,6 +60,8 @@
     "mcp-query-timeout-limit",
     "workspace-tooling-scan-guard",
     "admin-fullstack-feature-discovery",
-    "src-layout-restructure"
+    "src-layout-restructure",
+    "cocos-prefab-component-query",
+    "cocos-script-usage-query"
   ]
 }

@@ -13,6 +13,18 @@ Inspect binding options:
 node src/bin/cocos-authoring.js --workspace-root <project-root> --data-root <data-root> --feature <key> --prefab <prefab-name> --intent profile
 ```
 
+List scripts mounted on a prefab without reading `chain.graph.json`:
+
+```powershell
+node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --type prefab-component --file <prefab-path> --json
+```
+
+Find every prefab that mounts a script:
+
+```powershell
+node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --type script-usage --file <script-path> --json
+```
+
 Plan a click event:
 
 ```powershell
