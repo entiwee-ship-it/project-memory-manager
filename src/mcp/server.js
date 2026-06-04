@@ -184,6 +184,12 @@ const TOOL_DEFINITIONS = [
                 file: { type: 'string' },
                 excludeFile: { type: 'string' },
                 excludePrefab: { type: 'string' },
+                area: { type: 'string' },
+                module: { type: 'string' },
+                excludeModule: { type: 'string' },
+                protocol: { type: 'string' },
+                path: { type: 'string' },
+                detail: { type: 'string' },
                 from: { type: 'string' },
                 direction: { type: 'string' },
                 upstream: { type: 'boolean' },
@@ -216,6 +222,12 @@ const TOOL_DEFINITIONS = [
                 file: { type: 'string' },
                 excludeFile: { type: 'string' },
                 excludePrefab: { type: 'string' },
+                area: { type: 'string' },
+                module: { type: 'string' },
+                excludeModule: { type: 'string' },
+                protocol: { type: 'string' },
+                path: { type: 'string' },
+                detail: { type: 'string' },
                 from: { type: 'string' },
                 direction: { type: 'string' },
                 upstream: { type: 'boolean' },
@@ -311,6 +323,12 @@ function hasQuerySelector(args = {}) {
         'file',
         'excludeFile',
         'excludePrefab',
+        'area',
+        'module',
+        'excludeModule',
+        'protocol',
+        'path',
+        'detail',
         'from',
         'direction',
     ].some(key => Boolean(args[key])) || Boolean(args.upstream || args.downstream);
@@ -689,7 +707,7 @@ function runQueryScript(scriptName, argv, timeoutMs) {
 }
 
 function appendQuerySelectorArgs(argv, args, options) {
-    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'endpoint', 'state', 'type', 'name', 'tag', 'file', 'from', 'direction']) {
+    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'endpoint', 'state', 'type', 'name', 'tag', 'file', 'area', 'module', 'protocol', 'path', 'detail', 'from', 'direction']) {
         if (args[key]) {
             argv.push(`--${key}`, args[key]);
         }
@@ -699,6 +717,9 @@ function appendQuerySelectorArgs(argv, args, options) {
     }
     if (args.excludePrefab) {
         argv.push('--exclude-prefab', args.excludePrefab);
+    }
+    if (args.excludeModule) {
+        argv.push('--exclude-module', args.excludeModule);
     }
     if (hasQuerySelector(args)) {
         argv.push('--limit', String(options.limit));

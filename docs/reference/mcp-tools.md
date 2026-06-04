@@ -28,5 +28,7 @@ For Cocos prefab work, use:
 - `type=prefab-component` with `file=<prefab path>` to get grouped component attachments.
 - `type=script-usage` with `file=<script path>` to find prefab/nodePath usage.
 - `excludeFile=<prefab path>` or `excludePrefab=<prefab path>` to remove the current prefab from script usage results.
+- `area`, `module`, `excludeModule`, `protocol`, and `path` narrow broad results such as `login` to a specific subsystem.
+- `detail=summary|grouped|full` controls Cocos summary verbosity.
 
 All tools accept `workspaceRoot`; most accept `dataRoot` for external data layout.

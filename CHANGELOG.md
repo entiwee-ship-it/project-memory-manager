@@ -7,6 +7,18 @@
 
 ## [未发布]
 
+## [0.25.0] - 2026-06-04
+
+### 新增
+- 支持 Vite `@/` alias 和 `api.auth.*` 这类 API namespace getter，后台 Vue 页面方法可继续追到 API 模块、request 和后端 endpoint。
+- 查询新增 `area`、`module`、`excludeModule`、`protocol`、`path` 过滤参数，可收窄 `login`、`captcha`、`auth` 等宽泛词结果。
+- Cocos summary 查询新增 `detail=summary|grouped|full`，`limit` 明确作用于分组数量。
+
+### 修复
+- 修复 `redisClient.set` 被误连到 `app.set` 这类低可信 member call。
+- 修复 `window.$requestService?.resetAuthState()` 被误判为 Vue 文件本地 `resetAuthState` 自环。
+- `method=getCaptcha --area backend` / `--file <path>` 这类查询可在歧义候选中直接消解。
+
 ## [0.24.0] - 2026-06-04
 
 ### 新增

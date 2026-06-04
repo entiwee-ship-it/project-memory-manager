@@ -425,8 +425,10 @@ function runAdminFullstackAssertions() {
     const scriptNames = graph.nodes.filter(node => node.type === 'script').map(node => node.name);
     assert.ok(scriptNames.includes('Login.vue'), 'indexes Vue SFC scripts');
     assert.ok(scriptNames.includes('authApi.js'), 'indexes frontend JS API modules');
+    assert.ok(scriptNames.includes('index.js'), 'indexes frontend API barrel modules');
     assert.ok(scan.scripts.some(script => script.scriptPath.endsWith('/Login.vue')));
     assert.ok(scan.scripts.some(script => script.scriptPath.endsWith('/authApi.js')));
+    assert.ok(scan.scripts.some(script => script.scriptPath.endsWith('/utils/api/index.js')));
 
     const methodNames = graph.nodes.filter(node => node.type === 'method').map(node => node.name);
     assert.ok(methodNames.includes('Login.handleLogin'));
@@ -468,6 +470,8 @@ function runAdminFullstackAssertions() {
         const toNode = graph.nodes.find(node => node.id === edge.to);
         return fromNode?.name === 'authController.getCaptcha' && edge.type === 'calls' && String(toNode?.name || '').endsWith('.saveCaptcha');
     }));
+    assert.equal(hasEdge('captchaService.saveCaptcha', 'app.set', 'calls'), false);
+    assert.equal(hasEdge('Login.resetAuthState', 'Login.resetAuthState', 'calls'), false);
 
     const nestedCwd = path.join(tempRoot, 'cms-client', 'src', 'views', 'login');
     const requestTraversal = namesFromTraversal(
@@ -502,6 +506,19 @@ function runAdminFullstackAssertions() {
     );
     assert.ok(controllerTraversal.some(name => String(name || '').endsWith('.generateCaptcha')));
     assert.ok(controllerTraversal.some(name => String(name || '').endsWith('.saveCaptcha')));
+
+    const backendCaptchaTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--method', 'getCaptcha', '--area', 'backend', '--downstream', '--depth', '3', '--json'], nestedCwd)
+    );
+    assert.equal(backendCaptchaTraversal.resolvedStart.name, 'authController.getCaptcha');
+    assert.ok(backendCaptchaTraversal.traversal.some(item => String(item.node?.name || '').endsWith('.generateCaptcha')));
+
+    const filteredLoginEndpoints = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--type', 'endpoint', '--name', 'login', '--module', 'cms-server', '--protocol', 'http', '--path', '/api/auth/login', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(filteredLoginEndpoints));
+    assert.equal(filteredLoginEndpoints.length, 1);
+    assert.equal(filteredLoginEndpoints[0].name, 'POST /api/auth/login');
 
     const missingMessage = parseTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--message', 'login', '--json'], nestedCwd)
@@ -682,6 +699,14 @@ function runCocosQuerySummaryAssertions() {
     assert.ok(prefabSummary.builtinComponents.some(item => item.rawType === 'sp.Skeleton'));
     assert.ok(prefabSummary.unresolvedComponents.some(item => item.rawType === 'c238ewfJ2VJnZ8Gb8YQs5Ts'));
 
+    const compactPrefabSummary = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'prefab-component', '--file', lobbyPrefab, '--detail', 'summary', '--limit', '1', '--json'], tempRoot)
+    );
+    assert.equal(compactPrefabSummary.detail, 'summary');
+    assert.equal(compactPrefabSummary.customScripts.length, 1);
+    assert.equal(Object.hasOwn(compactPrefabSummary.customScripts[0], 'instances'), false);
+    assert.equal(Object.hasOwn(compactPrefabSummary.customScripts[0], 'nodePaths'), false);
+
     const scriptUsage = parseTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'script-usage', '--file', redDotScript, '--json'], tempRoot)
     );
@@ -697,6 +722,14 @@ function runCocosQuerySummaryAssertions() {
     );
     assert.equal(externalUsage.counts.uniquePrefabs, 1);
     assert.equal(externalUsage.prefabs[0].prefabPath, mailPrefab);
+
+    const groupedUsage = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'script-usage', '--file', redDotScript, '--detail', 'grouped', '--limit', '1', '--json'], tempRoot)
+    );
+    assert.equal(groupedUsage.detail, 'grouped');
+    assert.equal(groupedUsage.prefabs.length, 1);
+    assert.equal(Object.hasOwn(groupedUsage.prefabs[0], 'instances'), false);
+    assert.ok(Array.isArray(groupedUsage.prefabs[0].nodePaths));
 }
 
 function runCocosAuthoringAssertions() {

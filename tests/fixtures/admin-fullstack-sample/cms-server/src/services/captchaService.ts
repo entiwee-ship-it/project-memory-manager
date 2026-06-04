@@ -1,3 +1,5 @@
+import { redisClient } from '../app';
+
 export function generateCaptcha() {
   return {
     key: 'captcha-key',
@@ -6,5 +8,5 @@ export function generateCaptcha() {
 }
 
 export async function saveCaptcha(key, code) {
-  return `${key}:${code}`;
+  return redisClient.set(key, code);
 }

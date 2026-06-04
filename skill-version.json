@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "releaseDate": "2026-06-04",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -62,6 +62,10 @@
     "admin-fullstack-feature-discovery",
     "src-layout-restructure",
     "cocos-prefab-component-query",
-    "cocos-script-usage-query"
+    "cocos-script-usage-query",
+    "vue-api-namespace-linking",
+    "safe-member-call-resolution",
+    "query-filter-disambiguation",
+    "summary-detail-levels"
   ]
 }

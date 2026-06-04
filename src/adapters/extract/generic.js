@@ -32,6 +32,29 @@ function resolveFromProjectRoot(specifier, context) {
     return null;
 }
 
+function resolveCandidatePath(basePath) {
+    const candidates = [
+        basePath,
+        `${basePath}.ts`,
+        `${basePath}.tsx`,
+        `${basePath}.js`,
+        `${basePath}.jsx`,
+        `${basePath}.vue`,
+        path.join(basePath, 'index.ts'),
+        path.join(basePath, 'index.tsx'),
+        path.join(basePath, 'index.js'),
+        path.join(basePath, 'index.jsx'),
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
 /**
  * 规范化路径分隔符为 /
  */
@@ -67,29 +90,43 @@ function isProjectRootPath(specifier) {
     return rootPathPatterns.some(pattern => pattern.test(normalized));
 }
 
+function resolveAliasPath(specifier, context) {
+    const normalized = normalizeSlashes(specifier);
+    if (!normalized.startsWith('@/')) {
+        return null;
+    }
+
+    const relativePath = normalized.slice(2);
+    const roots = [
+        ...(context?.methodRootsAbs || []),
+        ...(context?.componentRootsAbs || []),
+        ...(context?.assetRootsAbs || []),
+    ];
+    const srcRoots = roots.filter(rootPath => path.basename(rootPath).toLowerCase() === 'src');
+    const candidates = srcRoots.length > 0
+        ? srcRoots
+        : [path.join(context?.cwd || process.cwd(), 'src')];
+
+    for (const rootPath of candidates) {
+        const resolved = resolveCandidatePath(path.join(rootPath, relativePath));
+        if (resolved) {
+            return resolved;
+        }
+    }
+
+    return null;
+}
+
 function resolveImportPath(specifier, scriptFile, context) {
     // 优先处理相对路径
     if (specifier.startsWith('./') || specifier.startsWith('../')) {
         const basePath = path.resolve(path.dirname(scriptFile), specifier);
-        const candidates = [
-            basePath,
-            `${basePath}.ts`,
-            `${basePath}.tsx`,
-            `${basePath}.js`,
-            `${basePath}.jsx`,
-            `${basePath}.vue`,
-            path.join(basePath, 'index.ts'),
-            path.join(basePath, 'index.tsx'),
-            path.join(basePath, 'index.js'),
-            path.join(basePath, 'index.jsx'),
-        ];
+        return resolveCandidatePath(basePath);
+    }
 
-        for (const candidate of candidates) {
-            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-                return candidate;
-            }
-        }
-        return null;
+    const aliasResolved = resolveAliasPath(specifier, context);
+    if (aliasResolved) {
+        return aliasResolved;
     }
 
     // 处理项目根目录路径（如 app/common/utils）

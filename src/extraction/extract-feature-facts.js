@@ -624,7 +624,7 @@ function extractImports(source, scriptFile, context) {
             resolvedPath,
             resolvedVia,
             isLocal: Boolean(resolvedPath),
-            isApi: Boolean(resolvedPath && /Api\.ts$/.test(resolvedPath)),
+            isApi: Boolean(resolvedPath && /api\.(ts|tsx|js|jsx)$/i.test(resolvedPath)),
             isResponse: Boolean(resolvedPath && /Response\.ts$/.test(resolvedPath)),
         });
     }
@@ -1880,7 +1880,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                 const candidateMethod = qualifiedParts[qualifiedParts.length - 1] || '';
                 const rootIdentifier = qualifiedParts[0] || '';
                 if (
-                    qualifiedParts.length > 1 &&
+                    qualifiedParts.length === 1 &&
                     knownMethodNames.includes(candidateMethod) &&
                     !importMap.has(rootIdentifier) &&
                     !paramSet.has(rootIdentifier) &&
@@ -3034,7 +3034,10 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         if (importIdentifiers.has(rootIdentifier) || paramSet.has(rootIdentifier)) {
             continue;
         }
-        if (pathParts.length === 1 && candidateMethod === methodName) {
+        if (pathParts.length > 1) {
+            continue;
+        }
+        if (candidateMethod === methodName) {
             continue;
         }
 
@@ -3396,6 +3399,65 @@ function extractExports(source) {
     return exports;
 }
 
+function extractApiNamespaces(source, imports = []) {
+    const namespaces = [];
+    const importMap = buildImportIdentifierMap(imports);
+    const exportConstPattern = /export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*\{/g;
+    let match = null;
+
+    while ((match = exportConstPattern.exec(source))) {
+        const namespaceName = match[1];
+        const openBraceIndex = source.indexOf('{', match.index);
+        const objectRange = extractWrappedRange(source, openBraceIndex, '{', '}');
+        if (!objectRange) {
+            continue;
+        }
+
+        const members = [];
+        const body = objectRange.content;
+        const getterPattern = /get\s+([A-Za-z_$][\w$]*)\s*\(\)\s*\{\s*return\s+([A-Za-z_$][\w$]*)\s*;?\s*\}/g;
+        let getterMatch = null;
+        while ((getterMatch = getterPattern.exec(body))) {
+            const memberName = getterMatch[1];
+            const targetIdentifier = getterMatch[2];
+            const importInfo = importMap.get(targetIdentifier) || null;
+            members.push({
+                memberName,
+                targetIdentifier,
+                sourcePath: importInfo?.resolvedPath || '',
+                sourceSpecifier: importInfo?.specifier || '',
+                resolvedVia: importInfo?.resolvedVia || '',
+                kind: 'getter',
+            });
+        }
+
+        const propertyPattern = /(?:^|,)\s*([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)\s*(?=,|$)/g;
+        let propertyMatch = null;
+        while ((propertyMatch = propertyPattern.exec(body))) {
+            const memberName = propertyMatch[1];
+            const targetIdentifier = propertyMatch[2];
+            const importInfo = importMap.get(targetIdentifier) || null;
+            members.push({
+                memberName,
+                targetIdentifier,
+                sourcePath: importInfo?.resolvedPath || '',
+                sourceSpecifier: importInfo?.specifier || '',
+                resolvedVia: importInfo?.resolvedVia || '',
+                kind: 'property',
+            });
+        }
+
+        if (members.length > 0) {
+            namespaces.push({
+                name: namespaceName,
+                members: dedupeBy(members, item => `${item.memberName}::${item.targetIdentifier}::${item.sourcePath}`),
+            });
+        }
+    }
+
+    return namespaces;
+}
+
 function extractScriptSummary(source, scriptFile, exports) {
     const classPattern = /(?:@[^\n]+\s*)*export\s+class\s+([A-Za-z_$][\w$]*)/g;
     const classMatch = classPattern.exec(source);
@@ -3457,6 +3519,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
             const fieldTypes = extractFieldTypes(source, parseScriptFile, imports);
             const handlerMaps = extractHandlerMaps(source);
             const exports = extractExports(source);
+            const apiNamespaces = extractApiNamespaces(source, imports);
             const methods = [];
             const regexDefinitions = [
                 ...extractMethodDefinitions(source),
@@ -3563,6 +3626,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                     entries,
                 })),
                 exports,
+                apiNamespaces,
                 methods,
                 analysisMode: astContext?.methods?.length ? 'typescript-ast+regex' : 'regex',
             });

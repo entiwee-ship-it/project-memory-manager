@@ -8,7 +8,7 @@
 
 <script setup>
 import { reactive, onMounted } from 'vue';
-import { authApi } from '../../api/authApi';
+import { api } from '@/utils/api';
 
 const form = reactive({
   username: '',
@@ -17,16 +17,23 @@ const form = reactive({
 });
 
 async function initCaptcha() {
-  const result = await authApi.getCaptcha();
+  const result = await api.auth.getCaptcha();
   form.captcha = result.code;
 }
 
 async function handleLogin() {
-  await authApi.login(form);
+  await api.auth.login(form);
+}
+
+function resetAuthState() {
+  if (window.$requestService?.resetAuthState) {
+    window.$requestService.resetAuthState();
+  }
 }
 
 onMounted(() => {
   initCaptcha();
+  resetAuthState();
 });
 </script>
 

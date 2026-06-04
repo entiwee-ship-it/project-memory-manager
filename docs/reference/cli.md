@@ -24,6 +24,22 @@ node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --dat
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file E:/xile-workspace/qyProject/xy-client/assets/script/game/redDot/view/RedDotView.ts --exclude-file E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --json
 ```
 
+## 查询收窄
+
+宽泛词建议用过滤参数先限定场景：
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type endpoint --name login --module cms-server --protocol http --path /auth/login --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method getCaptcha --area backend --downstream --json
+```
+
+Cocos summary 可控制输出体积：
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type prefab-component --file <prefab-path> --detail summary --limit 5 --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file <script-path> --detail grouped --json
+```
+
 Additional commands:
 
 ```text

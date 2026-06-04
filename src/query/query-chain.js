@@ -28,6 +28,12 @@ function parseArgs(argv) {
         file: '',
         excludeFile: '',
         excludePrefab: '',
+        area: '',
+        module: '',
+        excludeModule: '',
+        protocol: '',
+        path: '',
+        detail: '',
         hasHandler: '',
         root: layoutArgs.workspaceRoot || '',
         dataRoot: layoutArgs.dataRoot || '',
@@ -121,6 +127,30 @@ function parseArgs(argv) {
         }
         if (token === '--exclude-prefab') {
             args.excludePrefab = argv[++index];
+            continue;
+        }
+        if (token === '--area') {
+            args.area = argv[++index];
+            continue;
+        }
+        if (token === '--module') {
+            args.module = argv[++index];
+            continue;
+        }
+        if (token === '--exclude-module') {
+            args.excludeModule = argv[++index];
+            continue;
+        }
+        if (token === '--protocol') {
+            args.protocol = argv[++index];
+            continue;
+        }
+        if (token === '--path') {
+            args.path = argv[++index];
+            continue;
+        }
+        if (token === '--detail') {
+            args.detail = argv[++index];
             continue;
         }
         if (token === '--has-handler') {
@@ -332,6 +362,67 @@ function matchPath(value, query) {
 
 function samePath(left, right) {
     return Boolean(left && right && normalizePathText(left) === normalizePathText(right));
+}
+
+function pathHasModule(filePath, moduleName) {
+    const query = normalizePathText(moduleName);
+    if (!query) {
+        return true;
+    }
+    const value = normalizePathText(filePath);
+    return value === query || value.includes(`/${query}/`) || value.includes(query);
+}
+
+function nodeMatchesQueryFilters(node, args = {}) {
+    if (!node) {
+        return false;
+    }
+    const meta = node.meta || {};
+    const fileText = node.file || meta.scriptPath || meta.prefabPath || '';
+    const inferredArea = matchContains(fileText, 'cms-client') || matchContains(fileText, 'xy-client') || matchContains(fileText, 'assets/script')
+        ? 'frontend'
+        : matchContains(fileText, 'cms-server') || matchContains(fileText, 'qy-server') || matchContains(fileText, 'app/http') || matchContains(fileText, 'app/servers')
+          ? 'backend'
+          : node.area || '';
+    if (args.area && !matchContains(`${node.area || ''} ${inferredArea}`, args.area)) {
+        return false;
+    }
+    if (args.module && !pathHasModule(fileText, args.module)) {
+        return false;
+    }
+    if (args.excludeModule && pathHasModule(fileText, args.excludeModule)) {
+        return false;
+    }
+    if (args.protocol) {
+        const protocolText = [
+            meta.protocol,
+            meta.transport,
+            meta.kind,
+            node.type === 'endpoint' ? 'http' : '',
+            node.type === 'request' && meta.httpMethod ? 'http' : '',
+        ].filter(Boolean).join(' ');
+        if (!matchContains(protocolText, args.protocol)) {
+            return false;
+        }
+    }
+    if (args.path) {
+        const pathText = [
+            node.name,
+            meta.path,
+            meta.route,
+            meta.target,
+            meta.prefabPath,
+            meta.assetPath,
+        ].filter(Boolean).join(' ');
+        if (!matchContains(pathText, args.path)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function hasNodeFilters(args = {}) {
+    return Boolean(args.area || args.module || args.excludeModule || args.protocol || args.path || args.file);
 }
 
 function getOwnEntry(bucket, key) {
@@ -799,8 +890,40 @@ function groupedComponentsToArray(groupMap) {
     });
 }
 
+function normalizeDetail(args = {}) {
+    const value = String(args.detail || '').trim().toLowerCase();
+    return ['summary', 'grouped', 'full'].includes(value) ? value : 'full';
+}
+
+function limitGroups(groups, args = {}) {
+    const limit = Number.isFinite(args.limit) && args.limit > 0 ? args.limit : groups.length;
+    return groups.slice(0, limit);
+}
+
+function componentGroupForDetail(group, detail) {
+    if (detail === 'summary') {
+        return {
+            componentName: group.componentName,
+            rawType: group.rawType,
+            scriptPath: group.scriptPath,
+            componentInstances: group.componentInstances,
+        };
+    }
+    if (detail === 'grouped') {
+        return {
+            componentName: group.componentName,
+            rawType: group.rawType,
+            scriptPath: group.scriptPath,
+            componentInstances: group.componentInstances,
+            nodePaths: group.nodePaths,
+        };
+    }
+    return group;
+}
+
 function buildPrefabComponentSummary(graph, args) {
     const prefabPath = args.file || args.name || '';
+    const detail = normalizeDetail(args);
     const componentNodes = (graph.nodes || []).filter(node => {
         if (!isPrefabComponentAttachment(node)) {
             return false;
@@ -828,6 +951,7 @@ function buildPrefabComponentSummary(graph, args) {
     const unresolvedGroups = groupedComponentsToArray(unresolvedComponents);
     return {
         kind: 'prefab-component-summary',
+        detail,
         prefabPath,
         counts: {
             componentInstances: componentNodes.length,
@@ -838,15 +962,17 @@ function buildPrefabComponentSummary(graph, args) {
             unresolvedComponents: unresolvedGroups.length,
             unresolvedInstances: unresolvedGroups.reduce((sum, item) => sum + item.componentInstances, 0),
         },
-        customScripts: customScriptGroups,
-        builtinComponents: builtinGroups,
-        unresolvedComponents: unresolvedGroups,
+        customScripts: limitGroups(customScriptGroups, args).map(group => componentGroupForDetail(group, detail)),
+        builtinComponents: limitGroups(builtinGroups, args).map(group => componentGroupForDetail(group, detail)),
+        unresolvedComponents: limitGroups(unresolvedGroups, args).map(group => componentGroupForDetail(group, detail)),
+        limitAppliedToGroups: args.limit,
     };
 }
 
 function buildScriptUsageSummary(graph, args) {
     const scriptPath = args.file || args.name || '';
     const excludePath = args.excludePrefab || args.excludeFile || '';
+    const detail = normalizeDetail(args);
     const componentNodes = (graph.nodes || []).filter(node => {
         if (!isPrefabComponentAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
             return false;
@@ -895,16 +1021,35 @@ function buildScriptUsageSummary(graph, args) {
         nodePaths: item.nodePaths.sort((left, right) => left.localeCompare(right)),
         instances: item.instances.sort((left, right) => String(left.nodePath).localeCompare(String(right.nodePath))),
     })).sort((left, right) => left.prefabPath.localeCompare(right.prefabPath));
+    const prefabsForDetail = limitGroups(prefabs, args).map(item => {
+        if (detail === 'summary') {
+            return {
+                prefabPath: item.prefabPath,
+                componentInstances: item.componentInstances,
+            };
+        }
+        if (detail === 'grouped') {
+            return {
+                prefabPath: item.prefabPath,
+                componentInstances: item.componentInstances,
+                componentNames: item.componentNames,
+                nodePaths: item.nodePaths,
+            };
+        }
+        return item;
+    });
 
     return {
         kind: 'script-usage-summary',
+        detail,
         scriptPath,
         excludedPrefabPath: excludePath,
         counts: {
             uniquePrefabs: prefabs.length,
             componentInstances: componentNodes.length,
         },
-        prefabs,
+        prefabs: prefabsForDetail,
+        limitAppliedToGroups: args.limit,
     };
 }
 
@@ -914,6 +1059,7 @@ function searchNodes(graph, lookup, args) {
     if (args.type) {
         nodes = nodes.filter(node => node.type === args.type);
     }
+    nodes = nodes.filter(node => nodeMatchesQueryFilters(node, args));
     if (args.name) {
         nodes = nodes.filter(node => {
             return (
@@ -1590,16 +1736,41 @@ function printFeatureSummary(summary, asJson) {
     summary.examples.forEach(example => console.log(`  - ${example}`));
 }
 
-function resolveTypedStart(graph, lookup, selectorType, query) {
+function filterResolvedStart(resolved, graph, lookup, args = {}) {
+    if (!hasNodeFilters(args)) {
+        return resolved;
+    }
+    if (resolved?.ambiguous) {
+        const nodes = resolved.ambiguous
+            .map(candidate => resolveAmbiguousCandidateNode(graph, lookup, candidate))
+            .filter(node => nodeMatchesQueryFilters(node, args));
+        if (nodes.length === 1) {
+            return { id: nodes[0].id };
+        }
+        if (nodes.length > 1) {
+            return { ambiguous: nodes.map(node => `${node.type}:${node.name}`) };
+        }
+        return resolved;
+    }
+    if (resolved?.id) {
+        const node = getOwnEntry(lookup.nodesById, resolved.id);
+        if (node && !nodeMatchesQueryFilters(node, args)) {
+            return { ambiguous: [] };
+        }
+    }
+    return resolved;
+}
+
+function resolveTypedStart(graph, lookup, selectorType, query, args = {}) {
     const resolveNodeByType = (type, label) => {
-        const exact = graph.nodes.filter(node => node.type === type && (node.name === query || node.id === query));
+        const exact = graph.nodes.filter(node => node.type === type && (node.name === query || node.id === query) && nodeMatchesQueryFilters(node, args));
         if (exact.length === 1) {
             return { id: exact[0].id };
         }
         if (exact.length > 1) {
             return { ambiguous: exact.map(node => `${node.type}:${node.name}`) };
         }
-        const matches = findMatchingNodes(graph, query).filter(node => node.type === type);
+        const matches = findMatchingNodes(graph, query).filter(node => node.type === type && nodeMatchesQueryFilters(node, args));
         if (matches.length === 1) {
             return { id: matches[0].id };
         }
@@ -1614,49 +1785,49 @@ function resolveTypedStart(graph, lookup, selectorType, query) {
         if (!method) {
             throw new Error(`未找到方法: ${query}`);
         }
-        return method;
+        return filterResolvedStart(method, graph, lookup, args);
     }
     if (selectorType === 'event') {
         const event = getOwnEntry(lookup.events, query);
         if (!event) {
             throw new Error(`未找到事件: ${query}`);
         }
-        return event;
+        return filterResolvedStart(event, graph, lookup, args);
     }
     if (selectorType === 'message') {
         const message = getOwnEntry(lookup.messages, query);
         if (!message) {
             throw new Error(`未找到消息: ${query}`);
         }
-        return message;
+        return filterResolvedStart(message, graph, lookup, args);
     }
     if (selectorType === 'request') {
         const request = getOwnEntry(lookup.requests, query);
         if (!request) {
             return resolveNodeByType('request', 'request');
         }
-        return request;
+        return filterResolvedStart(request, graph, lookup, args);
     }
     if (selectorType === 'endpoint') {
         const endpoint = getOwnEntry(lookup.endpoints, query);
         if (!endpoint) {
             return resolveNodeByType('endpoint', 'endpoint');
         }
-        return endpoint;
+        return filterResolvedStart(endpoint, graph, lookup, args);
     }
     if (selectorType === 'state') {
         const state = resolveState(lookup, query);
         if (!state) {
             throw new Error(`未找到 state: ${query}`);
         }
-        return state;
+        return filterResolvedStart(state, graph, lookup, args);
     }
 
     const resolved = resolveNodeId(graph, lookup, query);
     if (!resolved) {
         throw new Error(`未找到节点: ${query}`);
     }
-    return typeof resolved === 'string' ? { id: resolved } : resolved;
+    return filterResolvedStart(typeof resolved === 'string' ? { id: resolved } : resolved, graph, lookup, args);
 }
 
 function resolveTraversalSpec(args, graph, lookup) {
@@ -1716,7 +1887,7 @@ function run(argv = process.argv.slice(2)) {
 
     const traversalSpec = resolveTraversalSpec(args, graph, lookup);
     if (traversalSpec) {
-        const resolved = resolveTypedStart(graph, lookup, traversalSpec.selectorType, traversalSpec.inputQuery);
+        const resolved = resolveTypedStart(graph, lookup, traversalSpec.selectorType, traversalSpec.inputQuery, args);
         if (resolved?.ambiguous) {
             printTraversal(
                 withAmbiguousRecommendations(resolved, graph, lookup, {
@@ -1827,7 +1998,7 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
     if (args.request) {
-        const request = resolveTypedStart(graph, lookup, 'request', args.request);
+        const request = resolveTypedStart(graph, lookup, 'request', args.request, args);
         if (request?.ambiguous) {
             printSummary(
                 withAmbiguousRecommendations(request, graph, lookup, {
@@ -1861,7 +2032,7 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
     if (args.endpoint) {
-        const endpoint = resolveTypedStart(graph, lookup, 'endpoint', args.endpoint);
+        const endpoint = resolveTypedStart(graph, lookup, 'endpoint', args.endpoint, args);
         if (endpoint?.ambiguous) {
             printSummary(
                 withAmbiguousRecommendations(endpoint, graph, lookup, {

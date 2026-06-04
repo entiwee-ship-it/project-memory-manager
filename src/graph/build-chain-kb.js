@@ -345,6 +345,90 @@ function buildMethodMap(raw) {
     return map;
 }
 
+function buildApiNamespaceMap(raw) {
+    const map = new Map();
+    for (const script of raw.scripts || []) {
+        for (const namespace of script.apiNamespaces || []) {
+            for (const member of namespace.members || []) {
+                if (!namespace.name || !member.memberName || !member.sourcePath) {
+                    continue;
+                }
+                map.set(`${normalize(script.scriptPath)}::${namespace.name}.${member.memberName}`, {
+                    namespace: namespace.name,
+                    memberName: member.memberName,
+                    targetIdentifier: member.targetIdentifier || '',
+                    sourcePath: normalize(member.sourcePath),
+                    sourceSpecifier: member.sourceSpecifier || '',
+                    resolvedVia: member.resolvedVia || '',
+                });
+            }
+        }
+    }
+    return map;
+}
+
+function resolveImportedCallTarget(importedCall, apiNamespaceMap, methodMap) {
+    const sourcePath = normalize(importedCall?.sourcePath || '');
+    const method = String(importedCall?.method || '').trim();
+    if (!sourcePath || !method) {
+        return null;
+    }
+
+    const memberPath = String(importedCall.memberPath || '').trim();
+    if (memberPath) {
+        const firstMember = memberPath.split('.').filter(Boolean)[0] || '';
+        const namespaceTarget = apiNamespaceMap.get(`${sourcePath}::${importedCall.identifier}.${firstMember}`) || null;
+        if (namespaceTarget?.sourcePath && methodMap.has(methodKey(namespaceTarget.sourcePath, method))) {
+            return {
+                scriptPath: namespaceTarget.sourcePath,
+                methodName: method,
+                confidence: 'high',
+                resolvedVia: namespaceTarget.resolvedVia || importedCall.resolvedVia || '',
+                namespaceMember: firstMember,
+                targetIdentifier: namespaceTarget.targetIdentifier || '',
+            };
+        }
+        return null;
+    }
+
+    if (['function', 'handler-reference'].includes(importedCall.callKind) && methodMap.has(methodKey(sourcePath, method))) {
+        return {
+            scriptPath: sourcePath,
+            methodName: method,
+            confidence: 'high',
+            resolvedVia: importedCall.resolvedVia || '',
+        };
+    }
+
+    if ((importedCall.isApi || /api\.(ts|tsx|js|jsx)$/i.test(sourcePath)) && methodMap.has(methodKey(sourcePath, method))) {
+        return {
+            scriptPath: sourcePath,
+            methodName: method,
+            confidence: 'high',
+            resolvedVia: importedCall.resolvedVia || '',
+        };
+    }
+
+    const methodInfo = methodMap.get(methodKey(sourcePath, method)) || null;
+    if (
+        importedCall.callKind === 'static-method' &&
+        methodInfo &&
+        (
+            String(methodInfo.ownerName || '').toLowerCase() === String(importedCall.identifier || '').toLowerCase() ||
+            /^[A-Z]/.test(String(importedCall.identifier || ''))
+        )
+    ) {
+        return {
+            scriptPath: sourcePath,
+            methodName: method,
+            confidence: 'high',
+            resolvedVia: importedCall.resolvedVia || '',
+        };
+    }
+
+    return null;
+}
+
 function inferPinusMethodRoutes(scriptPath, methodName) {
     const normalizedPath = normalize(scriptPath);
     const pinusMatch = normalizedPath.match(/(?:^|\/)app\/servers\/([^/]+)\/(handler|remote)\/([^/]+)\.[^.]+$/);
@@ -785,6 +869,7 @@ function buildGraph(raw, config, projectProfile, root) {
     const edgeSet = new Set();
     const featureId = makeNodeId('module', config.featureKey);
     const methodMap = buildMethodMap(raw);
+    const apiNamespaceMap = buildApiNamespaceMap(raw);
     const methodRouteMap = buildMethodRouteMap(methodMap);
     const httpMountMap = buildHttpMountMap(raw);
     const componentNodeMap = new Map();
@@ -1523,10 +1608,11 @@ function buildGraph(raw, config, projectProfile, root) {
             }
 
             for (const importedCall of method.importedCalls || []) {
-                if (!importedCall.sourcePath) {
+                const importedTarget = resolveImportedCallTarget(importedCall, apiNamespaceMap, methodMap);
+                if (!importedTarget) {
                     continue;
                 }
-                const targetMethodNode = ensureMethodNode(importedCall.sourcePath, importedCall.method);
+                const targetMethodNode = ensureMethodNode(importedTarget.scriptPath, importedTarget.methodName);
                 addEdge({
                     from: currentMethodId,
                     to: targetMethodNode.id,
@@ -1538,7 +1624,10 @@ function buildGraph(raw, config, projectProfile, root) {
                         isApi: importedCall.isApi,
                         callKind: importedCall.callKind || '',
                         memberPath: importedCall.memberPath || '',
-                        resolvedVia: importedCall.resolvedVia || '',
+                        resolvedVia: importedTarget.resolvedVia || importedCall.resolvedVia || '',
+                        confidence: importedTarget.confidence || 'high',
+                        namespaceMember: importedTarget.namespaceMember || '',
+                        targetIdentifier: importedTarget.targetIdentifier || '',
                     },
                 });
             }
@@ -1756,10 +1845,11 @@ function buildGraph(raw, config, projectProfile, root) {
                 }
 
                 for (const callbackImportedCall of request.callbackImportedCalls || []) {
-                    if (!callbackImportedCall.sourcePath) {
+                    const callbackTarget = resolveImportedCallTarget(callbackImportedCall, apiNamespaceMap, methodMap);
+                    if (!callbackTarget) {
                         continue;
                     }
-                    const callbackMethodNode = ensureMethodNode(callbackImportedCall.sourcePath, callbackImportedCall.method);
+                    const callbackMethodNode = ensureMethodNode(callbackTarget.scriptPath, callbackTarget.methodName);
                     addEdge({
                         from: currentMethodId,
                         to: callbackMethodNode.id,
@@ -1770,6 +1860,9 @@ function buildGraph(raw, config, projectProfile, root) {
                             request: request.target || request.callee,
                             identifier: callbackImportedCall.identifier,
                             isApi: Boolean(callbackImportedCall.isApi),
+                            memberPath: callbackImportedCall.memberPath || '',
+                            resolvedVia: callbackTarget.resolvedVia || callbackImportedCall.resolvedVia || '',
+                            confidence: callbackTarget.confidence || 'high',
                         },
                     });
                 }
