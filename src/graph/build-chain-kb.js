@@ -1055,6 +1055,31 @@ function buildGraph(raw, config, projectProfile, root) {
         return endpointNode;
     };
 
+    const ensureUnresolvedCallNode = (scriptPath, callInfo = {}, area = inferNodeArea(scriptPath)) => {
+        const ownerExpression = String(callInfo.ownerExpression || callInfo.identifier || '').trim();
+        const memberName = String(callInfo.memberName || callInfo.method || '').trim();
+        if (!ownerExpression || !memberName) {
+            return null;
+        }
+        const name = `${ownerExpression}.${memberName}`;
+        const unresolvedNode = addNode({
+            id: makeNodeId('unresolved-call', scriptPath, ownerExpression, memberName),
+            type: 'unresolved-call',
+            name,
+            file: normalize(path.resolve(root, scriptPath)),
+            area,
+            stack: inferStacks(area, projectProfile),
+            meta: {
+                ownerExpression,
+                memberName,
+                reason: callInfo.reason || 'owner_not_resolved_or_external_client',
+                scriptPath,
+            },
+        });
+        appendNodeTags(unresolvedNode, ownerExpression, memberName, name, 'unresolved-call', unresolvedNode.meta.reason);
+        return unresolvedNode;
+    };
+
     const expandMountedEndpointInfos = (scriptPath, endpointInfo) => {
         const mountPaths = httpMountMap.get(normalize(scriptPath)) || [];
         if (mountPaths.length <= 0) {
@@ -1607,11 +1632,36 @@ function buildGraph(raw, config, projectProfile, root) {
                 });
             }
 
+            const resolvedImportedSignatures = new Set();
+            const unresolvedImportedSignatures = new Set();
             for (const importedCall of method.importedCalls || []) {
                 const importedTarget = resolveImportedCallTarget(importedCall, apiNamespaceMap, methodMap);
                 if (!importedTarget) {
+                    const unresolvedNode = ensureUnresolvedCallNode(script.scriptPath, {
+                        ownerExpression: importedCall.memberPath
+                            ? `${importedCall.identifier}.${importedCall.memberPath}`
+                            : importedCall.identifier,
+                        memberName: importedCall.method,
+                        reason: 'owner_not_resolved_or_external_client',
+                    }, methodArea);
+                    if (unresolvedNode) {
+                        unresolvedImportedSignatures.add(`${importedCall.identifier}::${importedCall.method}`);
+                        addEdge({
+                            from: currentMethodId,
+                            to: unresolvedNode.id,
+                            type: 'unresolved_calls',
+                            sourceKind: 'script',
+                            area: methodArea,
+                            meta: {
+                                ownerExpression: unresolvedNode.meta.ownerExpression,
+                                memberName: unresolvedNode.meta.memberName,
+                                reason: unresolvedNode.meta.reason,
+                            },
+                        });
+                    }
                     continue;
                 }
+                resolvedImportedSignatures.add(`${importedCall.identifier}::${importedCall.method}`);
                 const targetMethodNode = ensureMethodNode(importedTarget.scriptPath, importedTarget.methodName);
                 addEdge({
                     from: currentMethodId,
@@ -1628,6 +1678,32 @@ function buildGraph(raw, config, projectProfile, root) {
                         confidence: importedTarget.confidence || 'high',
                         namespaceMember: importedTarget.namespaceMember || '',
                         targetIdentifier: importedTarget.targetIdentifier || '',
+                    },
+                });
+            }
+
+            for (const unresolvedCall of method.unresolvedCalls || []) {
+                const ownerExpression = String(unresolvedCall.ownerExpression || '').trim();
+                const memberName = String(unresolvedCall.memberName || '').trim();
+                const firstIdentifier = ownerExpression.split('.')[0] || '';
+                const signature = `${firstIdentifier}::${memberName}`;
+                if (resolvedImportedSignatures.has(signature) || unresolvedImportedSignatures.has(signature)) {
+                    continue;
+                }
+                const unresolvedNode = ensureUnresolvedCallNode(script.scriptPath, unresolvedCall, methodArea);
+                if (!unresolvedNode) {
+                    continue;
+                }
+                addEdge({
+                    from: currentMethodId,
+                    to: unresolvedNode.id,
+                    type: 'unresolved_calls',
+                    sourceKind: 'script',
+                    area: methodArea,
+                    meta: {
+                        ownerExpression: unresolvedNode.meta.ownerExpression,
+                        memberName: unresolvedNode.meta.memberName,
+                        reason: unresolvedNode.meta.reason,
                     },
                 });
             }

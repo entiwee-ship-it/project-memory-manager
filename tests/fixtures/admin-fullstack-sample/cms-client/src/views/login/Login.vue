@@ -22,7 +22,29 @@ async function initCaptcha() {
 }
 
 async function handleLogin() {
+  if (!validateCaptcha()) {
+    showError('captcha is required');
+    return;
+  }
   await api.auth.login(form);
+  saveLoginInfo();
+  refreshCaptcha();
+}
+
+function validateCaptcha() {
+  return form.captcha.length > 0;
+}
+
+function showError(message) {
+  form.error = message;
+}
+
+function saveLoginInfo() {
+  form.lastLogin = form.username;
+}
+
+function refreshCaptcha() {
+  initCaptcha();
 }
 
 function resetAuthState() {

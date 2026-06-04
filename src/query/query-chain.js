@@ -34,12 +34,21 @@ function parseArgs(argv) {
         protocol: '',
         path: '',
         detail: '',
+        mode: '',
+        fullstack: false,
+        focus: '',
+        includeUnresolved: false,
+        grouped: false,
+        groupLimit: null,
+        instanceLimit: null,
+        nodePathLimit: null,
         hasHandler: '',
         root: layoutArgs.workspaceRoot || '',
         dataRoot: layoutArgs.dataRoot || '',
         layout: layoutArgs.layout || '',
         depth: 2,
         limit: 20,
+        limitExplicit: false,
         json: false,
         // 语义查询参数
         hasOperation: '',
@@ -153,6 +162,38 @@ function parseArgs(argv) {
             args.detail = argv[++index];
             continue;
         }
+        if (token === '--mode') {
+            args.mode = argv[++index];
+            continue;
+        }
+        if (token === '--fullstack') {
+            args.fullstack = true;
+            continue;
+        }
+        if (token === '--focus') {
+            args.focus = argv[++index];
+            continue;
+        }
+        if (token === '--include-unresolved') {
+            args.includeUnresolved = true;
+            continue;
+        }
+        if (token === '--grouped') {
+            args.grouped = true;
+            continue;
+        }
+        if (token === '--group-limit') {
+            args.groupLimit = Number.parseInt(argv[++index], 10);
+            continue;
+        }
+        if (token === '--instance-limit') {
+            args.instanceLimit = Number.parseInt(argv[++index], 10);
+            continue;
+        }
+        if (token === '--node-path-limit') {
+            args.nodePathLimit = Number.parseInt(argv[++index], 10);
+            continue;
+        }
         if (token === '--has-handler') {
             args.hasHandler = argv[++index];
             continue;
@@ -179,6 +220,7 @@ function parseArgs(argv) {
         }
         if (token === '--limit') {
             args.limit = Number.parseInt(argv[++index], 10) || 20;
+            args.limitExplicit = true;
             continue;
         }
         if (token === '--json') {
@@ -717,6 +759,70 @@ function traverse(lookup, startId, direction, depth) {
     return result;
 }
 
+function isFullstackMode(args = {}) {
+    const mode = String(args.mode || '').trim().toLowerCase();
+    return Boolean(args.fullstack || mode === 'fullstack' || String(args.focus || '').trim().toLowerCase() === 'fullstack');
+}
+
+function effectiveTraversalDepth(args = {}) {
+    const requestedDepth = Number.isFinite(args.depth) && args.depth > 0 ? args.depth : 2;
+    return isFullstackMode(args) ? Math.max(requestedDepth, 4) : requestedDepth;
+}
+
+function isUnresolvedTraversalItem(item) {
+    return item?.node?.type === 'unresolved-call' || item?.edge?.type === 'unresolved_calls';
+}
+
+function isHttpMainlineNode(node, startNode) {
+    if (!node) {
+        return false;
+    }
+    if (['request', 'endpoint', 'route'].includes(node.type)) {
+        return true;
+    }
+    if (node.type !== 'method') {
+        return false;
+    }
+    if (!startNode?.file) {
+        return true;
+    }
+    return !samePath(node.file, startNode.file);
+}
+
+function shapeTraversalResult(rawTraversal, lookup, startNode, args = {}) {
+    let traversal = rawTraversal;
+    if (!args.includeUnresolved) {
+        traversal = traversal.filter(item => !isUnresolvedTraversalItem(item));
+    }
+
+    const focus = String(args.focus || '').trim().toLowerCase();
+    const shaped = {
+        traversal,
+        relatedHelpers: [],
+    };
+    if (focus !== 'fullstack') {
+        return shaped;
+    }
+
+    const helperMap = new Map();
+    const focusedTraversal = [];
+    for (const item of traversal) {
+        const node = item.node || null;
+        if (isHttpMainlineNode(node, startNode)) {
+            focusedTraversal.push(item);
+            continue;
+        }
+        if (node?.type === 'method' && startNode?.file && samePath(node.file, startNode.file)) {
+            helperMap.set(node.id, summarizeNode(node, lookup));
+            continue;
+        }
+        focusedTraversal.push(item);
+    }
+    shaped.traversal = focusedTraversal;
+    shaped.relatedHelpers = [...helperMap.values()].sort((left, right) => left.name.localeCompare(right.name));
+    return shaped;
+}
+
 function summarizeEdges(edges, lookup, limit = 8) {
     return (edges || []).slice(0, limit).map(edge => ({
         type: edge.type,
@@ -892,15 +998,42 @@ function groupedComponentsToArray(groupMap) {
 
 function normalizeDetail(args = {}) {
     const value = String(args.detail || '').trim().toLowerCase();
-    return ['summary', 'grouped', 'full'].includes(value) ? value : 'full';
+    return ['counts', 'summary', 'grouped', 'full'].includes(value) ? value : 'full';
 }
 
 function limitGroups(groups, args = {}) {
-    const limit = Number.isFinite(args.limit) && args.limit > 0 ? args.limit : groups.length;
+    const limit = Number.isFinite(args.groupLimit) && args.groupLimit > 0
+        ? args.groupLimit
+        : (args.limitExplicit && Number.isFinite(args.limit) && args.limit > 0 ? args.limit : groups.length);
     return groups.slice(0, limit);
 }
 
-function componentGroupForDetail(group, detail) {
+function limitInstances(instances, args = {}) {
+    const limit = Number.isFinite(args.instanceLimit) && args.instanceLimit > 0 ? args.instanceLimit : instances.length;
+    return instances.slice(0, limit);
+}
+
+function limitNodePaths(nodePaths, args = {}) {
+    const limit = Number.isFinite(args.nodePathLimit) && args.nodePathLimit > 0 ? args.nodePathLimit : nodePaths.length;
+    return nodePaths.slice(0, limit);
+}
+
+function buildLimitMetadata(args = {}, source = {}) {
+    return {
+        groupLimit: Number.isFinite(args.groupLimit) && args.groupLimit > 0
+            ? args.groupLimit
+            : (args.limitExplicit && Number.isFinite(args.limit) && args.limit > 0 ? args.limit : null),
+        instanceLimit: Number.isFinite(args.instanceLimit) && args.instanceLimit > 0 ? args.instanceLimit : null,
+        nodePathLimit: Number.isFinite(args.nodePathLimit) && args.nodePathLimit > 0 ? args.nodePathLimit : null,
+        groupsReturned: source.groupsReturned ?? null,
+        groupsTotal: source.groupsTotal ?? null,
+        instancesReturned: source.instancesReturned ?? null,
+        instancesTotal: source.instancesTotal ?? null,
+        truncated: Boolean(source.truncated),
+    };
+}
+
+function componentGroupForDetail(group, detail, args = {}) {
     if (detail === 'summary') {
         return {
             componentName: group.componentName,
@@ -915,10 +1048,14 @@ function componentGroupForDetail(group, detail) {
             rawType: group.rawType,
             scriptPath: group.scriptPath,
             componentInstances: group.componentInstances,
-            nodePaths: group.nodePaths,
+            nodePaths: limitNodePaths(group.nodePaths, args),
         };
     }
-    return group;
+    return {
+        ...group,
+        nodePaths: limitNodePaths(group.nodePaths, args),
+        instances: limitInstances(group.instances, args),
+    };
 }
 
 function buildPrefabComponentSummary(graph, args) {
@@ -949,23 +1086,43 @@ function buildPrefabComponentSummary(graph, args) {
     const customScriptGroups = groupedComponentsToArray(customScripts);
     const builtinGroups = groupedComponentsToArray(builtinComponents);
     const unresolvedGroups = groupedComponentsToArray(unresolvedComponents);
-    return {
+    const counts = {
+        componentInstances: componentNodes.length,
+        customScripts: customScriptGroups.length,
+        customScriptInstances: customScriptGroups.reduce((sum, item) => sum + item.componentInstances, 0),
+        builtinComponents: builtinGroups.length,
+        builtinInstances: builtinGroups.reduce((sum, item) => sum + item.componentInstances, 0),
+        unresolvedComponents: unresolvedGroups.length,
+        unresolvedInstances: unresolvedGroups.reduce((sum, item) => sum + item.componentInstances, 0),
+    };
+    const limitedCustomGroups = limitGroups(customScriptGroups, args);
+    const limitedBuiltinGroups = limitGroups(builtinGroups, args);
+    const limitedUnresolvedGroups = limitGroups(unresolvedGroups, args);
+    const base = {
         kind: 'prefab-component-summary',
         detail,
         prefabPath,
-        counts: {
-            componentInstances: componentNodes.length,
-            customScripts: customScriptGroups.length,
-            customScriptInstances: customScriptGroups.reduce((sum, item) => sum + item.componentInstances, 0),
-            builtinComponents: builtinGroups.length,
-            builtinInstances: builtinGroups.reduce((sum, item) => sum + item.componentInstances, 0),
-            unresolvedComponents: unresolvedGroups.length,
-            unresolvedInstances: unresolvedGroups.reduce((sum, item) => sum + item.componentInstances, 0),
-        },
-        customScripts: limitGroups(customScriptGroups, args).map(group => componentGroupForDetail(group, detail)),
-        builtinComponents: limitGroups(builtinGroups, args).map(group => componentGroupForDetail(group, detail)),
-        unresolvedComponents: limitGroups(unresolvedGroups, args).map(group => componentGroupForDetail(group, detail)),
+        counts,
+        limits: buildLimitMetadata(args, {
+            groupsReturned: limitedCustomGroups.length + limitedBuiltinGroups.length + limitedUnresolvedGroups.length,
+            groupsTotal: customScriptGroups.length + builtinGroups.length + unresolvedGroups.length,
+            instancesReturned: componentNodes.length,
+            instancesTotal: componentNodes.length,
+            truncated:
+                limitedCustomGroups.length < customScriptGroups.length ||
+                limitedBuiltinGroups.length < builtinGroups.length ||
+                limitedUnresolvedGroups.length < unresolvedGroups.length,
+        }),
         limitAppliedToGroups: args.limit,
+    };
+    if (detail === 'counts') {
+        return base;
+    }
+    return {
+        ...base,
+        customScripts: limitedCustomGroups.map(group => componentGroupForDetail(group, detail, args)),
+        builtinComponents: limitedBuiltinGroups.map(group => componentGroupForDetail(group, detail, args)),
+        unresolvedComponents: limitedUnresolvedGroups.map(group => componentGroupForDetail(group, detail, args)),
     };
 }
 
@@ -1021,7 +1178,8 @@ function buildScriptUsageSummary(graph, args) {
         nodePaths: item.nodePaths.sort((left, right) => left.localeCompare(right)),
         instances: item.instances.sort((left, right) => String(left.nodePath).localeCompare(String(right.nodePath))),
     })).sort((left, right) => left.prefabPath.localeCompare(right.prefabPath));
-    const prefabsForDetail = limitGroups(prefabs, args).map(item => {
+    const limitedPrefabs = limitGroups(prefabs, args);
+    const prefabsForDetail = limitedPrefabs.map(item => {
         if (detail === 'summary') {
             return {
                 prefabPath: item.prefabPath,
@@ -1033,13 +1191,17 @@ function buildScriptUsageSummary(graph, args) {
                 prefabPath: item.prefabPath,
                 componentInstances: item.componentInstances,
                 componentNames: item.componentNames,
-                nodePaths: item.nodePaths,
+                nodePaths: limitNodePaths(item.nodePaths, args),
             };
         }
-        return item;
+        return {
+            ...item,
+            nodePaths: limitNodePaths(item.nodePaths, args),
+            instances: limitInstances(item.instances, args),
+        };
     });
 
-    return {
+    const base = {
         kind: 'script-usage-summary',
         detail,
         scriptPath,
@@ -1048,8 +1210,129 @@ function buildScriptUsageSummary(graph, args) {
             uniquePrefabs: prefabs.length,
             componentInstances: componentNodes.length,
         },
-        prefabs: prefabsForDetail,
+        limits: buildLimitMetadata(args, {
+            groupsReturned: limitedPrefabs.length,
+            groupsTotal: prefabs.length,
+            instancesReturned: componentNodes.length,
+            instancesTotal: componentNodes.length,
+            truncated: limitedPrefabs.length < prefabs.length,
+        }),
         limitAppliedToGroups: args.limit,
+    };
+    if (detail === 'counts') {
+        return base;
+    }
+    return {
+        ...base,
+        prefabs: prefabsForDetail,
+    };
+}
+
+function collectScriptUsageGroups(graph, scriptPath, args = {}) {
+    const excludePath = args.excludePrefab || args.excludeFile || '';
+    const componentNodes = (graph.nodes || []).filter(node => {
+        if (!isPrefabComponentAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
+            return false;
+        }
+        if (!matchPath(node.file, scriptPath)) {
+            return false;
+        }
+        if (excludePath && matchPath(node.meta?.prefabPath, excludePath)) {
+            return false;
+        }
+        return true;
+    });
+
+    const prefabMap = new Map();
+    for (const node of componentNodes) {
+        const item = compactComponentNode(node);
+        const prefabPath = item.prefabPath || '(unknown-prefab)';
+        if (!prefabMap.has(prefabPath)) {
+            prefabMap.set(prefabPath, {
+                prefabPath,
+                componentInstances: 0,
+                nodePaths: [],
+            });
+        }
+        const group = prefabMap.get(prefabPath);
+        group.componentInstances += 1;
+        if (item.nodePath && !group.nodePaths.includes(item.nodePath)) {
+            group.nodePaths.push(item.nodePath);
+        }
+    }
+    return [...prefabMap.values()]
+        .map(group => ({
+            ...group,
+            nodePaths: group.nodePaths.sort((left, right) => left.localeCompare(right)),
+        }))
+        .sort((left, right) => left.prefabPath.localeCompare(right.prefabPath));
+}
+
+function buildPrefabScriptUsageSummary(graph, args) {
+    const prefabPath = args.file || args.name || '';
+    const detail = normalizeDetail(args);
+    const componentSummary = buildPrefabComponentSummary(graph, {
+        ...args,
+        detail: 'full',
+        limit: null,
+        groupLimit: null,
+        instanceLimit: null,
+        nodePathLimit: null,
+    });
+    const scripts = componentSummary.customScripts || [];
+    const scriptRows = scripts.map(script => {
+        const allUsage = collectScriptUsageGroups(graph, script.scriptPath, {});
+        const otherUsage = collectScriptUsageGroups(graph, script.scriptPath, {
+            excludePrefab: args.excludePrefab || prefabPath,
+        });
+        const row = {
+            componentName: script.componentName,
+            rawType: script.rawType,
+            scriptPath: script.scriptPath,
+            componentInstancesInSourcePrefab: script.componentInstances,
+            nodePathsInSourcePrefab: limitNodePaths(script.nodePaths || [], args),
+            totalPrefabUsageCount: allUsage.length,
+            otherPrefabUsageCount: otherUsage.length,
+            otherPrefabPaths: otherUsage.map(item => item.prefabPath),
+            usedOnlyInThisPrefab: otherUsage.length === 0,
+        };
+        if (detail === 'grouped' || detail === 'full') {
+            row.prefabs = limitGroups(allUsage, args).map(item => ({
+                prefabPath: item.prefabPath,
+                componentInstances: item.componentInstances,
+                nodePaths: limitNodePaths(item.nodePaths, args),
+            }));
+            row.otherPrefabs = limitGroups(otherUsage, args).map(item => ({
+                prefabPath: item.prefabPath,
+                componentInstances: item.componentInstances,
+                nodePaths: limitNodePaths(item.nodePaths, args),
+            }));
+        }
+        return row;
+    });
+    const limitedScripts = limitGroups(scriptRows, args);
+    const base = {
+        kind: 'prefab-script-usage-summary',
+        detail,
+        prefabPath,
+        excludedPrefabPath: args.excludePrefab || prefabPath,
+        counts: {
+            customScripts: scripts.length,
+            scriptsWithOtherPrefabUsage: scriptRows.filter(item => !item.usedOnlyInThisPrefab).length,
+            scriptsUsedOnlyInThisPrefab: scriptRows.filter(item => item.usedOnlyInThisPrefab).length,
+        },
+        limits: buildLimitMetadata(args, {
+            groupsReturned: limitedScripts.length,
+            groupsTotal: scriptRows.length,
+            truncated: limitedScripts.length < scriptRows.length,
+        }),
+    };
+    if (detail === 'counts') {
+        return base;
+    }
+    return {
+        ...base,
+        scripts: limitedScripts,
     };
 }
 
@@ -1105,6 +1388,91 @@ function searchNodes(graph, lookup, args) {
     }
 
     return nodes.slice(0, args.limit).map(node => summarizeNode(node, lookup));
+}
+
+function inferBusinessGroup(result) {
+    const text = normalizePathText([result.file, result.meta?.path, result.name].filter(Boolean).join(' '));
+    const isHttp = result.type === 'endpoint' || result.requestProtocol === 'http' || result.httpMethod || result.requestHttpMethod;
+    if (text.includes('/cms-client/')) {
+        return {
+            key: isHttp ? 'cms-client-http' : 'cms-client',
+            title: isHttp ? '后台前端 HTTP 请求' : '后台前端',
+            priority: 1,
+            recommendedArgs: { module: 'cms-client', protocol: isHttp ? 'http' : '' },
+        };
+    }
+    if (text.includes('/cms-server/')) {
+        return {
+            key: isHttp ? 'cms-server-http' : 'cms-server',
+            title: isHttp ? '后台后端 HTTP 接口' : '后台后端',
+            priority: 2,
+            recommendedArgs: { module: 'cms-server', protocol: isHttp ? 'http' : '' },
+        };
+    }
+    if (text.includes('/xy-client/')) {
+        return {
+            key: 'xy-client',
+            title: '游戏客户端',
+            priority: 3,
+            recommendedArgs: { module: 'xy-client' },
+        };
+    }
+    if (text.includes('/qy-server/')) {
+        return {
+            key: isHttp ? 'qy-server-http' : 'qy-server',
+            title: isHttp ? '游戏服 HTTP 接口' : '游戏服',
+            priority: 4,
+            recommendedArgs: { module: 'qy-server', protocol: isHttp ? 'http' : '' },
+        };
+    }
+    const fallback = getRecommendationGroup(result);
+    return {
+        key: fallback.key,
+        title: fallback.title,
+        priority: fallback.priority + 10,
+        recommendedArgs: {},
+    };
+}
+
+function buildGroupedSearchResults(results, args = {}) {
+    const groups = new Map();
+    for (const result of results || []) {
+        const groupInfo = inferBusinessGroup(result);
+        if (!groups.has(groupInfo.key)) {
+            groups.set(groupInfo.key, {
+                key: groupInfo.key,
+                title: groupInfo.title,
+                priority: groupInfo.priority,
+                recommendedArgs: groupInfo.recommendedArgs,
+                results: [],
+            });
+        }
+        groups.get(groupInfo.key).results.push(result);
+    }
+    const groupLimit = Number.isFinite(args.groupLimit) && args.groupLimit > 0 ? args.groupLimit : groups.size;
+    return {
+        kind: 'grouped-search-results',
+        query: {
+            type: args.type || '',
+            name: args.name || '',
+        },
+        counts: {
+            totalResults: results.length,
+            groups: groups.size,
+        },
+        groups: [...groups.values()]
+            .sort((left, right) => left.priority - right.priority)
+            .slice(0, groupLimit)
+            .map(group => ({
+                ...group,
+                results: group.results.slice(0, args.limit),
+            })),
+        limits: buildLimitMetadata(args, {
+            groupsReturned: Math.min(groupLimit, groups.size),
+            groupsTotal: groups.size,
+            truncated: groupLimit < groups.size,
+        }),
+    };
 }
 
 function formatNodeLabel(node) {
@@ -1905,6 +2273,13 @@ function run(argv = process.argv.slice(2)) {
 
         const startId = typeof resolved === 'string' ? resolved : resolved.id;
         const startNode = getOwnEntry(lookup.nodesById, startId);
+        const depth = effectiveTraversalDepth(args);
+        const shapedTraversal = shapeTraversalResult(
+            traverse(lookup, startId, traversalSpec.direction, depth),
+            lookup,
+            startNode,
+            args
+        );
         printTraversal(
             {
                 inputQuery: traversalSpec.inputQuery,
@@ -1912,8 +2287,11 @@ function run(argv = process.argv.slice(2)) {
                 kbVersionStatus,
                 node: startNode,
                 direction: traversalSpec.direction,
-                depth: args.depth,
-                traversal: traverse(lookup, startId, traversalSpec.direction, args.depth),
+                depth,
+                mode: isFullstackMode(args) ? 'fullstack' : (args.mode || ''),
+                focus: args.focus || '',
+                traversal: shapedTraversal.traversal,
+                relatedHelpers: shapedTraversal.relatedHelpers,
             },
             args.json
         );
@@ -2089,8 +2467,16 @@ function run(argv = process.argv.slice(2)) {
         printDetailedResult(buildScriptUsageSummary(graph, args), args.json);
         return;
     }
+    if (args.type === 'prefab-script-usage') {
+        printDetailedResult(buildPrefabScriptUsageSummary(graph, args), args.json);
+        return;
+    }
     if (args.type || args.name || args.tag || args.file || args.hasHandler) {
         const results = searchNodes(graph, lookup, args);
+        if (args.grouped) {
+            printDetailedResult(buildGroupedSearchResults(results, args), args.json);
+            return;
+        }
         printSearchResults(results, args.json);
         return;
     }

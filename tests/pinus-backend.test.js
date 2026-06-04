@@ -474,6 +474,34 @@ function runAdminFullstackAssertions() {
     assert.equal(hasEdge('Login.resetAuthState', 'Login.resetAuthState', 'calls'), false);
 
     const nestedCwd = path.join(tempRoot, 'cms-client', 'src', 'views', 'login');
+    const fullstackLoginTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--method', 'Login.handleLogin', '--downstream', '--mode', 'fullstack', '--json'], nestedCwd)
+    );
+    const fullstackNames = fullstackLoginTraversal.traversal.map(item => item.node?.name).filter(Boolean);
+    assert.ok(fullstackNames.includes('AuthApi.login'));
+    assert.ok(fullstackNames.includes('POST /auth/login'));
+    assert.ok(fullstackNames.includes('POST /api/auth/login'));
+    assert.ok(fullstackNames.includes('authController.login'));
+    assert.equal(fullstackLoginTraversal.mode, 'fullstack');
+    assert.ok(fullstackLoginTraversal.depth >= 4);
+
+    const focusedFullstackTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--method', 'Login.handleLogin', '--downstream', '--mode', 'fullstack', '--focus', 'fullstack', '--json'], nestedCwd)
+    );
+    const focusedNames = focusedFullstackTraversal.traversal.map(item => item.node?.name).filter(Boolean);
+    assert.ok(focusedNames.includes('AuthApi.login'));
+    assert.ok(focusedNames.includes('POST /api/auth/login'));
+    assert.equal(focusedNames.includes('Login.validateCaptcha'), false);
+    assert.ok(Array.isArray(focusedFullstackTraversal.relatedHelpers));
+    assert.ok(focusedFullstackTraversal.relatedHelpers.some(item => item.name === 'Login.validateCaptcha'));
+    assert.equal(focusedFullstackTraversal.focus, 'fullstack');
+
+    const unresolvedResetTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--method', 'Login.resetAuthState', '--downstream', '--include-unresolved', '--json'], nestedCwd)
+    );
+    assert.ok(unresolvedResetTraversal.traversal.some(item => item.node?.type === 'unresolved-call' && item.node?.name === 'window.$requestService.resetAuthState'));
+    assert.ok(unresolvedResetTraversal.traversal.some(item => item.node?.meta?.reason === 'dynamic_global_service'));
+
     const requestTraversal = namesFromTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--request', 'captcha', '--downstream', '--depth', '4', '--json'], nestedCwd)
     );
@@ -519,6 +547,18 @@ function runAdminFullstackAssertions() {
     assert.ok(Array.isArray(filteredLoginEndpoints));
     assert.equal(filteredLoginEndpoints.length, 1);
     assert.equal(filteredLoginEndpoints[0].name, 'POST /api/auth/login');
+
+    const groupedLoginEndpoints = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--type', 'endpoint', '--name', 'login', '--grouped', '--json'], nestedCwd)
+    );
+    assert.equal(groupedLoginEndpoints.kind, 'grouped-search-results');
+    assert.ok(groupedLoginEndpoints.groups.some(group => group.key === 'cms-server-http' && group.recommendedArgs.module === 'cms-server'));
+
+    const inlineEndpointTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--endpoint', 'GET /api/auth/inlineStatus', '--downstream', '--mode', 'fullstack', '--json'], nestedCwd)
+    );
+    assert.ok(inlineEndpointTraversal.traversal.some(item => item.node?.name === 'authRoutes.http_get_inlinestatus'));
+    assert.ok(inlineEndpointTraversal.traversal.some(item => String(item.node?.name || '').endsWith('.saveCaptcha')));
 
     const missingMessage = parseTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--message', 'login', '--json'], nestedCwd)
@@ -707,6 +747,14 @@ function runCocosQuerySummaryAssertions() {
     assert.equal(Object.hasOwn(compactPrefabSummary.customScripts[0], 'instances'), false);
     assert.equal(Object.hasOwn(compactPrefabSummary.customScripts[0], 'nodePaths'), false);
 
+    const countsPrefabSummary = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'prefab-component', '--file', lobbyPrefab, '--detail', 'counts', '--json'], tempRoot)
+    );
+    assert.equal(countsPrefabSummary.detail, 'counts');
+    assert.equal(Object.hasOwn(countsPrefabSummary, 'customScripts'), false);
+    assert.equal(countsPrefabSummary.counts.customScripts, 2);
+    assert.equal(countsPrefabSummary.limits.groupLimit, null);
+
     const scriptUsage = parseTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'script-usage', '--file', redDotScript, '--json'], tempRoot)
     );
@@ -730,6 +778,20 @@ function runCocosQuerySummaryAssertions() {
     assert.equal(groupedUsage.prefabs.length, 1);
     assert.equal(Object.hasOwn(groupedUsage.prefabs[0], 'instances'), false);
     assert.ok(Array.isArray(groupedUsage.prefabs[0].nodePaths));
+
+    const prefabScriptUsage = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'cocos-query-summary', '--type', 'prefab-script-usage', '--file', lobbyPrefab, '--exclude-prefab', lobbyPrefab, '--detail', 'grouped', '--json'], tempRoot)
+    );
+    assert.equal(prefabScriptUsage.kind, 'prefab-script-usage-summary');
+    assert.equal(prefabScriptUsage.prefabPath, lobbyPrefab);
+    assert.equal(prefabScriptUsage.counts.customScripts, 2);
+    const redDotBatchUsage = prefabScriptUsage.scripts.find(item => item.scriptPath === redDotScript);
+    assert.ok(redDotBatchUsage);
+    assert.equal(redDotBatchUsage.usedOnlyInThisPrefab, false);
+    assert.deepEqual(redDotBatchUsage.otherPrefabPaths, [mailPrefab]);
+    const lobbyViewBatchUsage = prefabScriptUsage.scripts.find(item => item.scriptPath === lobbyViewScript);
+    assert.ok(lobbyViewBatchUsage);
+    assert.equal(lobbyViewBatchUsage.usedOnlyInThisPrefab, true);
 }
 
 function runCocosAuthoringAssertions() {

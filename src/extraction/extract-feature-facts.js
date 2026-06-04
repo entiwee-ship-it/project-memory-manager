@@ -1672,6 +1672,7 @@ function createEmptyCallInfo() {
         localCalls: [],
         localCallSites: [],
         importedCalls: [],
+        unresolvedCalls: [],
         apiCalls: [],
         fieldCalls: [],
         eventSubscriptions: [],
@@ -1714,6 +1715,51 @@ function buildPinusRpcRequest(routeInfo, callbackDetails = {}) {
         callbackEventDispatches: callbackDetails.callbackEventDispatches || [],
         callbackInvocations: callbackDetails.callbackInvocations || [],
     };
+}
+
+function firstIdentifierOfExpression(expression) {
+    const match = String(expression || '').trim().match(/^([A-Za-z_$][\w$]*)/);
+    return match ? match[1] : '';
+}
+
+function unresolvedCallReason(ownerExpression) {
+    const owner = String(ownerExpression || '').trim();
+    if (owner === 'window' || owner.startsWith('window.')) {
+        return 'dynamic_global_service';
+    }
+    if (owner === 'global' || owner.startsWith('global.')) {
+        return 'dynamic_global_service';
+    }
+    if (owner === 'this' || owner.startsWith('this.')) {
+        return 'dynamic_instance_member';
+    }
+    return 'owner_not_resolved_or_external_client';
+}
+
+function extractUnresolvedMemberCalls(methodBody, imports = []) {
+    const calls = [];
+    const importedIdentifiers = new Set((imports || []).flatMap(item => [item.imported, item.local].filter(Boolean)));
+    const pattern = /\b([A-Za-z_$][\w$]*(?:(?:\?\.|\.)[A-Za-z_$][\w$]*)*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)\s*\(/g;
+    let match = null;
+    while ((match = pattern.exec(methodBody))) {
+        const ownerExpression = String(match[1] || '').replace(/\?\./g, '.');
+        const memberName = String(match[2] || '').trim();
+        if (!ownerExpression || !memberName) {
+            continue;
+        }
+        const firstIdentifier = firstIdentifierOfExpression(ownerExpression);
+        if (['this', 'super', 'console', 'Math', 'JSON', 'Promise', 'Array', 'Object', 'String', 'Number', 'Boolean'].includes(firstIdentifier)) {
+            continue;
+        }
+        calls.push({
+            ownerExpression,
+            memberName,
+            reason: importedIdentifiers.has(firstIdentifier)
+                ? 'owner_not_resolved_or_external_client'
+                : unresolvedCallReason(ownerExpression),
+        });
+    }
+    return dedupeBy(calls, item => `${item.ownerExpression}::${item.memberName}::${item.reason}`);
 }
 
 function buildHttpWrapperRequest(methodDef, httpMethod, targetPath, callee) {
@@ -3056,6 +3102,17 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const importedCalls = [];
     for (const importInfo of imports) {
         for (const identifier of importInfo.identifiers) {
+            const directFunctionPattern = new RegExp(`\\b${identifier.replace(/\$/g, '\\$')}\\s*\\(`, 'g');
+            let directFunctionMatch = null;
+            while ((directFunctionMatch = directFunctionPattern.exec(directBody))) {
+                const previousChar = directBody[Math.max(0, directFunctionMatch.index - 1)] || '';
+                if (previousChar === '.') {
+                    continue;
+                }
+                importedCalls.push(buildImportedCall(importInfo, identifier, identifier, {
+                    callKind: 'function',
+                }));
+            }
             const callPattern = new RegExp(`\\b(${identifier.replace(/\$/g, '\\$')}(?:\\.[A-Za-z_$][\\w$]*)*)\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g');
             let callMatch = null;
             while ((callMatch = callPattern.exec(directBody))) {
@@ -3110,6 +3167,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const stateAccesses = extractStateAccesses(directBody, fieldTypes, knownMethodNames);
     const notifyRoutes = extractNotifyRoutes(directBody);
     const dbAccesses = extractDbAccesses(directBody, imports);
+    const unresolvedCalls = extractUnresolvedMemberCalls(directBody, imports);
 
     return {
         localCalls: uniqueSorted(localCalls),
@@ -3128,6 +3186,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
                 resolvedVia: sample?.resolvedVia || '',
             };
         }),
+        unresolvedCalls,
         apiCalls: uniqueSorted(importedCalls.filter(call => call.isApi).map(call => `${call.identifier}.${call.method}`)),
         fieldCalls: uniqueSorted(fieldCalls.map(call => `${call.fieldName}.${call.method}`)).map(signature => {
             const [fieldName, method] = signature.split('.');
@@ -3167,6 +3226,10 @@ function mergeCallInfo(regexInfo, astInfo) {
     const mergedFieldCalls = dedupeBy(
         [...(regexInfo.fieldCalls || []), ...(astInfo.fieldCalls || [])],
         call => `${call.fieldName}::${call.method}::${call.sourcePath || ''}::${call.sourceSpecifier || ''}`
+    );
+    const mergedUnresolvedCalls = dedupeBy(
+        [...(regexInfo.unresolvedCalls || []), ...(astInfo.unresolvedCalls || [])],
+        call => `${call.ownerExpression || ''}::${call.memberName || ''}::${call.reason || ''}`
     );
     const mergedEventSubscriptionsMap = new Map();
     for (const item of [...(regexInfo.eventSubscriptions || []), ...(astInfo.eventSubscriptions || [])]) {
@@ -3253,6 +3316,7 @@ function mergeCallInfo(regexInfo, astInfo) {
             callSite => `${callSite.method}::${(callSite.args || []).join('||')}`
         ),
         importedCalls: mergedImportedCalls,
+        unresolvedCalls: mergedUnresolvedCalls,
         apiCalls: uniqueSorted(mergedImportedCalls.filter(call => call.isApi).map(call => `${call.identifier}.${call.method}`)),
         fieldCalls: mergedFieldCalls,
         eventSubscriptions: mergedEventSubscriptions,
@@ -3289,6 +3353,10 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
             item => `${item.bus}::${item.mode}::${item.event}`
         ),
         networkRequests: [],
+        unresolvedCalls: dedupeBy(
+            [...(callInfo.unresolvedCalls || [])],
+            item => `${item.ownerExpression || ''}::${item.memberName || ''}::${item.reason || ''}`
+        ),
         stateReads: uniqueSorted(
             (callInfo.stateReads || []).filter(item => !knownMethodNames.includes(String(item || '').split('.')[0]))
         ),
@@ -3590,6 +3658,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                     localCalls: callInfo.localCalls,
                     localCallSites: callInfo.localCallSites,
                     importedCalls: callInfo.importedCalls,
+                    unresolvedCalls: callInfo.unresolvedCalls,
                     apiCalls: callInfo.apiCalls,
                     fieldCalls: callInfo.fieldCalls,
                     eventSubscriptions: callInfo.eventSubscriptions,

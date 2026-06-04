@@ -190,6 +190,14 @@ const TOOL_DEFINITIONS = [
                 protocol: { type: 'string' },
                 path: { type: 'string' },
                 detail: { type: 'string' },
+                mode: { type: 'string' },
+                fullstack: { type: 'boolean' },
+                focus: { type: 'string' },
+                includeUnresolved: { type: 'boolean' },
+                grouped: { type: 'boolean' },
+                groupLimit: { type: 'number' },
+                instanceLimit: { type: 'number' },
+                nodePathLimit: { type: 'number' },
                 from: { type: 'string' },
                 direction: { type: 'string' },
                 upstream: { type: 'boolean' },
@@ -228,6 +236,14 @@ const TOOL_DEFINITIONS = [
                 protocol: { type: 'string' },
                 path: { type: 'string' },
                 detail: { type: 'string' },
+                mode: { type: 'string' },
+                fullstack: { type: 'boolean' },
+                focus: { type: 'string' },
+                includeUnresolved: { type: 'boolean' },
+                grouped: { type: 'boolean' },
+                groupLimit: { type: 'number' },
+                instanceLimit: { type: 'number' },
+                nodePathLimit: { type: 'number' },
                 from: { type: 'string' },
                 direction: { type: 'string' },
                 upstream: { type: 'boolean' },
@@ -329,9 +345,11 @@ function hasQuerySelector(args = {}) {
         'protocol',
         'path',
         'detail',
+        'mode',
+        'focus',
         'from',
         'direction',
-    ].some(key => Boolean(args[key])) || Boolean(args.upstream || args.downstream);
+    ].some(key => Boolean(args[key])) || Boolean(args.upstream || args.downstream || args.fullstack || args.includeUnresolved || args.grouped || args.groupLimit || args.instanceLimit || args.nodePathLimit);
 }
 
 function statSignature(filePath) {
@@ -707,7 +725,7 @@ function runQueryScript(scriptName, argv, timeoutMs) {
 }
 
 function appendQuerySelectorArgs(argv, args, options) {
-    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'endpoint', 'state', 'type', 'name', 'tag', 'file', 'area', 'module', 'protocol', 'path', 'detail', 'from', 'direction']) {
+    for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'endpoint', 'state', 'type', 'name', 'tag', 'file', 'area', 'module', 'protocol', 'path', 'detail', 'mode', 'focus', 'from', 'direction']) {
         if (args[key]) {
             argv.push(`--${key}`, args[key]);
         }
@@ -720,6 +738,24 @@ function appendQuerySelectorArgs(argv, args, options) {
     }
     if (args.excludeModule) {
         argv.push('--exclude-module', args.excludeModule);
+    }
+    if (args.fullstack) {
+        argv.push('--fullstack');
+    }
+    if (args.includeUnresolved) {
+        argv.push('--include-unresolved');
+    }
+    if (args.grouped) {
+        argv.push('--grouped');
+    }
+    if (args.groupLimit) {
+        argv.push('--group-limit', String(args.groupLimit));
+    }
+    if (args.instanceLimit) {
+        argv.push('--instance-limit', String(args.instanceLimit));
+    }
+    if (args.nodePathLimit) {
+        argv.push('--node-path-limit', String(args.nodePathLimit));
     }
     if (hasQuerySelector(args)) {
         argv.push('--limit', String(options.limit));

@@ -7,6 +7,20 @@
 
 ## [未发布]
 
+## [0.26.0] - 2026-06-04
+
+### 新增
+- 查询新增 `mode=fullstack` / `--fullstack`，前端方法到 HTTP request、后端 endpoint、handler/controller 的链路可自动扩展到完整深度。
+- 查询新增 `focus=fullstack`，主链路优先展示 API / HTTP / endpoint，折叠同文件 helper 到 `relatedHelpers`。
+- Cocos 新增 `type=prefab-script-usage`，可一次性查看某个 prefab 上所有自定义脚本在其它 prefab 的绑定情况。
+- Cocos summary 新增 `detail=counts`，并返回 `limits` 元数据说明 group / nodePath / instance 的限制与截断状态。
+- 宽泛 `type/name` 查询支持 `grouped` 分组输出，并附带 `module` / `protocol` 等推荐收窄参数。
+- 查询新增 `includeUnresolved` / `--include-unresolved`，可显示安全跳过的外部或动态 member call。
+
+### 改进
+- Express inline route callback 会作为 synthetic handler 进入链路，endpoint 可继续追到 callback 内直接导入的 service 方法。
+- 直接调用导入函数（例如 `saveCaptcha(...)`）也会被解析成 imported function call。
+
 ## [0.25.0] - 2026-06-04
 
 ### 新增

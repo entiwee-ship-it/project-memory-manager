@@ -22,6 +22,7 @@ Cocos prefab query examples:
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type prefab-component --file E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --json
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file E:/xile-workspace/qyProject/xy-client/assets/script/game/redDot/view/RedDotView.ts --json
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file E:/xile-workspace/qyProject/xy-client/assets/script/game/redDot/view/RedDotView.ts --exclude-file E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type prefab-script-usage --file E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --exclude-prefab E:/xile-workspace/qyProject/xy-client/assets/bundle/gui/lobby/lobby.prefab --detail grouped --json
 ```
 
 ## 查询收窄
@@ -30,13 +31,23 @@ node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --dat
 
 ```powershell
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type endpoint --name login --module cms-server --protocol http --path /auth/login --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type endpoint --name login --grouped --json
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method getCaptcha --area backend --downstream --json
+```
+
+Fullstack 链路会自动展开到 HTTP request、endpoint 和 handler：
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method Login.handleLogin --downstream --mode fullstack --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method Login.handleLogin --downstream --mode fullstack --focus fullstack --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method Login.resetAuthState --downstream --include-unresolved --json
 ```
 
 Cocos summary 可控制输出体积：
 
 ```powershell
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type prefab-component --file <prefab-path> --detail summary --limit 5 --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type prefab-component --file <prefab-path> --detail counts --json
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type script-usage --file <script-path> --detail grouped --json
 ```
 

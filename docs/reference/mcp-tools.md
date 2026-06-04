@@ -27,8 +27,13 @@ For Cocos prefab work, use:
 
 - `type=prefab-component` with `file=<prefab path>` to get grouped component attachments.
 - `type=script-usage` with `file=<script path>` to find prefab/nodePath usage.
+- `type=prefab-script-usage` with `file=<prefab path>` to batch-check every custom script mounted on a prefab and where else it is used.
 - `excludeFile=<prefab path>` or `excludePrefab=<prefab path>` to remove the current prefab from script usage results.
 - `area`, `module`, `excludeModule`, `protocol`, and `path` narrow broad results such as `login` to a specific subsystem.
-- `detail=summary|grouped|full` controls Cocos summary verbosity.
+- `mode=fullstack` or `fullstack=true` expands frontend-to-backend HTTP traces without manually setting deep traversal.
+- `focus=fullstack` folds same-file helper methods into `relatedHelpers`.
+- `includeUnresolved=true` shows safe skipped dynamic/member calls as unresolved call nodes.
+- `grouped=true` returns broad search results grouped by subsystem with recommended narrowing args.
+- `detail=counts|summary|grouped|full` controls Cocos summary verbosity.
 
 All tools accept `workspaceRoot`; most accept `dataRoot` for external data layout.
