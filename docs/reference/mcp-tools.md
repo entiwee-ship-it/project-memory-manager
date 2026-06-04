@@ -32,6 +32,9 @@ For Cocos prefab work, use:
 - `area`, `module`, `excludeModule`, `protocol`, and `path` narrow broad results such as `login` to a specific subsystem.
 - `mode=fullstack` or `fullstack=true` expands frontend-to-backend HTTP traces without manually setting deep traversal.
 - `focus=fullstack` folds same-file helper methods into `relatedHelpers`.
+- `focus=data` adds `dataAccessSummary`, grouped by table with read/write methods and operations.
+- `mode=fullstack-data` combines fullstack traversal depth with `dataAccessSummary`.
+- `type=table` with `name=<table>` finds a known table node directly.
 - `includeUnresolved=true` shows safe skipped dynamic/member calls as unresolved call nodes.
 - `grouped=true` returns broad search results grouped by subsystem with recommended narrowing args.
 - `detail=counts|summary|grouped|full` controls Cocos summary verbosity.

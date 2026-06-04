@@ -2,7 +2,7 @@
 
 ## What It Does
 
-Project Memory Manager (PMM) builds an external knowledge base for a target repository so Codex can query project structure, feature chains, HTTP routes, Pinus handlers, Vue/Express flows, Cocos prefab bindings, states, events, and learned project protocols without writing memory files into the target repository.
+Project Memory Manager (PMM) builds an external knowledge base for a target repository so Codex can query project structure, feature chains, HTTP routes, Pinus handlers, Vue/Express flows, backend table access summaries, Cocos prefab bindings, states, events, and learned project protocols without writing memory files into the target repository.
 
 The source repository, target development project, and generated PMM data root are separate:
 
@@ -65,6 +65,8 @@ node src/bin/validate-package.js
 ```
 
 More commands are documented in `docs/reference/cli.md`.
+
+For backend data impact checks, query with `focus=data` or `mode=fullstack-data` and read the returned `dataAccessSummary`.
 
 ## Data Separation
 

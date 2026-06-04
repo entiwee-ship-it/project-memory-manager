@@ -43,6 +43,14 @@ node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --dat
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method Login.resetAuthState --downstream --include-unresolved --json
 ```
 
+数据表影响面查询会在 JSON 中返回 `dataAccessSummary`：
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method LoginExecuteService.loginExecute --downstream --focus data --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --endpoint "GET /activity/goldenEgg/getGoldenEggReward" --downstream --mode fullstack-data --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type table --name tbUser --json
+```
+
 Cocos summary 可控制输出体积：
 
 ```powershell

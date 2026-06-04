@@ -761,7 +761,22 @@ function traverse(lookup, startId, direction, depth) {
 
 function isFullstackMode(args = {}) {
     const mode = String(args.mode || '').trim().toLowerCase();
-    return Boolean(args.fullstack || mode === 'fullstack' || String(args.focus || '').trim().toLowerCase() === 'fullstack');
+    return Boolean(args.fullstack || mode === 'fullstack' || mode === 'fullstack-data' || String(args.focus || '').trim().toLowerCase() === 'fullstack');
+}
+
+function isDataAccessSummaryMode(args = {}) {
+    const mode = String(args.mode || '').trim().toLowerCase();
+    const focus = String(args.focus || '').trim().toLowerCase();
+    return mode === 'fullstack-data' || focus === 'data';
+}
+
+function effectiveMode(args = {}) {
+    const mode = String(args.mode || '').trim();
+    const normalizedMode = mode.toLowerCase();
+    if (normalizedMode === 'fullstack-data') {
+        return 'fullstack-data';
+    }
+    return isFullstackMode(args) ? 'fullstack' : mode;
 }
 
 function effectiveTraversalDepth(args = {}) {
@@ -799,6 +814,7 @@ function shapeTraversalResult(rawTraversal, lookup, startNode, args = {}) {
     const shaped = {
         traversal,
         relatedHelpers: [],
+        dataTraversal: traversal,
     };
     if (focus !== 'fullstack') {
         return shaped;
@@ -821,6 +837,127 @@ function shapeTraversalResult(rawTraversal, lookup, startNode, args = {}) {
     shaped.traversal = focusedTraversal;
     shaped.relatedHelpers = [...helperMap.values()].sort((left, right) => left.name.localeCompare(right.name));
     return shaped;
+}
+
+function summarizeDataAccessActor(node) {
+    if (!node) {
+        return {
+            method: '',
+            nodeType: '',
+            file: '',
+            line: null,
+            area: '',
+        };
+    }
+    return {
+        method: node.name || '',
+        nodeType: node.type || '',
+        file: node.file || '',
+        line: node.line ?? null,
+        area: node.area || '',
+    };
+}
+
+function makeDataAccessEntry(edge, actorNode, item) {
+    return {
+        ...summarizeDataAccessActor(actorNode),
+        operation: edge.meta?.operation || '',
+        edgeType: edge.type || '',
+        depth: item.depth ?? null,
+    };
+}
+
+function sortDataAccessEntries(entries) {
+    return entries.sort((left, right) => {
+        const methodCompare = String(left.method || '').localeCompare(String(right.method || ''));
+        if (methodCompare !== 0) {
+            return methodCompare;
+        }
+        const operationCompare = String(left.operation || '').localeCompare(String(right.operation || ''));
+        if (operationCompare !== 0) {
+            return operationCompare;
+        }
+        return Number(left.depth || 0) - Number(right.depth || 0);
+    });
+}
+
+function buildDataAccessSummary(traversal, lookup) {
+    const tables = new Map();
+    const actorIds = new Set();
+    let readCount = 0;
+    let writeCount = 0;
+    const seenEdges = new Set();
+
+    for (const item of traversal || []) {
+        const edge = item.edge || {};
+        if (!['reads', 'writes'].includes(edge.type)) {
+            continue;
+        }
+        const fromNode = getOwnEntry(lookup.nodesById, edge.from) || null;
+        const toNode = getOwnEntry(lookup.nodesById, edge.to) || null;
+        const tableNode = toNode?.type === 'table'
+            ? toNode
+            : (fromNode?.type === 'table' ? fromNode : null);
+        if (!tableNode) {
+            continue;
+        }
+        const actorNode = tableNode.id === edge.to ? fromNode : toNode;
+        const dedupeKey = [
+            edge.from || '',
+            edge.to || '',
+            edge.type || '',
+            edge.meta?.operation || '',
+        ].join('|');
+        if (seenEdges.has(dedupeKey)) {
+            continue;
+        }
+        seenEdges.add(dedupeKey);
+
+        if (!tables.has(tableNode.id)) {
+            tables.set(tableNode.id, {
+                id: tableNode.id,
+                name: edge.meta?.tableName || tableNode.name || '',
+                file: tableNode.file || '',
+                importPath: edge.meta?.importPath || tableNode.meta?.importPath || '',
+                reads: [],
+                writes: [],
+            });
+        }
+
+        const access = makeDataAccessEntry(edge, actorNode, item);
+        if (actorNode?.id) {
+            actorIds.add(actorNode.id);
+        }
+        const tableSummary = tables.get(tableNode.id);
+        if (edge.type === 'reads') {
+            tableSummary.reads.push(access);
+            readCount++;
+        } else {
+            tableSummary.writes.push(access);
+            writeCount++;
+        }
+    }
+
+    const tableSummaries = [...tables.values()]
+        .map(table => ({
+            ...table,
+            reads: sortDataAccessEntries(table.reads),
+            writes: sortDataAccessEntries(table.writes),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name));
+
+    return {
+        kind: 'data-access-summary',
+        purpose: '当前链路遍历范围内的数据表读写摘要，用于从接口、方法或全栈链路快速判断涉及哪些后端表。',
+        counts: {
+            tables: tableSummaries.length,
+            reads: readCount,
+            writes: writeCount,
+            accessEdges: readCount + writeCount,
+            actors: actorIds.size,
+        },
+        tables: tableSummaries,
+    };
 }
 
 function summarizeEdges(edges, lookup, limit = 8) {
@@ -1952,6 +2089,17 @@ function printTraversal(result, asJson) {
 
     console.log(`起点: ${formatNodeLabel(result.node)}`);
     console.log(`方向: ${result.direction}, 深度: ${result.depth}`);
+    if (result.dataAccessSummary) {
+        const summary = result.dataAccessSummary;
+        console.log(`数据表读写: ${summary.counts.tables} 表, ${summary.counts.reads} 读, ${summary.counts.writes} 写`);
+        for (const table of summary.tables || []) {
+            const operations = [
+                table.reads.length ? `读:${table.reads.map(item => item.operation || item.method).filter(Boolean).join(', ')}` : '',
+                table.writes.length ? `写:${table.writes.map(item => item.operation || item.method).filter(Boolean).join(', ')}` : '',
+            ].filter(Boolean).join('; ');
+            console.log(`  - ${table.name}${operations ? ` (${operations})` : ''}`);
+        }
+    }
 
     if (!result.traversal.length) {
         console.log('未找到链路。');
@@ -2280,21 +2428,22 @@ function run(argv = process.argv.slice(2)) {
             startNode,
             args
         );
-        printTraversal(
-            {
-                inputQuery: traversalSpec.inputQuery,
-                resolvedStart: startNode ? summarizeNode(startNode, lookup) : null,
-                kbVersionStatus,
-                node: startNode,
-                direction: traversalSpec.direction,
-                depth,
-                mode: isFullstackMode(args) ? 'fullstack' : (args.mode || ''),
-                focus: args.focus || '',
-                traversal: shapedTraversal.traversal,
-                relatedHelpers: shapedTraversal.relatedHelpers,
-            },
-            args.json
-        );
+        const result = {
+            inputQuery: traversalSpec.inputQuery,
+            resolvedStart: startNode ? summarizeNode(startNode, lookup) : null,
+            kbVersionStatus,
+            node: startNode,
+            direction: traversalSpec.direction,
+            depth,
+            mode: effectiveMode(args),
+            focus: args.focus || '',
+            traversal: shapedTraversal.traversal,
+            relatedHelpers: shapedTraversal.relatedHelpers,
+        };
+        if (isDataAccessSummaryMode(args)) {
+            result.dataAccessSummary = buildDataAccessSummary(shapedTraversal.dataTraversal, lookup);
+        }
+        printTraversal(result, args.json);
         return;
     }
 

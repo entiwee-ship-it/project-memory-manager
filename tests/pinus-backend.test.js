@@ -315,6 +315,26 @@ function runFixtureAssertions() {
     assert.equal(typedMethodTraversal.resolvedStart?.name, 'goldenEgg.getGoldenEggReward');
     assert.ok(typedMethodTraversal.traversal.some(item => item.node?.name === 'tbUserAccount'));
 
+    const methodDataSummary = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--method', 'getGoldenEggReward', '--downstream', '--depth', '3', '--focus', 'data', '--json'], nestedCwd)
+    );
+    assert.equal(methodDataSummary.focus, 'data');
+    assert.equal(methodDataSummary.dataAccessSummary.kind, 'data-access-summary');
+    assert.equal(methodDataSummary.dataAccessSummary.counts.tables, 3);
+    assert.equal(methodDataSummary.dataAccessSummary.counts.reads, 1);
+    assert.equal(methodDataSummary.dataAccessSummary.counts.writes, 3);
+    const goldenEggUserInfoAccess = methodDataSummary.dataAccessSummary.tables.find(item => item.name === 'goldenEggUserInfoTable');
+    assert.ok(goldenEggUserInfoAccess);
+    assert.ok(goldenEggUserInfoAccess.reads.some(item => item.method === 'goldenEgg.getGoldenEggReward' && item.operation === 'from'));
+    assert.ok(goldenEggUserInfoAccess.writes.some(item => item.method === 'goldenEgg.getGoldenEggReward' && item.operation === 'update'));
+
+    const fullstackDataTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--endpoint', 'GET /activity/goldenEgg/getGoldenEggReward', '--downstream', '--mode', 'fullstack-data', '--json'], nestedCwd)
+    );
+    assert.equal(fullstackDataTraversal.mode, 'fullstack-data');
+    assert.ok(fullstackDataTraversal.depth >= 4);
+    assert.ok(fullstackDataTraversal.dataAccessSummary.tables.some(item => item.name === 'goldenEggLotteryRecordTable'));
+
     const typedMethodUpstream = namesFromTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'pinus-sample', '--method', 'getGoldenEggReward', '--upstream', '--depth', '2', '--json'], nestedCwd)
     );

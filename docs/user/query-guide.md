@@ -54,6 +54,17 @@ node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --dat
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method Login.resetAuthState --downstream --include-unresolved --json
 ```
 
+## 后端链路到数据表
+
+想知道某个后端方法、接口或全栈链路会读写哪些表时，优先看 `dataAccessSummary`：
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method LoginExecuteService.loginExecute --downstream --focus data --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --endpoint "GET /activity/goldenEgg/getGoldenEggReward" --downstream --mode fullstack-data --json
+```
+
+`focus=data` 不改变遍历深度，只在当前链路范围内汇总表读写。`mode=fullstack-data` 会像 `mode=fullstack` 一样自动展开到更深的 HTTP/fullstack 链路，并附加同样的数据表摘要。
+
 Use a concrete project root such as `E:/xile-workspace/qyProject`. Do not use the broad `E:/xile-workspace` root for normal project work.
 
 When a KB is stale, rebuild it before relying on the answer.

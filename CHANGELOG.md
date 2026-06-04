@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+## [0.27.0] - 2026-06-04
+
+### 新增
+- 链路查询新增 `focus=data`，会在普通 downstream/upstream 结果中附加 `dataAccessSummary`，按表汇总当前遍历范围内的读写方法、操作和统计数量。
+- 链路查询新增 `mode=fullstack-data`，在 `mode=fullstack` 的自动深度基础上同时返回数据表读写摘要，方便从页面/API/endpoint 一路看到后端表影响面。
+
 ## [0.26.0] - 2026-06-04
 
 ### 新增

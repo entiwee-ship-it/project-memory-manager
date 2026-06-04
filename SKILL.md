@@ -7,7 +7,7 @@ description: External project memory manager for Codex. Use MCP first to initial
 
 ## 什么时候使用
 
-当 Codex 需要理解一个现有项目的结构、跨文件调用链、HTTP 请求、Pinus 消息、Vue/Express 全栈链路、Cocos prefab 绑定、状态读写或项目协议时，使用 PMM。PMM 的记忆文件必须放在外置 data root，不能写入目标业务项目。
+当 Codex 需要理解一个现有项目的结构、跨文件调用链、HTTP 请求、Pinus 消息、Vue/Express 全栈链路、后端数据表读写、Cocos prefab 绑定、状态读写或项目协议时，使用 PMM。PMM 的记忆文件必须放在外置 data root，不能写入目标业务项目。
 
 ## 默认工作流
 
@@ -30,8 +30,9 @@ MCP 可用时不要优先读生成的 JSON 文件。先调用：
 1. 项目范围不清楚时，先用 `query_project_chain`。
 2. 已知 feature 时，用 `query_feature_chain`。
 3. 只知道关键词时，先查 `type/name/request/message/state`，再决定是否读源码。
-4. KB 结果不足时，读 `docs/` 和 `references/`。
-5. 最后才用 `rg` 回源码确认细节。
+4. 需要回答“这个接口/方法会动哪些表”时，用 `focus=data` 或 `mode=fullstack-data` 看 `dataAccessSummary`。
+5. KB 结果不足时，读 `docs/` 和 `references/`。
+6. 最后才用 `rg` 回源码确认细节。
 
 ## 构建和刷新 KB
 
