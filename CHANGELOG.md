@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+## [0.27.2] - 2026-06-05
+
+### 文档
+- GitHub 部署说明补充 `npx skills add ... --skill project-memory-manager`，明确 skill 安装和 MCP 配置是两个独立步骤。
+- README、Quick Start 和 MCP First 补充技能安装命令，避免只配置 MCP 后技能列表里看不到 PMM。
+
 ## [0.27.1] - 2026-06-05
 
 ### 文档

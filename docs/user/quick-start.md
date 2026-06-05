@@ -8,6 +8,12 @@ docs/user/install-from-github.md
 
 PMM should run with external data by default. The target project does not receive PMM runtime files.
 
+Install the Codex skill first so it appears in the skill list:
+
+```powershell
+npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
+```
+
 ```powershell
 $project = "E:/xile-workspace/qyProject"
 $data = "E:/xile-workspace/codex-tools/project-memory-data"

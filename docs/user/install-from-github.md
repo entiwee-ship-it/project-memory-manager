@@ -58,7 +58,28 @@ npm install
 node src/bin/validate-package.js .
 ```
 
-## 4. Configure Codex MCP
+## 4. Install The Codex Skill
+
+Install the PMM skill so Codex can see `project-memory-manager` in its skill list and load the PMM operating rules.
+
+```powershell
+npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
+```
+
+Verify the skill is installed:
+
+```powershell
+npx skills ls -g -a codex
+```
+
+The skill and the MCP server are related but separate:
+
+- Skill install gives Codex the `SKILL.md` guidance.
+- MCP config exposes PMM tools such as `get_current_state`, `build_project_index`, and `query_project_chain`.
+
+Restart Codex after installing or updating a skill. The current session does not hot-reload the skill list.
+
+## 5. Configure Codex MCP
 
 Edit the Codex config file:
 
@@ -98,7 +119,7 @@ command = "D:/nodejs/node.exe"
 
 Restart Codex after changing the MCP config. MCP tools are loaded at Codex startup.
 
-## 5. First Build
+## 6. First Build
 
 After Codex restarts, use MCP first:
 
@@ -130,7 +151,7 @@ Expected result:
 False
 ```
 
-## 6. Daily Use
+## 7. Daily Use
 
 Use MCP tools before reading generated JSON files:
 
@@ -147,7 +168,7 @@ Useful query options:
 - `mode=fullstack-data` for fullstack traversal plus table read/write summary.
 - `grouped=true` for broad keyword searches.
 
-## 7. Upgrade
+## 8. Upgrade
 
 When this GitHub repo changes:
 
@@ -158,15 +179,27 @@ npm install
 node src/bin/validate-package.js .
 ```
 
-Restart Codex so MCP reloads the new source. Then rebuild project KBs:
+Update the installed skill too:
+
+```powershell
+npx skills update project-memory-manager -g -a codex -y
+```
+
+Restart Codex so it reloads both the skill and MCP source. Then rebuild project KBs:
 
 ```powershell
 node src/bin/rebuild-kbs.js --workspace-root $project --data-root $pmmData
 ```
 
-If only PMM data changed because a KB was rebuilt, Codex usually does not need a restart. If PMM source code or MCP config changed, restart Codex.
+If only PMM data changed because a KB was rebuilt, Codex usually does not need a restart. If PMM source code, installed skill content, or MCP config changed, restart Codex.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
+
+If `project-memory-manager` does not appear in the skill list:
+
+- Run `npx skills ls -g -a codex`.
+- Re-run the `npx skills add ... --skill project-memory-manager ...` command.
+- Restart Codex.
 
 If MCP tools do not appear:
 
