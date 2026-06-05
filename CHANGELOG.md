@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+## [0.27.3] - 2026-06-05
+
+### 文档
+- 技能安装命令补充 `--full-depth`，避免 `npx skills add` 使用缓存元数据导致安装旧版 PMM skill。
+- 技能升级流程改为 `skills remove` 后重新 `skills add --full-depth`，不再建议对 GitHub root skill 使用 `skills update`。
+
 ## [0.27.2] - 2026-06-05
 
 ### 文档

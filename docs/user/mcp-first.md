@@ -5,7 +5,7 @@ Codex should use PMM through MCP whenever possible.
 Install the skill and configure MCP. The skill makes `project-memory-manager` appear in the skill list; MCP exposes callable tools.
 
 ```powershell
-npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
+npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
 ```
 
 Preferred tool order:

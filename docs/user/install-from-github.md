@@ -63,7 +63,7 @@ node src/bin/validate-package.js .
 Install the PMM skill so Codex can see `project-memory-manager` in its skill list and load the PMM operating rules.
 
 ```powershell
-npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y
+npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
 ```
 
 Verify the skill is installed:
@@ -182,10 +182,11 @@ node src/bin/validate-package.js .
 Update the installed skill too:
 
 ```powershell
-npx skills update project-memory-manager -g -a codex -y
+npx skills remove project-memory-manager -g -a codex -y
+npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
 ```
 
-Restart Codex so it reloads both the skill and MCP source. Then rebuild project KBs:
+`skills update` may not refresh this GitHub root skill reliably because it can resolve cached package metadata. Remove + add forces a fresh clone. Restart Codex so it reloads both the skill and MCP source. Then rebuild project KBs:
 
 ```powershell
 node src/bin/rebuild-kbs.js --workspace-root $project --data-root $pmmData
@@ -198,7 +199,7 @@ If only PMM data changed because a KB was rebuilt, Codex usually does not need a
 If `project-memory-manager` does not appear in the skill list:
 
 - Run `npx skills ls -g -a codex`.
-- Re-run the `npx skills add ... --skill project-memory-manager ...` command.
+- Re-run the `npx skills add ... --skill project-memory-manager ... --full-depth` command.
 - Restart Codex.
 
 If MCP tools do not appear:

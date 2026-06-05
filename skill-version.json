@@ -1,14 +1,14 @@
 {
   "name": "project-memory-manager",
-  "version": "0.27.2",
-  "releaseDate": "2026-06-04",
+  "version": "0.27.3",
+  "releaseDate": "2026-06-05",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
   "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
-  "installCommand": "npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y",
+  "installCommand": "npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth",
   "updateCommands": [
-    "npx skills check",
-    "npx skills update"
+    "npx skills remove project-memory-manager -g -a codex -y",
+    "npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth"
   ],
   "rebuildCommand": "node src/bin/rebuild-kbs.js --workspace-root <project-root>",
   "capabilities": [
