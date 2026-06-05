@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "releaseDate": "2026-06-05",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",

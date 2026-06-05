@@ -7,6 +7,11 @@
 
 ## [未发布]
 
+## [0.28.1] - 2026-06-05
+
+### 修复
+- 修复 `refresh-memory-indexes` 刷新 feature registry 时被 KB 目录扫描记录覆盖 `configPath` 的问题，避免 feature KB 已重建后仍被标记为 `missing-kb-config`。
+
 ## [0.28.0] - 2026-06-05
 
 ### 新增

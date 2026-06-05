@@ -239,6 +239,10 @@ function testFeatureKbExternalData() {
     refreshMemoryIndexes(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
     buildCocosAuthoringProfile(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
 
+    const refreshedRegistry = JSON.parse(fs.readFileSync(context.paths.featureRegistry, 'utf8'));
+    const refreshedFeature = refreshedRegistry.features.find(feature => feature.featureKey === 'feature-sample');
+    assert.equal(refreshedFeature.configPath, configPath.replace(/\\/g, '/'));
+
     assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
     assert.equal(fs.existsSync(context.paths.featureIndex), true);
     assert.equal(fs.existsSync(path.join(context.paths.stateDir, 'cocos-authoring-profile.json')), true);

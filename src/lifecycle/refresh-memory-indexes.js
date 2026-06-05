@@ -72,6 +72,8 @@ function mergeFeatureRecords(...groups) {
             merged.set(normalized.featureKey, {
                 ...existing,
                 ...normalized,
+                configPath: normalized.configPath || existing.configPath || '',
+                docsDir: normalized.docsDir || existing.docsDir || '',
                 outputs: {
                     ...(existing.outputs || {}),
                     ...(normalized.outputs || {}),
@@ -134,7 +136,7 @@ function run(argv = process.argv.slice(2)) {
         });
     });
     const featuresFromKbDirs = scanFeatureDirs(context);
-    const features = mergeFeatureRecords(existingFeatures, featuresFromConfigs, featuresFromKbDirs);
+    const features = mergeFeatureRecords(featuresFromKbDirs, existingFeatures, featuresFromConfigs);
 
     const domains = domainFiles.map(filePath => ({
         title: firstHeading(filePath),
