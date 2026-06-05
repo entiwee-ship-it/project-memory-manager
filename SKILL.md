@@ -11,11 +11,12 @@ description: External project memory manager for Codex. Use MCP first to initial
 
 ## 默认工作流
 
-1. 先通过 MCP `get_current_state` 查看目标项目是否已有 PMM data root。
-2. 没有状态时，使用 MCP `init_workspace` 和 `detect_topology` 初始化外置记忆。
-3. 需要全局理解时，使用 `build_project_index` 或 `start_build_project_index`。
-4. 需要 feature 级链路时，先 `discover_features`，再 `build_feature_index`。
-5. 查询时优先 MCP，只有 MCP 不可用时才使用 CLI。
+1. 新电脑或新 Codex 环境部署时，先读 `docs/user/install-from-github.md`。
+2. 先通过 MCP `get_current_state` 查看目标项目是否已有 PMM data root。
+3. 没有状态时，使用 MCP `init_workspace` 和 `detect_topology` 初始化外置记忆。
+4. 需要全局理解时，使用 `build_project_index` 或 `start_build_project_index`。
+5. 需要 feature 级链路时，先 `discover_features`，再 `build_feature_index`。
+6. 查询时优先 MCP，只有 MCP 不可用时才使用 CLI。
 
 ## MCP 优先规则
 
@@ -64,6 +65,7 @@ E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js
 ## 必读文档索引
 
 - `docs/user/quick-start.md`
+- `docs/user/install-from-github.md`
 - `docs/user/mcp-first.md`
 - `docs/user/external-data-layout.md`
 - `docs/reference/cli.md`

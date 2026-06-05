@@ -12,6 +12,15 @@ The source repository, target development project, and generated PMM data root a
 
 ## Quick Start
 
+On a new computer, start here:
+
+- Clone this GitHub repo.
+- Install npm dependencies.
+- Configure Codex MCP to run `src/bin/mcp.js`.
+- Keep generated PMM data outside the target project.
+
+The full setup path is documented in `docs/user/install-from-github.md`.
+
 Use MCP first when Codex has the PMM server loaded. CLI commands are mainly for setup, verification, and fallback.
 
 ```powershell
@@ -87,6 +96,7 @@ The target project stays clean. Removing PMM from Codex does not require deletin
 ## Documentation Map
 
 - `docs/user/quick-start.md`: user setup and common workflow.
+- `docs/user/install-from-github.md`: new-computer setup from GitHub clone to Codex MCP verification.
 - `docs/user/mcp-first.md`: MCP-first operating model.
 - `docs/user/external-data-layout.md`: source/project/data-root separation.
 - `docs/reference/cli.md`: CLI command reference.

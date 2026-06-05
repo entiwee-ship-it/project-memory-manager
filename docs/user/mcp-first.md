@@ -17,4 +17,16 @@ The MCP server entrypoint is:
 node src/bin/mcp.js
 ```
 
+Codex config example:
+
+```toml
+[mcp_servers.project_memory_manager]
+command = "node"
+args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
+startup_timeout_sec = 120
+
+[mcp_servers.project_memory_manager.env]
+PMM_DATA_ROOT = "E:/xile-workspace/codex-tools/project-memory-data"
+```
+
 After changing the MCP entrypoint or PMM source code, restart Codex so it reloads the server.

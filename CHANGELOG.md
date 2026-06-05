@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+## [0.27.1] - 2026-06-05
+
+### 文档
+- 新增 `docs/user/install-from-github.md`，覆盖新电脑从 GitHub clone PMM、安装依赖、配置 Codex MCP、首次构建、查询验证、升级和故障排查的完整流程。
+- README、Quick Start、MCP First、External Data Layout 和 SKILL 入口补充新部署路径和 MCP 配置模板。
+
 ## [0.27.0] - 2026-06-04
 
 ### 新增

@@ -1,5 +1,11 @@
 # Quick Start
 
+For a new computer or fresh Codex install, first complete:
+
+```text
+docs/user/install-from-github.md
+```
+
 PMM should run with external data by default. The target project does not receive PMM runtime files.
 
 ```powershell
