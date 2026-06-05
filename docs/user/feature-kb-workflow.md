@@ -1,21 +1,21 @@
-# Feature KB Workflow
+# 功能 KB 工作流
 
-Discover candidates:
+发现功能候选：
 
 ```powershell
 node src/bin/discover-features.js --workspace-root <project-root> --data-root <data-root> --limit 300 --min-confidence low --json
 ```
 
-Build one feature:
+构建单个功能 KB：
 
 ```powershell
 node src/bin/build-feature.js --workspace-root <project-root> --data-root <data-root> --feature-key <key> --json
 ```
 
-Rebuild all known KBs:
+重建所有已知 KB：
 
 ```powershell
 node src/bin/rebuild-kbs.js --workspace-root <project-root> --data-root <data-root>
 ```
 
-Feature KBs should be regenerated from source facts, not manually edited.
+功能 KB 应从源码事实重新生成，不要手工编辑生成文件。

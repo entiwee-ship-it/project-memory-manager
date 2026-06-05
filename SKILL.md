@@ -1,13 +1,13 @@
 ---
 name: project-memory-manager
-description: Use PMM before broad source exploration when Codex needs project memory, repository understanding, module or feature discovery, call-chain tracing, frontend/backend HTTP flows, MCP or CLI KB queries, event/message/state analysis, database table impact, Cocos prefab/script usage, or cross-session context. Prefer MCP tools first and keep PMM runtime data outside target repos. Skip only for trivial commands, known-file edits, or tasks with enough explicit context.
+description: 当 Codex 需要项目记忆、仓库理解、模块或功能发现、调用链追踪、前后端 HTTP 链路、MCP/CLI KB 查询、事件/消息/状态分析、数据库表影响、Cocos prefab/script 使用关系或跨会话上下文时，先使用 PMM。优先调用 MCP 工具，PMM 运行数据必须放在目标项目外部。只有简单命令、已知文件小改动或上下文已经足够时才跳过。
 ---
 
 # 项目记忆管理器
 
 ## 使用判断
 
-PMM 用来让 Codex 在动源码前先理解项目。只要任务需要项目结构、模块边界、feature 入口、跨文件调用链、HTTP 前后端链路、消息/事件/状态流、数据库表影响、Cocos prefab/script 绑定或跨会话上下文，就先用 PMM。
+PMM 用来让 Codex 在动源码前先理解项目。只要任务需要项目结构、模块边界、功能入口、跨文件调用链、HTTP 前后端链路、消息/事件/状态流、数据库表影响、Cocos prefab/script 绑定或跨会话上下文，就先用 PMM。
 
 可以跳过 PMM 的情况只有三类：
 
@@ -15,18 +15,18 @@ PMM 用来让 Codex 在动源码前先理解项目。只要任务需要项目结
 - 只是运行简单命令、看 git 状态、查时间、改纯格式。
 - 当前上下文已经足够，不需要跨文件或跨模块理解。
 
-## MCP-first 流程
+## MCP 优先流程
 
 MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg`。按这个顺序走：
 
-1. `get_current_state`：确认目标项目是否已有外置 PMM data root、project-global KB 和 feature registry。
-2. `diagnose_workspace`：状态缺失、路径不确定或 KB 疑似 stale 时先诊断。
+1. `get_current_state`：确认目标项目是否已有外置 PMM 数据根目录、project-global KB 和功能注册表。
+2. `diagnose_workspace`：状态缺失、路径不确定或 KB 疑似过期时先诊断。
 3. `init_workspace` + `detect_topology`：新项目或新电脑首次接入时初始化外置记忆。
-4. `build_project_index` 或 `start_build_project_index`：需要全局理解、项目刚更新或 KB stale 时重建 project-global。
-5. `discover_features` + `build_feature_index`：需要 feature 级链路、入口拆分或多模块边界时生成 feature KB。
+4. `build_project_index` 或 `start_build_project_index`：需要全局理解、项目刚更新或 KB 过期时重建 project-global。
+5. `discover_features` + `build_feature_index`：需要功能级链路、入口拆分或多模块边界时生成功能 KB。
 6. `query_project_chain` / `query_feature_chain`：查询证据，再决定是否回源码精读。
 
-CLI 只作为 fallback 或维护入口。MCP 不可用时再使用 `src/bin/*.js` 命令。
+CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` 命令。
 
 ## 常用查询配方
 
@@ -41,13 +41,13 @@ CLI 只作为 fallback 或维护入口。MCP 不可用时再使用 `src/bin/*.js
 
 ## 结果使用规则
 
-- 先向用户说明 PMM 查到的证据范围，例如 KB 是否存在、是否 stale、命中了哪些入口。
-- KB stale 时先重建再相信结果。
+- 先向用户说明 PMM 查到的证据范围，例如 KB 是否存在、是否过期、命中了哪些入口。
+- KB 过期时先重建再相信结果。
 - PMM 返回歧义候选时，优先用推荐的 selector 再查一次，不要直接猜。
 - PMM 结果不足时，再读项目文档和源码，用 `rg` 精确确认。
 - 回答链路问题时，把 PMM 证据和源码确认结果分开说清楚。
 
-## CLI fallback
+## CLI 兜底
 
 ```powershell
 node src/bin/init-workspace.js --workspace-root <project-root> --data-root <pmm-data-root>
@@ -88,6 +88,6 @@ E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js
 
 - 记忆文件是记忆文件，业务项目是业务项目，PMM 源码是 PMM 源码。
 - 不创建或恢复 `scripts/` 旧入口。
-- 不把 PMM runtime 文件写进目标项目，除非用户明确要求 legacy 布局。
-- 查询优先 MCP，构建优先 MCP，CLI 是 fallback 和维护入口。
-- 发现 stale KB 时先重建，再相信查询结果。
+- 不把 PMM 运行文件写进目标项目，除非用户明确要求旧布局。
+- 查询优先 MCP，构建优先 MCP，CLI 是兜底和维护入口。
+- 发现过期 KB 时先重建，再相信查询结果。

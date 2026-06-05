@@ -1,10 +1,10 @@
 {
   "name": "project-memory-manager",
-  "version": "0.27.4",
+  "version": "0.27.5",
   "releaseDate": "2026-06-05",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
-  "upgradeMessage": "Never edit the installed skill copy directly. Fix the GitHub source repo, push, then reinstall or update the skill before rebuilding project KBs.",
+  "upgradeMessage": "不要直接修改已安装的 skill 副本。先修改 GitHub 源码仓库并推送，再重装或更新 skill，最后按需重建项目 KB。",
   "installCommand": "npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth",
   "updateCommands": [
     "npx skills remove project-memory-manager -g -a codex -y",

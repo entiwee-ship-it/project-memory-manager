@@ -1,28 +1,30 @@
 # project-memory-manager
 
-## What It Does
+## 工具定位
 
-Project Memory Manager (PMM) builds an external knowledge base for a target repository so Codex can query project structure, feature chains, HTTP routes, Pinus handlers, Vue/Express flows, backend table access summaries, Cocos prefab bindings, states, events, and learned project protocols without writing memory files into the target repository.
+Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Pinus handler、Vue/Express 全栈链路、后端数据表读写摘要、Cocos prefab 绑定、状态、事件和项目协议。
 
-The source repository, target development project, and generated PMM data root are separate:
+PMM 的核心边界是三套目录分离：
 
-- PMM source: this repository.
-- Target project: the repository being developed.
-- PMM data root: external runtime data, usually `E:/xile-workspace/codex-tools/project-memory-data`.
+- PMM 源码：当前仓库。
+- 目标项目：Codex 实际要开发的业务仓库。
+- PMM 数据根目录：PMM 生成的外置运行数据，通常是 `E:/xile-workspace/codex-tools/project-memory-data`。
 
-## Quick Start
+不要把 PMM 运行数据写进目标项目。
 
-On a new computer, start here:
+## 快速开始
 
-- Clone this GitHub repo.
-- Install npm dependencies.
-- Install the Codex skill so `project-memory-manager` appears in the skill list.
-- Configure Codex MCP to run `src/bin/mcp.js`.
-- Keep generated PMM data outside the target project.
+新电脑或新 Codex 环境按这个顺序处理：
 
-The full setup path is documented in `docs/user/install-from-github.md`.
+- clone 当前 GitHub 仓库。
+- 安装 npm 依赖。
+- 安装 Codex skill，让技能列表里出现 `project-memory-manager`。
+- 配置 Codex MCP，让它启动 `src/bin/mcp.js`。
+- 把生成的 PMM 数据放在外置数据根目录。
 
-Use MCP first when Codex has the PMM server loaded. CLI commands are mainly for setup, verification, and fallback.
+完整流程见 `docs/user/install-from-github.md`。
+
+Codex 已加载 PMM MCP 后，日常查询优先使用 MCP。CLI 主要用于部署、验证和 MCP 不可用时兜底。
 
 ```powershell
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
@@ -33,33 +35,33 @@ node src/bin/discover-features.js --workspace-root E:/xile-workspace/qyProject -
 node src/bin/build-feature.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --feature-key qyproject-admin --json
 ```
 
-## MCP First
+## MCP 优先
 
-Run the MCP server with:
+MCP 服务入口：
 
 ```powershell
 node src/bin/mcp.js
 ```
 
-Codex MCP config should point to:
+Codex MCP 配置应指向：
 
 ```toml
 args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 ```
 
-Primary MCP tools:
+常用 MCP 工具：
 
-- `get_current_state`: inspect PMM state for a workspace.
-- `build_project_index`: build project-global KB synchronously.
-- `start_build_project_index`: start async project-global build.
-- `discover_features`: create feature candidates.
-- `build_feature_index`: generate and build one feature KB.
-- `query_project_chain`: query project-global KB.
-- `query_feature_chain`: query one feature KB.
+- `get_current_state`：查看目标项目的 PMM 状态。
+- `build_project_index`：同步构建 project-global KB。
+- `start_build_project_index`：异步构建 project-global KB。
+- `discover_features`：发现功能候选。
+- `build_feature_index`：生成并构建单个功能 KB。
+- `query_project_chain`：查询 project-global KB。
+- `query_feature_chain`：查询单个功能 KB。
 
-## New CLI Entrypoints
+## CLI 入口
 
-All supported CLI commands live under `src/bin`.
+所有受支持的 CLI 命令都在 `src/bin` 下。
 
 ```powershell
 node src/bin/mcp.js
@@ -75,43 +77,43 @@ node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```
 
-More commands are documented in `docs/reference/cli.md`.
+更多命令见 `docs/reference/cli.md`。
 
-For backend data impact checks, query with `focus=data` or `mode=fullstack-data` and read the returned `dataAccessSummary`.
+需要看后端数据表影响时，用 `focus=data` 或 `mode=fullstack-data` 查询，并读取返回的 `dataAccessSummary`。
 
-## Data Separation
+## 数据分离
 
-Use external-data layout for active development:
+日常开发使用 `external-data` 布局：
 
 ```powershell
 node src/bin/build-project.js --workspace-root <project-root> --data-root <pmm-data-root> --layout external-data
 ```
 
-PMM writes runtime files under:
+PMM 运行文件会写到：
 
 ```text
 <pmm-data-root>/workspaces/<workspace-id>/
 ```
 
-The target project stays clean. Removing PMM from Codex does not require deleting generated files from the target repository.
+目标项目保持干净。以后从 Codex 移除 PMM 时，不需要到业务仓库里清理一堆生成文件。
 
-## Documentation Map
+## 文档索引
 
-- `docs/user/quick-start.md`: user setup and common workflow.
-- `docs/user/install-from-github.md`: new-computer setup from GitHub clone to Codex MCP verification.
-- `docs/user/mcp-first.md`: MCP-first operating model.
-- `docs/user/external-data-layout.md`: source/project/data-root separation.
-- `docs/reference/cli.md`: CLI command reference.
-- `docs/reference/mcp-tools.md`: MCP tool reference.
-- `docs/developer/source-layout.md`: source tree ownership.
-- `docs/developer/testing.md`: local validation commands.
-- `docs/guides/fullstack-admin-kb.md`: Vue/Express admin KB workflow.
-- `docs/guides/cocos-authoring.md`: Cocos authoring workflow.
-- `docs/guides/troubleshooting.md`: common diagnostics.
+- `docs/user/quick-start.md`：快速启动和常用流程。
+- `docs/user/install-from-github.md`：新电脑从 GitHub clone 到 Codex MCP 验证的完整流程。
+- `docs/user/mcp-first.md`：MCP 优先使用方式。
+- `docs/user/external-data-layout.md`：PMM 源码、目标项目、数据根目录三者分离规则。
+- `docs/reference/cli.md`：CLI 命令参考。
+- `docs/reference/mcp-tools.md`：MCP 工具参考。
+- `docs/developer/source-layout.md`：源码目录职责。
+- `docs/developer/testing.md`：本地验证命令。
+- `docs/guides/fullstack-admin-kb.md`：Vue/Express 后台 KB 流程。
+- `docs/guides/cocos-authoring.md`：Cocos 创作辅助流程。
+- `docs/guides/troubleshooting.md`：常见诊断。
 
-## Development
+## 开发验证
 
-Run focused tests while editing:
+改动后运行匹配的验证命令：
 
 ```powershell
 npm test
@@ -124,8 +126,8 @@ npm run test:source-layout
 node src/bin/validate-package.js .
 ```
 
-The `scripts/` directory is intentionally removed. Do not add compatibility wrappers there.
+`scripts/` 目录已经有意删除，不要再新增兼容包装入口。
 
-## License
+## 许可证
 
 MIT

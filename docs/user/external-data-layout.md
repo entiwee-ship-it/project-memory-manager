@@ -1,30 +1,30 @@
-# External Data Layout
+# 外置数据布局
 
-PMM has three separate locations:
+PMM 固定拆分为三类目录：
 
-- Source repo: `project-memory-manager`
-- Target repo: the project Codex is developing
-- Data root: generated PMM runtime data
+- 源码仓库：`project-memory-manager`
+- 目标项目：Codex 正在开发的业务项目
+- 数据根目录：PMM 生成的运行数据
 
-External data layout writes to:
+外置数据布局会写入：
 
 ```text
 <data-root>/workspaces/<workspace-id>/
 ```
 
-If `--data-root` is omitted, PMM uses `PMM_DATA_ROOT`. If that is also omitted, it uses a sibling `project-memory-data` directory next to the PMM source repo.
+如果省略 `--data-root`，PMM 会读取 `PMM_DATA_ROOT`。如果也没有配置 `PMM_DATA_ROOT`，PMM 会使用源码仓库同级的 `project-memory-data` 目录。
 
-Use:
+命令示例：
 
 ```powershell
 node src/bin/build-project.js --workspace-root <project-root> --data-root <data-root> --layout external-data
 ```
 
-Recommended Codex MCP env:
+推荐的 Codex MCP 环境变量：
 
 ```toml
 [mcp_servers.project_memory_manager.env]
 PMM_DATA_ROOT = "E:/xile-workspace/codex-tools/project-memory-data"
 ```
 
-Do not set `<data-root>` to a directory inside `<project-root>`. Do not add runtime KB files to the target project. Fixture directories in tests may still contain `project-memory` because they model old project layouts.
+不要把 `<data-root>` 设置到 `<project-root>` 里面。不要把 PMM 运行 KB 文件加入目标项目。测试 fixture 目录里可能仍有 `project-memory`，那只是为了覆盖旧布局兼容场景。

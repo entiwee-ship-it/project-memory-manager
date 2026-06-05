@@ -1,14 +1,14 @@
-# Quick Start
+# 快速开始
 
-For a new computer or fresh Codex install, first complete:
+新电脑或新的 Codex 环境，先完整执行：
 
 ```text
 docs/user/install-from-github.md
 ```
 
-PMM should run with external data by default. The target project does not receive PMM runtime files.
+PMM 默认应使用外置数据根目录。目标项目不应该出现 PMM 运行文件。
 
-Install the Codex skill first so it appears in the skill list:
+先安装 Codex skill，让技能列表里能看到 `project-memory-manager`：
 
 ```powershell
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
@@ -24,10 +24,10 @@ node src/bin/build-project.js --workspace-root $project --data-root $data --json
 node src/bin/discover-features.js --workspace-root $project --data-root $data --json
 ```
 
-Build a feature KB after choosing a candidate:
+选择功能候选后，再构建对应功能 KB：
 
 ```powershell
 node src/bin/build-feature.js --workspace-root $project --data-root $data --feature-key qyproject-admin --json
 ```
 
-Query with MCP first. Use CLI only when the MCP server is unavailable.
+查询时优先使用 MCP。只有 MCP 服务不可用时才使用 CLI。

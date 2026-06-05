@@ -1,30 +1,30 @@
-# Query Guide
+# 查询指南
 
-Project-wide query:
+项目全局查询：
 
 ```powershell
 node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --message login --downstream --json
 ```
 
-Feature query:
+Feature 查询：
 
 ```powershell
 node src/bin/query-feature.js --workspace-root <project-root> --data-root <data-root> --feature <key> --request captcha --downstream --depth 5 --json
 ```
 
-Direct chain query:
+直接链路查询：
 
 ```powershell
 node src/bin/query-chain.js --workspace-root <project-root> --data-root <data-root> --feature <key> --method <name> --downstream --json
 ```
 
-Cocos prefab component summary:
+Cocos prefab 组件摘要：
 
 ```powershell
 node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --type prefab-component --file <prefab-path> --json
 ```
 
-Cocos script usage summary:
+Cocos 脚本使用摘要：
 
 ```powershell
 node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --type script-usage --file <script-path> --json
@@ -65,6 +65,6 @@ node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --dat
 
 `focus=data` 不改变遍历深度，只在当前链路范围内汇总表读写。`mode=fullstack-data` 会像 `mode=fullstack` 一样自动展开到更深的 HTTP/fullstack 链路，并附加同样的数据表摘要。
 
-Use a concrete project root such as `E:/xile-workspace/qyProject`. Do not use the broad `E:/xile-workspace` root for normal project work.
+日常项目查询必须使用具体项目根目录，例如 `E:/xile-workspace/qyProject`。不要把宽泛的 `E:/xile-workspace` 当成普通项目根使用。
 
-When a KB is stale, rebuild it before relying on the answer.
+KB 过期时，先重建再相信查询结果。

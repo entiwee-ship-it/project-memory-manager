@@ -1,25 +1,25 @@
-# Install From GitHub
+# 从 GitHub 安装 PMM
 
-Use this guide when setting up PMM on a new computer or a fresh Codex install.
+新电脑或新的 Codex 环境接入 PMM 时，按这份流程执行。
 
-PMM uses three separate locations:
+PMM 固定使用三套目录：
 
-- PMM source repo: the code cloned from GitHub.
-- PMM data root: generated KB/runtime data owned by PMM.
-- Target project: the repository Codex will develop.
+- PMM 源码仓库：从 GitHub clone 下来的工具源码。
+- PMM 数据根目录：PMM 生成的 KB 和运行数据。
+- 目标项目：Codex 要开发的业务仓库。
 
-Do not put the PMM data root inside the target project.
+不要把 PMM 数据根目录放进目标项目。
 
-## 1. Prerequisites
+## 1. 准备环境
 
-Install these first:
+先确认这些工具已经安装：
 
 - Git
-- Node.js 18 or newer
+- Node.js 18 或更新版本
 - npm
-- Codex with MCP support
+- 支持 MCP 的 Codex
 
-Check the local tools:
+检查命令：
 
 ```powershell
 git --version
@@ -27,9 +27,9 @@ node --version
 npm --version
 ```
 
-## 2. Choose Paths
+## 2. 选择目录
 
-Use absolute paths. On Windows, forward slashes are accepted by Node and avoid TOML escaping issues.
+统一使用绝对路径。Windows 上建议在配置里使用 `/`，Node 能识别，也能减少 TOML 转义问题。
 
 ```powershell
 $pmmSource = "E:/xile-workspace/codex-tools/project-memory-manager"
@@ -37,9 +37,9 @@ $pmmData = "E:/xile-workspace/codex-tools/project-memory-data"
 $project = "E:/xile-workspace/qyProject"
 ```
 
-For another computer, change these to local paths. Keep `$pmmSource`, `$pmmData`, and `$project` as three different directories.
+换到其它电脑时，把这三个变量改成本机路径即可。`$pmmSource`、`$pmmData`、`$project` 必须是三个不同目录。
 
-## 3. Clone And Install
+## 3. 拉取源码并安装依赖
 
 ```powershell
 New-Item -ItemType Directory -Force -Path (Split-Path $pmmSource), $pmmData
@@ -49,7 +49,7 @@ npm install
 node src/bin/validate-package.js .
 ```
 
-If the repo already exists:
+如果仓库已经存在：
 
 ```powershell
 git -C $pmmSource pull --ff-only
@@ -58,42 +58,42 @@ npm install
 node src/bin/validate-package.js .
 ```
 
-## 4. Install The Codex Skill
+## 4. 安装 Codex skill
 
-Install the PMM skill so Codex can see `project-memory-manager` in its skill list and load the PMM operating rules.
+安装 PMM skill 后，Codex 技能列表里才会出现 `project-memory-manager`，并加载 PMM 的使用规则。
 
 ```powershell
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
 ```
 
-Verify the skill is installed:
+验证 skill 是否安装成功：
 
 ```powershell
 npx skills ls -g -a codex
 ```
 
-The skill and the MCP server are related but separate:
+skill 和 MCP 服务是两件事：
 
-- Skill install gives Codex the `SKILL.md` guidance.
-- MCP config exposes PMM tools such as `get_current_state`, `build_project_index`, and `query_project_chain`.
+- 安装 skill：让 Codex 看到 `SKILL.md` 里的使用规则。
+- 配置 MCP：把 `get_current_state`、`build_project_index`、`query_project_chain` 等 PMM 工具暴露给 Codex。
 
-Restart Codex after installing or updating a skill. The current session does not hot-reload the skill list.
+安装或更新 skill 后要重启 Codex。当前会话不会热加载技能列表。
 
-## 5. Configure Codex MCP
+## 5. 配置 Codex MCP
 
-Edit the Codex config file:
+编辑 Codex 配置文件：
 
 ```text
 ~/.codex/config.toml
 ```
 
-On Windows this is usually:
+Windows 上通常是：
 
 ```text
 C:/Users/<User>/.codex/config.toml
 ```
 
-Add or update this block:
+新增或更新这段配置：
 
 ```toml
 [mcp_servers.project_memory_manager]
@@ -105,23 +105,23 @@ startup_timeout_sec = 120
 PMM_DATA_ROOT = "E:/xile-workspace/codex-tools/project-memory-data"
 ```
 
-If `node` is not available to Codex, use the absolute Node path:
+如果 Codex 启动 MCP 时找不到 `node`，改用 Node 的绝对路径：
 
 ```powershell
 where.exe node
 ```
 
-Then set `command` to that path, for example:
+然后把 `command` 改成这个路径，例如：
 
 ```toml
 command = "D:/nodejs/node.exe"
 ```
 
-Restart Codex after changing the MCP config. MCP tools are loaded at Codex startup.
+修改 MCP 配置后要重启 Codex。MCP 工具只在 Codex 启动时加载。
 
-## 6. First Build
+## 6. 首次构建
 
-After Codex restarts, use MCP first:
+Codex 重启后优先使用 MCP：
 
 1. `get_current_state`
 2. `init_workspace`
@@ -129,7 +129,7 @@ After Codex restarts, use MCP first:
 4. `build_project_index` with `dryRun=false`, or `start_build_project_index`
 5. `query_project_chain`
 
-CLI fallback:
+CLI 兜底命令：
 
 ```powershell
 Set-Location $pmmSource
@@ -139,38 +139,38 @@ node src/bin/build-project.js --workspace-root $project --data-root $pmmData --j
 node src/bin/query-project.js --workspace-root $project --data-root $pmmData --type method --name login --limit 5 --json
 ```
 
-Confirm the target project stayed clean:
+确认目标项目没有被写入 PMM 运行目录：
 
 ```powershell
 Test-Path "$project/project-memory"
 ```
 
-Expected result:
+期望结果：
 
 ```text
 False
 ```
 
-## 7. Daily Use
+## 7. 日常使用
 
-Use MCP tools before reading generated JSON files:
+先用 MCP 工具，不要优先读取生成的 JSON 文件：
 
-- `query_project_chain` for project-global queries.
-- `discover_features` when feature boundaries are unclear.
-- `build_feature_index` for one feature candidate.
-- `query_feature_chain` for focused method/event/request/endpoint chains.
+- `query_project_chain`：查询 project-global。
+- `discover_features`：功能边界不清楚时发现候选。
+- `build_feature_index`：为某个功能候选构建 KB。
+- `query_feature_chain`：查询 method、event、request、endpoint 等聚焦链路。
 
-Useful query options:
+常用查询参数：
 
-- `mode=fullstack` for frontend-to-backend HTTP chains.
-- `focus=fullstack` to fold same-file helper methods into `relatedHelpers`.
-- `focus=data` to add `dataAccessSummary`.
-- `mode=fullstack-data` for fullstack traversal plus table read/write summary.
-- `grouped=true` for broad keyword searches.
+- `mode=fullstack`：查询前端到后端的 HTTP 链路。
+- `focus=fullstack`：把同文件 helper 方法折叠到 `relatedHelpers`。
+- `focus=data`：附加 `dataAccessSummary`。
+- `mode=fullstack-data`：全栈链路加数据表读写摘要。
+- `grouped=true`：宽泛关键词查询时分组展示候选。
 
-## 8. Upgrade
+## 8. 升级
 
-When this GitHub repo changes:
+GitHub 仓库更新后：
 
 ```powershell
 git -C $pmmSource pull --ff-only
@@ -179,48 +179,48 @@ npm install
 node src/bin/validate-package.js .
 ```
 
-Update the installed skill too:
+同时更新已安装的 skill：
 
 ```powershell
 npx skills remove project-memory-manager -g -a codex -y
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
 ```
 
-`skills update` may not refresh this GitHub root skill reliably because it can resolve cached package metadata. Remove + add forces a fresh clone. Restart Codex so it reloads both the skill and MCP source. Then rebuild project KBs:
+不要依赖 `skills update` 更新这个 GitHub root skill，它可能命中缓存元数据。用 remove + add 可以强制重新 clone。然后重启 Codex，让 skill 和 MCP 源码都重新加载。之后重建目标项目 KB：
 
 ```powershell
 node src/bin/rebuild-kbs.js --workspace-root $project --data-root $pmmData
 ```
 
-If only PMM data changed because a KB was rebuilt, Codex usually does not need a restart. If PMM source code, installed skill content, or MCP config changed, restart Codex.
+如果只是重建 KB 导致 PMM 数据根目录内容变化，通常不需要重启 Codex。如果 PMM 源码、已安装 skill 内容或 MCP 配置变化，就需要重启 Codex。
 
-## 9. Troubleshooting
+## 9. 故障排查
 
-If `project-memory-manager` does not appear in the skill list:
+如果技能列表里看不到 `project-memory-manager`：
 
-- Run `npx skills ls -g -a codex`.
-- Re-run the `npx skills add ... --skill project-memory-manager ... --full-depth` command.
-- Restart Codex.
+- 执行 `npx skills ls -g -a codex`。
+- 重新执行 `npx skills add ... --skill project-memory-manager ... --full-depth`。
+- 重启 Codex。
 
-If MCP tools do not appear:
+如果 MCP 工具没有出现：
 
-- Check the config block name is `[mcp_servers.project_memory_manager]`.
-- Check `args` points to `src/bin/mcp.js`.
-- Restart Codex.
+- 检查配置块名是否是 `[mcp_servers.project_memory_manager]`。
+- 检查 `args` 是否指向 `src/bin/mcp.js`。
+- 重启 Codex。
 
-If MCP fails to start:
+如果 MCP 启动失败：
 
-- Use an absolute Node path in `command`.
-- Run `node src/bin/mcp.js` from `$pmmSource` to catch syntax/runtime errors.
-- Run `node src/bin/validate-package.js .`.
+- 在 `command` 里使用 Node 绝对路径。
+- 在 `$pmmSource` 下执行 `node src/bin/mcp.js`，看语法或运行时错误。
+- 执行 `node src/bin/validate-package.js .`。
 
-If query results look stale:
+如果查询结果看起来过期：
 
-- Run `get_current_state`.
-- Rebuild with `build_project_index` or `node src/bin/rebuild-kbs.js`.
+- 先执行 `get_current_state`。
+- 使用 `build_project_index` 或 `node src/bin/rebuild-kbs.js` 重建。
 
-If the target project contains `project-memory/`:
+如果目标项目里出现了 `project-memory/`：
 
-- Stop using legacy layout.
-- Use `--data-root <pmm-data-root>` or `PMM_DATA_ROOT`.
-- Keep runtime data under the PMM data root, not inside the target project.
+- 停止使用旧布局。
+- 使用 `--data-root <pmm-data-root>` 或 `PMM_DATA_ROOT`。
+- 运行数据只放 PMM 数据根目录，不放目标项目。

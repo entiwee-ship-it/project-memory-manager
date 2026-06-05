@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+## [0.27.5] - 2026-06-05
+
+### 文档
+- 将 README 和 `docs/user` 下的使用流程统一改为中文表达，命令、配置键、路径和协议名保持技术原文。
+- 将 PMM skill frontmatter 描述和版本升级提示改为中文，避免技能列表与版本信息继续显示英文说明。
+
 ## [0.27.4] - 2026-06-05
 
 ### 文档
@@ -24,13 +30,13 @@
 
 ### 文档
 - GitHub 部署说明补充 `npx skills add ... --skill project-memory-manager`，明确 skill 安装和 MCP 配置是两个独立步骤。
-- README、Quick Start 和 MCP First 补充技能安装命令，避免只配置 MCP 后技能列表里看不到 PMM。
+- README、快速开始和 MCP 优先文档补充技能安装命令，避免只配置 MCP 后技能列表里看不到 PMM。
 
 ## [0.27.1] - 2026-06-05
 
 ### 文档
 - 新增 `docs/user/install-from-github.md`，覆盖新电脑从 GitHub clone PMM、安装依赖、配置 Codex MCP、首次构建、查询验证、升级和故障排查的完整流程。
-- README、Quick Start、MCP First、External Data Layout 和 SKILL 入口补充新部署路径和 MCP 配置模板。
+- README、快速开始、MCP 优先、外置数据布局和 SKILL 入口补充新部署路径和 MCP 配置模板。
 
 ## [0.27.0] - 2026-06-04
 
