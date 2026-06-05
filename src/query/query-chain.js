@@ -5,6 +5,7 @@ const { hasOwn, readJson, readJsonSafe } = require('../shared/common');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../graph/feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
 const { loadSkillVersion } = require('../maintenance/show-version');
+const { buildKbFreshnessStatus } = require('../shared/source-snapshot');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -341,18 +342,21 @@ function currentSkillVersionInfo() {
     }
 }
 
-function buildKbVersionStatus(graph) {
-    const currentSkill = currentSkillVersionInfo();
-    const builtWithSkill = graph?.builtWithSkill || null;
-    const stale = Boolean(
-        currentSkill
-        && builtWithSkill?.version
-        && currentSkill.version
-        && builtWithSkill.version !== currentSkill.version
-    );
+function loadFreshnessConfig(root, feature = {}) {
+    const configPath = String(feature.configPath || '').trim();
+    if (!configPath) {
+        return null;
+    }
+    const resolved = path.isAbsolute(configPath) ? configPath : path.resolve(root, configPath);
+    return readJsonSafe(resolved, { required: false, defaultValue: null });
+}
 
-    return {
-        builtWithSkill: builtWithSkill || null,
+function buildKbVersionStatus(graph, options = {}) {
+    const currentSkill = currentSkillVersionInfo();
+    return buildKbFreshnessStatus({
+        root: options.root || process.cwd(),
+        graph,
+        config: options.config || null,
         currentSkill: currentSkill
             ? {
                 name: currentSkill.name || '',
@@ -360,11 +364,14 @@ function buildKbVersionStatus(graph) {
                 repo: currentSkill.repo || '',
             }
             : null,
-        stale,
-        recommendedAction: stale
-            ? 'node src/bin/rebuild-kbs.js --workspace-root <project-root>'
-            : '',
-    };
+        recommendedAction: options.recommendedAction || 'node src/bin/rebuild-kbs.js --workspace-root <project-root>',
+    });
+}
+
+function buildQueryRecommendedAction(featureKey) {
+    return featureKey === 'project-global'
+        ? 'build_project_index'
+        : 'node src/bin/rebuild-kbs.js --workspace-root <project-root>';
 }
 
 function warnIfKbStale(status) {
@@ -2180,7 +2187,7 @@ function buildArtifactGuide(feature) {
     ];
 }
 
-function buildFeatureSummary(feature, graph, lookup) {
+function buildFeatureSummary(feature, graph, lookup, context = null) {
     const nodeCount = Array.isArray(graph.nodes) ? graph.nodes.length : 0;
     const edgeCount = Array.isArray(graph.edges) ? graph.edges.length : 0;
     const nodesByType = Object.fromEntries(
@@ -2188,7 +2195,11 @@ function buildFeatureSummary(feature, graph, lookup) {
     );
     const examples = buildRecommendedCommands(feature.featureKey, lookup);
     const artifacts = buildArtifactGuide(feature);
-    const kbVersionStatus = buildKbVersionStatus(graph);
+    const kbVersionStatus = buildKbVersionStatus(graph, {
+        root: context?.workspaceRoot || process.cwd(),
+        config: context ? loadFreshnessConfig(context.workspaceRoot, feature) : null,
+        recommendedAction: buildQueryRecommendedAction(feature.featureKey),
+    });
 
     return {
         kind: 'feature-summary',
@@ -2210,6 +2221,7 @@ function buildFeatureSummary(feature, graph, lookup) {
             '只有 KB 结果不足以回答问题时，再读相关 docs；最后才用 rg/grep 回源码确认。'
         ],
         kbVersionStatus,
+        kbFreshness: kbVersionStatus,
         artifacts,
         examples,
     };
@@ -2396,7 +2408,11 @@ function run(argv = process.argv.slice(2)) {
         layout: args.layout,
     });
     const { feature, graph, lookup } = loadFeatureLookup(context, args.feature);
-    const kbVersionStatus = buildKbVersionStatus(graph);
+    const kbVersionStatus = buildKbVersionStatus(graph, {
+        root: context.workspaceRoot,
+        config: loadFreshnessConfig(context.workspaceRoot, feature),
+        recommendedAction: buildQueryRecommendedAction(feature.featureKey),
+    });
     if (!args.json) {
         warnIfKbStale(kbVersionStatus);
     }
@@ -2432,6 +2448,7 @@ function run(argv = process.argv.slice(2)) {
             inputQuery: traversalSpec.inputQuery,
             resolvedStart: startNode ? summarizeNode(startNode, lookup) : null,
             kbVersionStatus,
+            kbFreshness: kbVersionStatus,
             node: startNode,
             direction: traversalSpec.direction,
             depth,
@@ -2465,6 +2482,7 @@ function run(argv = process.argv.slice(2)) {
                 name: args.event,
                 bus: event.bus || '',
                 kbVersionStatus,
+                kbFreshness: kbVersionStatus,
                 subscribers: event.subscribers || [],
                 emitters: event.emitters || [],
                 node: summarizeNode(getOwnEntry(lookup.nodesById, event.id), lookup),
@@ -2493,6 +2511,7 @@ function run(argv = process.argv.slice(2)) {
                 protocol: message.protocol || '',
                 confidence: message.confidence ?? null,
                 kbVersionStatus,
+                kbFreshness: kbVersionStatus,
                 dispatchers: message.dispatchers || [],
                 emitters: message.emitters || [],
                 handlers: message.handlers || [],
@@ -2548,6 +2567,7 @@ function run(argv = process.argv.slice(2)) {
                 name: requestNode?.name || args.request,
                 callee: requestInfo.callee || '',
                 kbVersionStatus,
+                kbFreshness: kbVersionStatus,
                 callers: requestInfo.callers || [],
                 protocol: requestInfo.protocol || '',
                 httpMethod: requestInfo.httpMethod || '',
@@ -2584,6 +2604,7 @@ function run(argv = process.argv.slice(2)) {
                 httpPath: endpointInfo.path || endpointNode?.meta?.path || '',
                 handlers: endpointInfo.handlers || [],
                 kbVersionStatus,
+                kbFreshness: kbVersionStatus,
                 node: summarizeNode(endpointNode, lookup),
             },
             args.json
@@ -2600,6 +2621,7 @@ function run(argv = process.argv.slice(2)) {
                 type: 'state',
                 name: args.state,
                 kbVersionStatus,
+                kbFreshness: kbVersionStatus,
                 readers: state.readers || [],
                 writers: state.writers || [],
                 node: summarizeNode(getOwnEntry(lookup.nodesById, state.id), lookup),
@@ -2630,7 +2652,7 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
 
-    printFeatureSummary(buildFeatureSummary(feature, graph, lookup), args.json);
+    printFeatureSummary(buildFeatureSummary(feature, graph, lookup, context), args.json);
 }
 
 module.exports = {

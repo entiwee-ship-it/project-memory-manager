@@ -7,6 +7,18 @@
 
 ## [未发布]
 
+## [0.28.0] - 2026-06-05
+
+### 新增
+- KB 构建产物新增 `sourceSnapshot`，记录扫描范围内源码文件的路径、mtime、size 和指纹，用于判断业务源码变化后 KB 是否过期。
+- MCP 新增 `check_kb_freshness`，可显式返回 project-global 或指定 feature KB 的 `fresh` / `stale` / `missing` / `unknown` 状态、原因和推荐重建动作。
+- `get_current_state` 新增 `projectGlobalFreshness`，查询前即可知道 project-global KB 是否可信。
+- `query_project_chain` / `query_feature_chain` 结果新增 `kbFreshness`，并保留旧的 `kbVersionStatus` 兼容字段。
+
+### 改进
+- MCP project query cache 纳入源码快照指纹，目标源码变化时即使 KB 文件 mtime 未变，也会自动失效缓存并返回 stale 状态。
+- README、SKILL、MCP 优先文档、查询指南和 MCP 工具参考补充 KB 新鲜度判断规则。
+
 ## [0.27.5] - 2026-06-05
 
 ### 文档

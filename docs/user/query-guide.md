@@ -1,5 +1,16 @@
 # 查询指南
 
+## 查询前先看 KB 新鲜度
+
+通过 MCP 使用 PMM 时，先调用 `get_current_state` 或 `check_kb_freshness`。返回的 `projectGlobalFreshness` / `kbFreshness` 有四种状态：
+
+- `fresh`：KB 与当前源码一致，可以直接查询。
+- `stale`：扫描范围内源码文件新增、删除、修改，或 PMM 版本变化，需要先重建。
+- `missing`：KB 尚未构建。
+- `unknown`：旧 KB 没有源码快照或缺少构建配置，需要重建一次。
+
+查询结果如果附带 `kbFreshness.status != fresh`，不要直接信任链路结论，先执行返回的 `recommendedAction`。
+
 项目全局查询：
 
 ```powershell

@@ -162,6 +162,9 @@ function testProjectKbExternalData() {
     assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
     assert.equal(fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')), true);
     const graph = JSON.parse(fs.readFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), 'utf8'));
+    assert.equal(graph.sourceSnapshot.kind, 'source-snapshot');
+    assert.equal(graph.sourceSnapshot.staleCheckVersion, 1);
+    assert.ok(graph.sourceSnapshot.files.some(item => item.path === 'qyproject/cms-server/src/sample.ts'));
     assert.equal(graph.nodes.some(node => String(node.file || '').includes('node_modules')), false);
     assert.equal(graph.nodes.some(node => String(node.file || '').includes('codex-work/work/tmp')), false);
     assert.equal(graph.nodes.some(node => String(node.file || '').includes('legacy-root-backups')), false);

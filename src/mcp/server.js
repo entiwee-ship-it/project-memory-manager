@@ -11,6 +11,8 @@ const { run: buildProjectKb } = require('../commands/build/build-project');
 const { run: discoverFeaturesCli } = require('../commands/build/discover-features');
 const { run: buildFeatureIndexCli } = require('../commands/build/build-feature');
 const { loadSkillVersion } = require('../maintenance/show-version');
+const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../graph/feature-kb');
+const { buildKbFreshnessStatus } = require('../shared/source-snapshot');
 
 const jobs = new Map();
 let nextJobId = 1;
@@ -93,6 +95,19 @@ const TOOL_DEFINITIONS = [
             properties: {
                 workspaceRoot: { type: 'string' },
                 dataRoot: { type: 'string' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'check_kb_freshness',
+        description: 'Check whether project-global or feature KBs are fresh, stale, missing, or unknown before trusting query results.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                feature: { type: 'string' },
             },
             required: ['workspaceRoot'],
         },
@@ -294,6 +309,76 @@ function hasConfiguredAreaRoots(projectProfile) {
     );
 }
 
+function currentSkillSummary() {
+    try {
+        const version = loadSkillVersion(path.resolve(__dirname, '..', '..'));
+        return {
+            name: version.name || '',
+            version: version.version || '',
+            repo: version.repo || '',
+        };
+    } catch {
+        return null;
+    }
+}
+
+function projectGlobalConfigPath(context) {
+    return path.join(context.paths.configsDir, 'project-global.json');
+}
+
+function buildProjectGlobalFreshness(context) {
+    const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
+    const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
+    const graph = readJsonSafe(graphPath, null);
+    const hasLookup = fs.existsSync(lookupPath);
+    if (!graph || !hasLookup) {
+        return buildKbFreshnessStatus({
+            root: context.workspaceRoot,
+            graph: null,
+            config: null,
+            currentSkill: currentSkillSummary(),
+            recommendedAction: 'build_project_index',
+        });
+    }
+    return buildKbFreshnessStatus({
+        root: context.workspaceRoot,
+        graph,
+        config: readJsonSafe(projectGlobalConfigPath(context), null),
+        currentSkill: currentSkillSummary(),
+        recommendedAction: 'build_project_index',
+    });
+}
+
+function readFeatureRegistry(context) {
+    const registry = readJsonSafe(context.paths.featureRegistry, { features: [] });
+    return (registry.features || []).map(item => normalizeFeatureRecord(item));
+}
+
+function buildFeatureFreshness(context, featureKey) {
+    const feature = readFeatureRegistry(context).find(item => item.featureKey === featureKey);
+    if (!feature) {
+        return {
+            kind: 'kb-freshness',
+            status: 'missing',
+            stale: true,
+            reasonCodes: ['missing-feature'],
+            reasons: [`未找到功能 KB: ${featureKey}`],
+            recommendedAction: 'discover_features',
+        };
+    }
+    const { graph } = loadFeatureLookupArtifacts(context.workspaceRoot, feature);
+    const configPath = path.isAbsolute(feature.configPath)
+        ? feature.configPath
+        : path.resolve(context.workspaceRoot, feature.configPath || '');
+    return buildKbFreshnessStatus({
+        root: context.workspaceRoot,
+        graph,
+        config: readJsonSafe(configPath, null),
+        currentSkill: currentSkillSummary(),
+        recommendedAction: `build_feature_index:${feature.featureKey}`,
+    });
+}
+
 function captureConsoleLog(fn) {
     const output = [];
     const oldLog = console.log;
@@ -382,15 +467,26 @@ function buildProjectArtifactState(args) {
         statSignature(path.join(context.paths.projectGlobalDir, 'chain.lookup.json')),
         statSignature(context.paths.projectProtocols),
     ];
+    const projectGlobalFreshness = buildProjectGlobalFreshness(context);
+    const artifactSignature = JSON.stringify(artifacts.map(artifact => ({
+        file: artifact.file,
+        exists: artifact.exists,
+        mtimeMs: artifact.mtimeMs,
+        size: artifact.size,
+    })));
+    const sourceSignature = JSON.stringify({
+        status: projectGlobalFreshness.status,
+        currentFingerprint: projectGlobalFreshness.currentSnapshot?.fingerprint || '',
+        storedFingerprint: projectGlobalFreshness.sourceSnapshot?.fingerprint || '',
+        reasonCodes: projectGlobalFreshness.reasonCodes || [],
+    });
     return {
         context,
         artifacts,
-        signature: JSON.stringify(artifacts.map(artifact => ({
-            file: artifact.file,
-            exists: artifact.exists,
-            mtimeMs: artifact.mtimeMs,
-            size: artifact.size,
-        }))),
+        projectGlobalFreshness,
+        artifactSignature,
+        sourceSignature,
+        signature: JSON.stringify({ artifactSignature, sourceSignature }),
     };
 }
 
@@ -413,6 +509,9 @@ function withMcpQueryMetadata(payload, cacheMeta, queryMeta) {
     const result = payload && typeof payload === 'object' && !Array.isArray(payload)
         ? cloneJson(payload)
         : { result: payload };
+    if (!result.kbFreshness && cacheMeta?.projectGlobalFreshness) {
+        result.kbFreshness = cacheMeta.projectGlobalFreshness;
+    }
     result._mcpCache = cacheMeta;
     result._mcpQuery = queryMeta;
     return result;
@@ -429,6 +528,16 @@ function buildWorkspaceState(args) {
     const hasAreaRoots = hasConfiguredAreaRoots(projectProfile);
     const hasProjectGlobalKb = fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'))
         && fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.lookup.json'));
+    const projectGlobalFreshness = buildProjectGlobalFreshness(context);
+    const suggestedNextAction = !fs.existsSync(context.paths.manifest)
+        ? 'init_workspace'
+        : (!hasProjectProfile || !hasAreaRoots)
+            ? 'detect_topology'
+            : !hasProjectGlobalKb
+                ? 'build_project_index'
+                : projectGlobalFreshness.stale
+                    ? 'build_project_index'
+                    : 'query_project_chain';
     return {
         workspaceRoot: context.workspaceRoot,
         dataRoot: context.dataRoot,
@@ -443,16 +552,11 @@ function buildWorkspaceState(args) {
         hasProjectProfile,
         hasConfiguredAreaRoots: hasAreaRoots,
         hasProjectGlobalKb,
+        projectGlobalFreshness,
         legacyProjectMemoryExists: fs.existsSync(path.join(context.workspaceRoot, 'project-memory')),
         areas: projectProfile?.areas || null,
         stacks: projectProfile?.stacks || null,
-        suggestedNextAction: !fs.existsSync(context.paths.manifest)
-            ? 'init_workspace'
-            : (!hasProjectProfile || !hasAreaRoots)
-                ? 'detect_topology'
-                : !hasProjectGlobalKb
-                    ? 'build_project_index'
-                    : 'query_project_chain',
+        suggestedNextAction,
     };
 }
 
@@ -528,6 +632,28 @@ function diagnoseWorkspace(args) {
         missingAreaRoots,
         isHealthy: state.initialized && state.hasProjectProfile && state.hasConfiguredAreaRoots && missingAreaRoots.length === 0,
     });
+}
+
+function checkKbFreshness(args) {
+    const context = createWorkspaceContext({
+        workspaceRoot: args.workspaceRoot,
+        dataRoot: args.dataRoot,
+        layout: 'external-data',
+    });
+    const projectGlobal = buildProjectGlobalFreshness(context);
+    const result = {
+        workspaceRoot: context.workspaceRoot,
+        dataRoot: context.dataRoot,
+        layout: context.layout,
+        projectGlobal,
+    };
+    if (args.feature) {
+        result.feature = {
+            featureKey: args.feature,
+            freshness: buildFeatureFreshness(context, args.feature),
+        };
+    }
+    return textResult(result);
 }
 
 function buildProjectIndex(args) {
@@ -791,10 +917,16 @@ function queryProjectChain(args) {
     });
     const cacheKey = JSON.stringify({ baseKey, signature: artifactState.signature });
     let invalidatedByMtime = false;
+    let invalidatedBySource = false;
     for (const [key, entry] of projectQueryCache.entries()) {
         if (entry.baseKey === baseKey && entry.signature !== artifactState.signature) {
             projectQueryCache.delete(key);
-            invalidatedByMtime = true;
+            if (entry.artifactSignature !== artifactState.artifactSignature) {
+                invalidatedByMtime = true;
+            }
+            if (entry.sourceSignature !== artifactState.sourceSignature) {
+                invalidatedBySource = true;
+            }
         }
     }
 
@@ -803,9 +935,11 @@ function queryProjectChain(args) {
         return textResult(withMcpQueryMetadata(cached.payload, {
             hit: true,
             invalidatedByMtime: false,
+            invalidatedBySource: false,
             cachedAt: cached.cachedAt,
             elapsedMs: 0,
             artifacts: artifactState.artifacts,
+            projectGlobalFreshness: artifactState.projectGlobalFreshness,
         }, queryMeta));
     }
 
@@ -820,8 +954,10 @@ function queryProjectChain(args) {
             _mcpCache: {
                 hit: false,
                 invalidatedByMtime,
+                invalidatedBySource,
                 elapsedMs: result.elapsedMs,
                 artifacts: artifactState.artifacts,
+                projectGlobalFreshness: artifactState.projectGlobalFreshness,
             },
             _mcpQuery: queryMeta,
         });
@@ -835,15 +971,19 @@ function queryProjectChain(args) {
     projectQueryCache.set(cacheKey, {
         baseKey,
         signature: artifactState.signature,
+        artifactSignature: artifactState.artifactSignature,
+        sourceSignature: artifactState.sourceSignature,
         payload,
         cachedAt,
     });
     return textResult(withMcpQueryMetadata(payload, {
         hit: false,
         invalidatedByMtime,
+        invalidatedBySource,
         cachedAt,
         elapsedMs: result.elapsedMs,
         artifacts: artifactState.artifacts,
+        projectGlobalFreshness: artifactState.projectGlobalFreshness,
     }, queryMeta));
 }
 
@@ -907,23 +1047,25 @@ async function handleMcpRequest(request) {
                         ? detectTopology(args)
                         : name === 'diagnose_workspace'
                             ? diagnoseWorkspace(args)
-                            : name === 'build_project_index'
-                                ? buildProjectIndex(args)
-                                : name === 'start_build_project_index'
-                                    ? startBuildProjectIndex(args)
-                                    : name === 'get_job_status'
-                                        ? getJobStatus(args)
-                                        : name === 'get_job_result'
-                                            ? getJobResult(args)
-                                            : name === 'discover_features'
-                                                ? discoverFeatures(args)
-                                                : name === 'build_feature_index'
-                                                    ? buildFeatureIndex(args)
-                                                    : name === 'query_project_chain'
-                                                        ? queryProjectChain(args)
-                                                        : name === 'query_feature_chain'
-                                                            ? queryFeatureChain(args)
-                                                            : textResult({ error: `Unknown tool: ${name}` });
+                            : name === 'check_kb_freshness'
+                                ? checkKbFreshness(args)
+                                : name === 'build_project_index'
+                                    ? buildProjectIndex(args)
+                                    : name === 'start_build_project_index'
+                                        ? startBuildProjectIndex(args)
+                                        : name === 'get_job_status'
+                                            ? getJobStatus(args)
+                                            : name === 'get_job_result'
+                                                ? getJobResult(args)
+                                                : name === 'discover_features'
+                                                    ? discoverFeatures(args)
+                                                    : name === 'build_feature_index'
+                                                        ? buildFeatureIndex(args)
+                                                        : name === 'query_project_chain'
+                                                            ? queryProjectChain(args)
+                                                            : name === 'query_feature_chain'
+                                                                ? queryFeatureChain(args)
+                                                                : textResult({ error: `Unknown tool: ${name}` });
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {

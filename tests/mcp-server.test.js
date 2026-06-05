@@ -153,6 +153,7 @@ async function testToolsList() {
         'init_workspace',
         'detect_topology',
         'diagnose_workspace',
+        'check_kb_freshness',
         'build_project_index',
         'start_build_project_index',
         'get_job_status',
@@ -278,6 +279,61 @@ async function testBuildProjectIndexAutoPreparesWorkspace() {
     assert.equal(summary.project.layout, 'external-data');
 }
 
+async function testProjectFreshnessDetectsSourceChanges() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+
+    const buildResponse = await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+    const built = parseTextResult(buildResponse);
+    assert.equal(built.projectGlobalFreshness.status, 'fresh');
+    assert.equal(built.projectGlobalFreshness.stale, false);
+
+    const freshResponse = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const fresh = parseTextResult(freshResponse);
+    assert.equal(fresh.projectGlobal.status, 'fresh');
+    assert.equal(fresh.projectGlobal.stale, false);
+    assert.equal(fresh.projectGlobal.reasonCodes.length, 0);
+
+    fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function changed(){ return "changed"; }\n');
+
+    const staleStateResponse = await callTool('get_current_state', { workspaceRoot, dataRoot });
+    const staleState = parseTextResult(staleStateResponse);
+    assert.equal(staleState.projectGlobalFreshness.status, 'stale');
+    assert.equal(staleState.projectGlobalFreshness.stale, true);
+    assert.ok(staleState.projectGlobalFreshness.reasonCodes.includes('source-files-changed'));
+    assert.equal(staleState.suggestedNextAction, 'build_project_index');
+
+    const staleResponse = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const stale = parseTextResult(staleResponse);
+    assert.equal(stale.projectGlobal.status, 'stale');
+    assert.ok(stale.projectGlobal.changedFiles.some(item => item.path.endsWith('official-website/src/main.js')));
+    assert.equal(stale.projectGlobal.recommendedAction, 'build_project_index');
+}
+
+async function testProjectFreshnessUnknownWithoutSourceSnapshot() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+
+    const context = createWorkspaceContext({
+        workspaceRoot,
+        dataRoot,
+        layout: 'external-data',
+    });
+    const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
+    const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
+    delete graph.sourceSnapshot;
+    fs.writeFileSync(graphPath, `${JSON.stringify(graph, null, 2)}\n`);
+
+    const response = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const result = parseTextResult(response);
+    assert.equal(result.projectGlobal.status, 'unknown');
+    assert.equal(result.projectGlobal.stale, true);
+    assert.ok(result.projectGlobal.reasonCodes.includes('missing-source-snapshot'));
+    assert.equal(result.projectGlobal.recommendedAction, 'build_project_index');
+}
+
 async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     const { workspaceRoot, dataRoot } = makeWorkspace();
     writeWebsiteWorkspace(workspaceRoot);
@@ -294,6 +350,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     const first = parseTextResult(firstResponse);
     assert.equal(first._mcpCache.hit, false);
     assert.equal(first._mcpQuery.limit, 100);
+    assert.equal(first.kbFreshness.status, 'fresh');
 
     const secondResponse = await callTool('query_project_chain', {
         workspaceRoot,
@@ -305,6 +362,21 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     const second = parseTextResult(secondResponse);
     assert.equal(second._mcpCache.hit, true);
     assert.equal(second._mcpQuery.limit, 100);
+
+    fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function cacheChanged(){ return "changed"; }\n');
+
+    const sourceChangedResponse = await callTool('query_project_chain', {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'mountApp',
+        limit: 5000,
+    });
+    const sourceChanged = parseTextResult(sourceChangedResponse);
+    assert.equal(sourceChanged._mcpCache.hit, false);
+    assert.equal(sourceChanged._mcpCache.invalidatedBySource, true);
+    assert.equal(sourceChanged.kbFreshness.status, 'stale');
+    assert.ok(sourceChanged.kbFreshness.reasonCodes.includes('source-files-changed'));
 
     const context = createWorkspaceContext({
         workspaceRoot,
@@ -424,6 +496,8 @@ Promise.all([
     testInitAndDetectTopologyViaMcp(),
     testDetectTopologyKeepsManualAreaRoots(),
     testBuildProjectIndexAutoPreparesWorkspace(),
+    testProjectFreshnessDetectsSourceChanges(),
+    testProjectFreshnessUnknownWithoutSourceSnapshot(),
     testQueryProjectChainCacheInvalidatesOnKbMtime(),
     testAsyncBuildJob(),
     testDiscoverAndBuildFeatureIndexDryRun(),

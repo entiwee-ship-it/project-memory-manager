@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { runExtract } = require('../extraction/extract-feature-facts');
 const { hasOwn, inferArea, inferStacks, normalize, pathExists, readJson, readJsonSafe, repoRelative, slugify, timestamp, writeJson, writeJsonAtomic } = require('../shared/common');
+const { buildSourceSnapshot } = require('../shared/source-snapshot');
 const { normalizeConfig, normalizeFeatureRecord } = require('./feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
 const { loadSkillVersion } = require('../maintenance/show-version');
@@ -623,6 +624,7 @@ function buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup
         featureKey: config.featureKey,
         featureName: config.featureName,
         builtWithSkill,
+        sourceSnapshot: graph.sourceSnapshot || null,
         purpose: '功能知识库构建汇总与使用说明。优先用它确认 KB 覆盖范围、推荐查询入口和产物用途。',
         useWhen: '当你刚构建完 KB，或升级后不确定该查哪个文件、该先跑什么命令，尤其是 prefab/meta 绑定问题该怎么查时。',
         configPath: repoRelative(configPath, root),
@@ -2329,7 +2331,10 @@ function run(argv = process.argv.slice(2)) {
         runExtract(extractArgs);
         
         const raw = readJson(scanPath);
-        const graph = buildGraph(raw, config, profile, root);
+        const graph = {
+            ...buildGraph(raw, config, profile, root),
+            sourceSnapshot: buildSourceSnapshot(root, config),
+        };
         const lookup = buildLookup(graph);
         const report = buildKbReport(root, config, configPath, outputPaths, raw, graph, lookup);
 

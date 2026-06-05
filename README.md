@@ -52,6 +52,7 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 常用 MCP 工具：
 
 - `get_current_state`：查看目标项目的 PMM 状态。
+- `check_kb_freshness`：判断 KB 是否仍与当前源码和 PMM 版本一致。
 - `build_project_index`：同步构建 project-global KB。
 - `start_build_project_index`：异步构建 project-global KB。
 - `discover_features`：发现功能候选。
@@ -80,6 +81,8 @@ node src/bin/validate-package.js
 更多命令见 `docs/reference/cli.md`。
 
 需要看后端数据表影响时，用 `focus=data` 或 `mode=fullstack-data` 查询，并读取返回的 `dataAccessSummary`。
+
+查询前先看 `projectGlobalFreshness` 或 `kbFreshness`。状态为 `fresh` 才能直接信任；`stale`、`missing`、`unknown` 都应先按 `recommendedAction` 重建。
 
 ## 数据分离
 

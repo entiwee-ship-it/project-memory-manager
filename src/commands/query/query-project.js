@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { readJson, resolveProjectRoot } = require('../../shared/common');
+const { readJson, readJsonSafe, resolveProjectRoot } = require('../../shared/common');
 const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 const { run: runFeatureQuery } = require('../../query/query-chain');
+const { loadSkillVersion } = require('../../maintenance/show-version');
+const { buildKbFreshnessStatus } = require('../../shared/source-snapshot');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -128,6 +130,19 @@ function loadProjectArtifacts(context) {
 
 function loadProjectSummary(context) {
     const { graph, lookup, protocols } = loadProjectArtifacts(context);
+    const config = readJsonSafe(path.join(context.paths.configsDir, 'project-global.json'), { required: false, defaultValue: null });
+    const currentSkill = loadSkillVersion(path.resolve(__dirname, '..', '..', '..'));
+    const kbFreshness = buildKbFreshnessStatus({
+        root: context.workspaceRoot,
+        graph,
+        config,
+        currentSkill: {
+            name: currentSkill.name || '',
+            version: currentSkill.version || '',
+            repo: currentSkill.repo || '',
+        },
+        recommendedAction: 'build_project_index',
+    });
 
     return {
         kind: 'project-summary',
@@ -151,6 +166,7 @@ function loadProjectSummary(context) {
             transitionPatterns: protocols.summary?.transitionPatterns || 0,
         },
         builtWithSkill: graph.builtWithSkill || null,
+        kbFreshness,
         protocolsSummary: protocols.summary || {},
         examples: [
             'node src/bin/query-project.js --workspace-root <project-root>',
@@ -173,6 +189,12 @@ function printProjectSummary(summary, asJson) {
     console.log(`- kbDir: ${summary.project.kbDir}`);
     if (summary.builtWithSkill) {
         console.log(`- builtWithSkill: ${summary.builtWithSkill.name}@${summary.builtWithSkill.version}`);
+    }
+    if (summary.kbFreshness) {
+        console.log(`- kbFreshness: ${summary.kbFreshness.status}`);
+        if (summary.kbFreshness.stale) {
+            console.log(`- rebuild: ${summary.kbFreshness.recommendedAction}`);
+        }
     }
     console.log(`- nodes: ${summary.counts.nodes}`);
     console.log(`- edges: ${summary.counts.edges}`);
