@@ -346,6 +346,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
         type: 'method',
         name: 'mountApp',
         limit: 5000,
+        freshnessPolicy: 'allow_stale',
     });
     const first = parseTextResult(firstResponse);
     assert.equal(first._mcpCache.hit, false);
@@ -358,6 +359,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
         type: 'method',
         name: 'mountApp',
         limit: 5000,
+        freshnessPolicy: 'allow_stale',
     });
     const second = parseTextResult(secondResponse);
     assert.equal(second._mcpCache.hit, true);
@@ -371,6 +373,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
         type: 'method',
         name: 'mountApp',
         limit: 5000,
+        freshnessPolicy: 'allow_stale',
     });
     const sourceChanged = parseTextResult(sourceChangedResponse);
     assert.equal(sourceChanged._mcpCache.hit, false);
@@ -393,10 +396,59 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
         type: 'method',
         name: 'mountApp',
         limit: 5000,
+        freshnessPolicy: 'allow_stale',
     });
     const third = parseTextResult(thirdResponse);
     assert.equal(third._mcpCache.hit, false);
     assert.equal(third._mcpCache.invalidatedByMtime, true);
+}
+
+async function testQueryProjectChainAutoRebuildsStaleKb() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+    fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function autoRebuild(){ return "fresh"; }\n');
+
+    const response = await callTool('query_project_chain', {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'autoRebuild',
+    });
+    const result = parseTextResult(response);
+
+    assert.equal(Array.isArray(result.result), true);
+    assert.equal(result.kbFreshness.status, 'fresh');
+    assert.equal(result._mcpFreshness.policy, 'auto_rebuild');
+    assert.equal(result._mcpFreshness.initialStatus, 'stale');
+    assert.equal(result._mcpFreshness.rebuilt, true);
+    assert.equal(result._mcpFreshness.finalStatus, 'fresh');
+    assert.ok(result.result.some(match => match.name === 'main.autoRebuild'));
+}
+
+async function testQueryProjectChainRequireFreshBlocksStaleKb() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+    fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function blockedByRequireFresh(){ return "stale"; }\n');
+
+    const response = await callTool('query_project_chain', {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'blockedByRequireFresh',
+        freshnessPolicy: 'require_fresh',
+    });
+    const result = parseTextResult(response);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'KB_NOT_FRESH');
+    assert.equal(result.kbFreshness.status, 'stale');
+    assert.equal(result._mcpFreshness.policy, 'require_fresh');
+    assert.equal(result._mcpFreshness.rebuilt, false);
+    assert.equal(result._mcpFreshness.finalStatus, 'stale');
 }
 
 async function waitForJob(jobId, maxAttempts = 40) {
@@ -469,6 +521,7 @@ async function testQueryFeatureChainViaMcp() {
         workspaceRoot,
         dataRoot,
         feature,
+        freshnessPolicy: 'allow_stale',
     });
     const summary = parseTextResult(summaryResponse);
     assert.equal(summary.kind, 'feature-summary');
@@ -480,6 +533,7 @@ async function testQueryFeatureChainViaMcp() {
         feature,
         downstream: true,
         from: 'createClub',
+        freshnessPolicy: 'allow_stale',
     });
     const chain = parseTextResult(chainResponse);
     assert.ok(Array.isArray(chain.ambiguous));
@@ -487,6 +541,49 @@ async function testQueryFeatureChainViaMcp() {
     assert.ok(chain.recommendations.groups.some(group => group.key === 'http-endpoint'));
     assert.ok(chain.recommendations.groups.some(group => group.key === 'pinus-route'));
     assert.ok(chain.recommendations.groups.some(group => group.key === 'method'));
+}
+
+async function testQueryFeatureChainAutoRebuildsStaleKb() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFeatureDiscoveryWorkspace(workspaceRoot);
+
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+    const discoverResponse = await callTool('discover_features', {
+        workspaceRoot,
+        dataRoot,
+        limit: 5,
+        minConfidence: 'low',
+    });
+    const discovered = parseTextResult(discoverResponse);
+    const featureKey = discovered.candidates[0].featureKey;
+    await callTool('build_feature_index', {
+        workspaceRoot,
+        dataRoot,
+        featureKey,
+        dryRun: false,
+    });
+
+    fs.appendFileSync(path.join(workspaceRoot, 'qy-server', 'game-server', 'app', 'http', 'routes', 'activity', 'goldenEgg.ts'), [
+        'export function autoFeatureRebuild(){ return "fresh"; }',
+        '',
+    ].join('\n'));
+
+    const response = await callTool('query_feature_chain', {
+        workspaceRoot,
+        dataRoot,
+        feature: featureKey,
+        type: 'method',
+        name: 'autoFeatureRebuild',
+    });
+    const result = parseTextResult(response);
+
+    assert.equal(Array.isArray(result.result), true);
+    assert.equal(result.kbFreshness.status, 'fresh');
+    assert.equal(result._mcpFreshness.policy, 'auto_rebuild');
+    assert.equal(result._mcpFreshness.initialStatus, 'stale');
+    assert.equal(result._mcpFreshness.rebuilt, true);
+    assert.equal(result._mcpFreshness.finalStatus, 'fresh');
+    assert.ok(result.result.some(match => match.name.endsWith('.autoFeatureRebuild')));
 }
 
 Promise.all([
@@ -499,9 +596,12 @@ Promise.all([
     testProjectFreshnessDetectsSourceChanges(),
     testProjectFreshnessUnknownWithoutSourceSnapshot(),
     testQueryProjectChainCacheInvalidatesOnKbMtime(),
+    testQueryProjectChainAutoRebuildsStaleKb(),
+    testQueryProjectChainRequireFreshBlocksStaleKb(),
     testAsyncBuildJob(),
     testDiscoverAndBuildFeatureIndexDryRun(),
     testQueryFeatureChainViaMcp(),
+    testQueryFeatureChainAutoRebuildsStaleKb(),
 ])
     .then(() => console.log('mcp-server validation passed'))
     .catch(error => {

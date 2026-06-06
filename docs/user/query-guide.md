@@ -5,11 +5,13 @@
 通过 MCP 使用 PMM 时，先调用 `get_current_state` 或 `check_kb_freshness`。返回的 `projectGlobalFreshness` / `kbFreshness` 有四种状态：
 
 - `fresh`：KB 与当前源码一致，可以直接查询。
-- `stale`：扫描范围内源码文件新增、删除、修改，或 PMM 版本变化，需要先重建。
+- `stale`：扫描范围内源码文件新增、删除、修改，或 PMM 版本变化。
 - `missing`：KB 尚未构建。
-- `unknown`：旧 KB 没有源码快照或缺少构建配置，需要重建一次。
+- `unknown`：旧 KB 没有源码快照或缺少构建配置。
 
-查询结果如果附带 `kbFreshness.status != fresh`，不要直接信任链路结论，先执行返回的 `recommendedAction`。
+MCP 查询默认 `freshnessPolicy=auto_rebuild`。`query_project_chain` / `query_feature_chain` 发现状态不是 `fresh` 时，会同步重建并等待完成；只有最终 `fresh` 才返回查询结果。返回的 `_mcpFreshness` 可用于确认是否发生了自动重建。
+
+CLI 查询不会自动等待重建。使用 CLI 时，如果 `kbFreshness.status != fresh`，不要直接信任链路结论，先执行返回的 `recommendedAction` 或运行 `rebuild-kbs.js`。
 
 项目全局查询：
 

@@ -57,8 +57,8 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `start_build_project_index`：异步构建 project-global KB。
 - `discover_features`：发现功能候选。
 - `build_feature_index`：生成并构建单个功能 KB。
-- `query_project_chain`：查询 project-global KB。
-- `query_feature_chain`：查询单个功能 KB。
+- `query_project_chain`：查询 project-global KB；默认会先确保 KB 为 `fresh`，必要时同步重建并等待完成。
+- `query_feature_chain`：查询单个功能 KB；默认会先确保 feature KB 为 `fresh`，必要时同步重建并等待完成。
 
 ## CLI 入口
 
@@ -82,7 +82,7 @@ node src/bin/validate-package.js
 
 需要看后端数据表影响时，用 `focus=data` 或 `mode=fullstack-data` 查询，并读取返回的 `dataAccessSummary`。
 
-查询前先看 `projectGlobalFreshness` 或 `kbFreshness`。状态为 `fresh` 才能直接信任；`stale`、`missing`、`unknown` 都应先按 `recommendedAction` 重建。
+查询结果会返回 `kbFreshness` 和 `_mcpFreshness`。MCP 查询默认 `freshnessPolicy=auto_rebuild`：状态为 `stale`、`missing`、`unknown` 时会先重建并等待 `fresh`，再返回查询结果。只有调试旧 KB 时才显式传 `freshnessPolicy=allow_stale`；想阻止自动重建时传 `freshnessPolicy=require_fresh`。
 
 ## 数据分离
 

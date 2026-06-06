@@ -7,6 +7,16 @@
 
 ## [未发布]
 
+## [0.29.0] - 2026-06-06
+
+### 新增
+- `query_project_chain` 和 `query_feature_chain` 新增 `freshnessPolicy`，默认 `auto_rebuild`。查询前如果 KB 是 `stale`、`missing` 或 `unknown`，MCP 会同步重建并等待最终 `fresh` 后再查询。
+- 查询结果新增 `_mcpFreshness`，记录初始状态、最终状态、是否自动重建和重建输出尾部，便于确认 Codex 是否真的等到 KB 可用。
+
+### 改进
+- `freshnessPolicy=require_fresh` 会在 KB 非 `fresh` 时直接阻止查询；`freshnessPolicy=allow_stale` 才允许调试旧 KB。
+- feature 查询结果在 selector 返回数组时也会补齐 `kbFreshness`，避免无法判断 feature KB 最终状态。
+
 ## [0.28.1] - 2026-06-05
 
 ### 修复

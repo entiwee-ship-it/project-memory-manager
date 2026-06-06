@@ -22,6 +22,8 @@ const MAX_MCP_QUERY_LIMIT = 100;
 const DEFAULT_MCP_QUERY_TIMEOUT_MS = 8000;
 const MAX_MCP_QUERY_TIMEOUT_MS = 30000;
 const MAX_PROJECT_QUERY_CACHE_ENTRIES = 100;
+const DEFAULT_FRESHNESS_POLICY = 'auto_rebuild';
+const FRESHNESS_POLICIES = new Set(['auto_rebuild', 'require_fresh', 'allow_stale']);
 const projectQueryCache = new Map();
 
 const TOOL_DEFINITIONS = [
@@ -220,6 +222,7 @@ const TOOL_DEFINITIONS = [
                 limit: { type: 'number' },
                 depth: { type: 'number' },
                 timeoutMs: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
             },
             required: ['workspaceRoot'],
         },
@@ -266,6 +269,7 @@ const TOOL_DEFINITIONS = [
                 limit: { type: 'number' },
                 depth: { type: 'number' },
                 timeoutMs: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
             },
             required: ['workspaceRoot', 'feature'],
         },
@@ -505,12 +509,18 @@ function cloneJson(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
-function withMcpQueryMetadata(payload, cacheMeta, queryMeta) {
+function withMcpQueryMetadata(payload, cacheMeta, queryMeta, freshnessMeta = null) {
     const result = payload && typeof payload === 'object' && !Array.isArray(payload)
         ? cloneJson(payload)
         : { result: payload };
     if (!result.kbFreshness && cacheMeta?.projectGlobalFreshness) {
         result.kbFreshness = cacheMeta.projectGlobalFreshness;
+    }
+    if (!result.kbFreshness && cacheMeta?.featureFreshness) {
+        result.kbFreshness = cacheMeta.featureFreshness;
+    }
+    if (freshnessMeta) {
+        result._mcpFreshness = freshnessMeta;
     }
     result._mcpCache = cacheMeta;
     result._mcpQuery = queryMeta;
@@ -654,6 +664,210 @@ function checkKbFreshness(args) {
         };
     }
     return textResult(result);
+}
+
+function resolveFreshnessPolicy(args = {}) {
+    const requested = String(args.freshnessPolicy || '').trim();
+    if (!requested) {
+        return DEFAULT_FRESHNESS_POLICY;
+    }
+    return FRESHNESS_POLICIES.has(requested) ? requested : DEFAULT_FRESHNESS_POLICY;
+}
+
+function summarizeFreshness(freshness) {
+    return {
+        status: freshness?.status || 'unknown',
+        stale: Boolean(freshness?.stale),
+        reasonCodes: Array.isArray(freshness?.reasonCodes) ? freshness.reasonCodes : [],
+        recommendedAction: freshness?.recommendedAction || '',
+    };
+}
+
+function buildFreshnessMeta({ scope, policy, initialFreshness, finalFreshness, rebuilt = false, output = '', error = '' }) {
+    return {
+        scope,
+        policy,
+        initialStatus: initialFreshness?.status || 'unknown',
+        finalStatus: finalFreshness?.status || initialFreshness?.status || 'unknown',
+        rebuilt,
+        blocked: Boolean(finalFreshness?.stale),
+        initial: summarizeFreshness(initialFreshness),
+        final: summarizeFreshness(finalFreshness || initialFreshness),
+        rebuildOutput: output ? output.slice(-4000) : '',
+        error,
+    };
+}
+
+function buildNotFreshResult({ scope, policy, freshnessMeta, freshness, error = '' }) {
+    return textResult({
+        ok: false,
+        error: error || 'KB_NOT_FRESH',
+        message: policy === 'require_fresh'
+            ? 'KB 状态不是 fresh，freshnessPolicy=require_fresh 已阻止查询。'
+            : 'KB 自动重建后仍不是 fresh，已阻止查询旧 KB。',
+        scope,
+        freshnessPolicy: policy,
+        kbFreshness: freshness || freshnessMeta?.final || null,
+        _mcpFreshness: freshnessMeta,
+    });
+}
+
+function runProjectRebuildForQuery(args) {
+    const prepared = ensureWorkspacePrepared(args);
+    const captured = captureConsoleLog(() => buildProjectKb(layoutArgv(args)));
+    return [prepared.output, captured.output].filter(Boolean).join('\n');
+}
+
+function ensureProjectFreshForQuery(args, policy) {
+    const initial = buildWorkspaceState(args).projectGlobalFreshness;
+    if (policy === 'allow_stale' || !initial?.stale) {
+        return {
+            ok: true,
+            finalFreshness: initial,
+            freshnessMeta: buildFreshnessMeta({
+                scope: 'project-global',
+                policy,
+                initialFreshness: initial,
+                finalFreshness: initial,
+            }),
+        };
+    }
+    if (policy === 'require_fresh') {
+        const freshnessMeta = buildFreshnessMeta({
+            scope: 'project-global',
+            policy,
+            initialFreshness: initial,
+            finalFreshness: initial,
+        });
+        return {
+            ok: false,
+            result: buildNotFreshResult({ scope: 'project-global', policy, freshnessMeta, freshness: initial }),
+        };
+    }
+
+    let output = '';
+    try {
+        output = runProjectRebuildForQuery(args);
+    } catch (error) {
+        const finalFreshness = buildWorkspaceState(args).projectGlobalFreshness;
+        const freshnessMeta = buildFreshnessMeta({
+            scope: 'project-global',
+            policy,
+            initialFreshness: initial,
+            finalFreshness,
+            rebuilt: true,
+            output,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return {
+            ok: false,
+            result: buildNotFreshResult({
+                scope: 'project-global',
+                policy,
+                freshnessMeta,
+                freshness: finalFreshness,
+                error: error instanceof Error ? error.message : String(error),
+            }),
+        };
+    }
+
+    const finalFreshness = buildWorkspaceState(args).projectGlobalFreshness;
+    const freshnessMeta = buildFreshnessMeta({
+        scope: 'project-global',
+        policy,
+        initialFreshness: initial,
+        finalFreshness,
+        rebuilt: true,
+        output,
+    });
+    if (finalFreshness?.stale) {
+        return {
+            ok: false,
+            result: buildNotFreshResult({ scope: 'project-global', policy, freshnessMeta, freshness: finalFreshness }),
+        };
+    }
+    return { ok: true, freshnessMeta, finalFreshness };
+}
+
+function runFeatureRebuildForQuery(args) {
+    const argv = [...layoutArgv(args), '--feature-key', args.feature, '--json'];
+    return captureConsoleLog(() => buildFeatureIndexCli(argv)).output;
+}
+
+function ensureFeatureFreshForQuery(args, policy) {
+    const context = createWorkspaceContext({
+        workspaceRoot: args.workspaceRoot,
+        dataRoot: args.dataRoot,
+        layout: 'external-data',
+    });
+    const initial = buildFeatureFreshness(context, args.feature);
+    if (policy === 'allow_stale' || !initial?.stale) {
+        return {
+            ok: true,
+            finalFreshness: initial,
+            freshnessMeta: buildFreshnessMeta({
+                scope: `feature:${args.feature}`,
+                policy,
+                initialFreshness: initial,
+                finalFreshness: initial,
+            }),
+        };
+    }
+    if (policy === 'require_fresh') {
+        const freshnessMeta = buildFreshnessMeta({
+            scope: `feature:${args.feature}`,
+            policy,
+            initialFreshness: initial,
+            finalFreshness: initial,
+        });
+        return {
+            ok: false,
+            result: buildNotFreshResult({ scope: `feature:${args.feature}`, policy, freshnessMeta, freshness: initial }),
+        };
+    }
+
+    let output = '';
+    try {
+        output = runFeatureRebuildForQuery(args);
+    } catch (error) {
+        const finalFreshness = buildFeatureFreshness(context, args.feature);
+        const freshnessMeta = buildFreshnessMeta({
+            scope: `feature:${args.feature}`,
+            policy,
+            initialFreshness: initial,
+            finalFreshness,
+            rebuilt: true,
+            output,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return {
+            ok: false,
+            result: buildNotFreshResult({
+                scope: `feature:${args.feature}`,
+                policy,
+                freshnessMeta,
+                freshness: finalFreshness,
+                error: error instanceof Error ? error.message : String(error),
+            }),
+        };
+    }
+
+    const finalFreshness = buildFeatureFreshness(context, args.feature);
+    const freshnessMeta = buildFreshnessMeta({
+        scope: `feature:${args.feature}`,
+        policy,
+        initialFreshness: initial,
+        finalFreshness,
+        rebuilt: true,
+        output,
+    });
+    if (finalFreshness?.stale) {
+        return {
+            ok: false,
+            result: buildNotFreshResult({ scope: `feature:${args.feature}`, policy, freshnessMeta, freshness: finalFreshness }),
+        };
+    }
+    return { ok: true, freshnessMeta, finalFreshness };
 }
 
 function buildProjectIndex(args) {
@@ -899,6 +1113,11 @@ function appendQuerySelectorArgs(argv, args, options) {
 
 function queryProjectChain(args) {
     const options = resolveMcpQueryOptions(args);
+    const freshnessPolicy = resolveFreshnessPolicy(args);
+    const freshnessGate = ensureProjectFreshForQuery(args, freshnessPolicy);
+    if (!freshnessGate.ok) {
+        return freshnessGate.result;
+    }
     const argv = [...layoutArgv(args), '--json'];
     appendQuerySelectorArgs(argv, args, options);
 
@@ -907,12 +1126,14 @@ function queryProjectChain(args) {
         limit: hasQuerySelector(args) ? options.limit : null,
         depth: options.depth,
         timeoutMs: options.timeoutMs,
+        freshnessPolicy,
     };
     const baseKey = JSON.stringify({
         tool: 'query_project_chain',
         workspaceRoot: artifactState.context.workspaceRoot,
         dataRoot: artifactState.context.dataRoot,
         layout: artifactState.context.layout,
+        freshnessPolicy,
         argv,
     });
     const cacheKey = JSON.stringify({ baseKey, signature: artifactState.signature });
@@ -940,7 +1161,7 @@ function queryProjectChain(args) {
             elapsedMs: 0,
             artifacts: artifactState.artifacts,
             projectGlobalFreshness: artifactState.projectGlobalFreshness,
-        }, queryMeta));
+        }, queryMeta, freshnessGate.freshnessMeta));
     }
 
     const result = runQueryScript('query-project.js', argv, options.timeoutMs);
@@ -960,6 +1181,7 @@ function queryProjectChain(args) {
                 projectGlobalFreshness: artifactState.projectGlobalFreshness,
             },
             _mcpQuery: queryMeta,
+            _mcpFreshness: freshnessGate.freshnessMeta,
         });
     }
 
@@ -984,11 +1206,16 @@ function queryProjectChain(args) {
         elapsedMs: result.elapsedMs,
         artifacts: artifactState.artifacts,
         projectGlobalFreshness: artifactState.projectGlobalFreshness,
-    }, queryMeta));
+    }, queryMeta, freshnessGate.freshnessMeta));
 }
 
 function queryFeatureChain(args) {
     const options = resolveMcpQueryOptions(args);
+    const freshnessPolicy = resolveFreshnessPolicy(args);
+    const freshnessGate = ensureFeatureFreshForQuery(args, freshnessPolicy);
+    if (!freshnessGate.ok) {
+        return freshnessGate.result;
+    }
     const argv = [...layoutArgv(args), '--feature', args.feature, '--json'];
     appendQuerySelectorArgs(argv, args, options);
     const result = runQueryScript('query-feature.js', argv, options.timeoutMs);
@@ -1003,7 +1230,9 @@ function queryFeatureChain(args) {
                 limit: hasQuerySelector(args) ? options.limit : null,
                 depth: options.depth,
                 timeoutMs: options.timeoutMs,
+                freshnessPolicy,
             },
+            _mcpFreshness: freshnessGate.freshnessMeta,
         });
     }
     const payload = parseJsonOutput(result.stdout);
@@ -1011,11 +1240,13 @@ function queryFeatureChain(args) {
         hit: false,
         supported: false,
         elapsedMs: result.elapsedMs,
+        featureFreshness: freshnessGate.finalFreshness,
     }, {
         limit: hasQuerySelector(args) ? options.limit : null,
         depth: options.depth,
         timeoutMs: options.timeoutMs,
-    }));
+        freshnessPolicy,
+    }, freshnessGate.freshnessMeta));
 }
 
 async function handleMcpRequest(request) {

@@ -43,7 +43,20 @@
 - `missing-source-snapshot`：旧 KB 没有源码快照。
 - `missing-kb-config`：找不到构建配置，无法判断源码变化。
 
-查询结果会附带 `kbFreshness`。如果状态不是 `fresh`，Codex 应先执行返回的 `recommendedAction`。
+查询结果会附带 `kbFreshness` 和 `_mcpFreshness`。默认情况下，`query_project_chain` 和 `query_feature_chain` 使用 `freshnessPolicy=auto_rebuild`：
+
+- 查询前发现 KB 不是 `fresh` 时，MCP 会同步重建。
+- 重建完成后再次检查新鲜度。
+- 只有最终状态为 `fresh` 时才返回查询结果。
+- 重建失败或最终仍不是 `fresh` 时，MCP 返回 `ok=false`，不会返回旧 KB 结果。
+
+`_mcpFreshness` 会记录 `initialStatus`、`finalStatus`、`rebuilt` 和 `rebuildOutput`，用于确认 Codex 是否真的等待了重建完成。
+
+`freshnessPolicy` 可选值：
+
+- `auto_rebuild`：默认值，自动重建并等待 fresh。
+- `require_fresh`：KB 不是 fresh 时直接阻止查询，不自动重建。
+- `allow_stale`：允许查询旧 KB，只用于调试或对比，不应作为日常开发默认。
 
 ## 查询参数
 
@@ -59,6 +72,7 @@ Cocos prefab 相关查询：
 通用查询参数：
 
 - `area`、`module`、`excludeModule`、`protocol`、`path`：把 `login` 这类宽泛词收窄到具体子系统。
+- `freshnessPolicy=auto_rebuild|require_fresh|allow_stale`：控制查询前是否自动等待 KB 变为 fresh。
 - `mode=fullstack` 或 `fullstack=true`：自动展开前端到后端 HTTP 链路。
 - `focus=fullstack`：把同文件 helper 方法折叠到 `relatedHelpers`。
 - `focus=data`：附加按表分组的 `dataAccessSummary`。
