@@ -471,6 +471,8 @@ async function testAsyncBuildJob() {
     const started = parseTextResult(startResponse);
     assert.ok(started.jobId);
     assert.equal(started.status, 'queued');
+    assert.equal(started.exitCode, null);
+    assert.equal(started.wait, false);
 
     const finished = await waitForJob(started.jobId);
     assert.equal(finished.status, 'succeeded');
@@ -480,6 +482,27 @@ async function testAsyncBuildJob() {
     const result = parseTextResult(resultResponse);
     assert.equal(result.status, 'succeeded');
     assert.equal(result.hasProjectGlobalKb, true);
+}
+
+async function testAsyncBuildJobWaitOption() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+
+    const response = await callTool('start_build_project_index', {
+        workspaceRoot,
+        dataRoot,
+        wait: true,
+        timeoutMs: 60000,
+    });
+    const result = parseTextResult(response);
+    assert.ok(result.jobId);
+    assert.equal(result.wait, true);
+    assert.equal(result.timedOut, false);
+    assert.equal(result.status, 'succeeded');
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.hasProjectGlobalKb, true);
+    assert.equal(result.projectGlobalFreshness.status, 'fresh');
+    assert.equal(result.projectGlobalFreshness.stale, false);
 }
 
 async function testDiscoverAndBuildFeatureIndexDryRun() {
@@ -599,6 +622,7 @@ Promise.all([
     testQueryProjectChainAutoRebuildsStaleKb(),
     testQueryProjectChainRequireFreshBlocksStaleKb(),
     testAsyncBuildJob(),
+    testAsyncBuildJobWaitOption(),
     testDiscoverAndBuildFeatureIndexDryRun(),
     testQueryFeatureChainViaMcp(),
     testQueryFeatureChainAutoRebuildsStaleKb(),

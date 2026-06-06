@@ -11,11 +11,12 @@ const {
 const { run: initProjectMemory } = require('../src/commands/lifecycle/init-workspace');
 const { run: detectProjectTopology } = require('../src/commands/lifecycle/detect-topology');
 const { run: buildProjectKb } = require('../src/commands/build/build-project');
-const { run: buildChainKb } = require('../src/graph/build-chain-kb');
+const { computeImportResolutionStats, run: buildChainKb } = require('../src/graph/build-chain-kb');
 const { run: queryProjectKb } = require('../src/commands/query/query-project');
 const { run: queryKb } = require('../src/commands/query/query-feature');
 const { run: refreshMemoryIndexes } = require('../src/lifecycle/refresh-memory-indexes');
 const { run: buildCocosAuthoringProfile } = require('../src/commands/cocos/build-cocos-authoring-profile');
+const { buildKbFreshnessStatus } = require('../src/shared/source-snapshot');
 
 function testWorkspaceId() {
     assert.equal(workspaceIdFromRoot('E:/xile-workspace'), 'e-xile-workspace');
@@ -163,7 +164,7 @@ function testProjectKbExternalData() {
     assert.equal(fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')), true);
     const graph = JSON.parse(fs.readFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), 'utf8'));
     assert.equal(graph.sourceSnapshot.kind, 'source-snapshot');
-    assert.equal(graph.sourceSnapshot.staleCheckVersion, 1);
+    assert.equal(graph.sourceSnapshot.staleCheckVersion, 2);
     assert.ok(graph.sourceSnapshot.files.some(item => item.path === 'qyproject/cms-server/src/sample.ts'));
     assert.equal(graph.nodes.some(node => String(node.file || '').includes('node_modules')), false);
     assert.equal(graph.nodes.some(node => String(node.file || '').includes('codex-work/work/tmp')), false);
@@ -248,6 +249,100 @@ function testFeatureKbExternalData() {
     assert.equal(fs.existsSync(path.join(context.paths.stateDir, 'cocos-authoring-profile.json')), true);
 }
 
+function testGeneratedSnapshotFilesUseContentHash() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-generated-workspace-'));
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-generated-data-'));
+    const kbDir = path.join(dataRoot, 'kb');
+    const srcRoot = path.join(workspaceRoot, 'cms-server', 'src');
+    const generatedDir = path.join(srcRoot, 'config');
+    const ignoredDir = path.join(srcRoot, 'generated');
+    fs.mkdirSync(generatedDir, { recursive: true });
+    fs.mkdirSync(ignoredDir, { recursive: true });
+    fs.writeFileSync(path.join(srcRoot, 'app.ts'), 'export function appEntry(){ return "ok"; }\n');
+    const generatedFile = path.join(generatedDir, 'built-env.ts');
+    fs.writeFileSync(generatedFile, 'export const ENV_NAME = "dev";\n');
+    fs.writeFileSync(path.join(ignoredDir, 'noise.ts'), 'export function ignoredNoise(){ return "noise"; }\n');
+
+    const configPath = path.join(dataRoot, 'project-global.json');
+    fs.writeFileSync(configPath, JSON.stringify({
+        featureKey: 'project-global',
+        featureName: 'Project Global KB',
+        methodRoots: ['cms-server/src'],
+        snapshotIgnore: ['cms-server/src/generated/**'],
+        generatedFiles: ['cms-server/src/config/built-env.ts'],
+        outputs: {
+            scan: path.join(kbDir, 'scan.raw.json'),
+            graph: path.join(kbDir, 'chain.graph.json'),
+            lookup: path.join(kbDir, 'chain.lookup.json'),
+            report: path.join(kbDir, 'build.report.json'),
+        },
+    }, null, 2));
+
+    buildChainKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--config', configPath]);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const graph = JSON.parse(fs.readFileSync(path.join(kbDir, 'chain.graph.json'), 'utf8'));
+    const sourceFiles = graph.sourceSnapshot.files.map(item => item.path);
+    assert.equal(graph.sourceSnapshot.staleCheckVersion, 2);
+    assert.equal(sourceFiles.includes('cms-server/src/generated/noise.ts'), false);
+    const generatedSignature = graph.sourceSnapshot.files.find(item => item.path === 'cms-server/src/config/built-env.ts');
+    assert.equal(generatedSignature.generated, true);
+    assert.ok(generatedSignature.contentHash);
+
+    const later = new Date(Date.now() + 5000);
+    fs.utimesSync(generatedFile, later, later);
+    const mtimeOnly = buildKbFreshnessStatus({
+        root: workspaceRoot,
+        graph,
+        config,
+        recommendedAction: 'build_project_index',
+    });
+    assert.equal(mtimeOnly.status, 'fresh');
+    assert.equal(mtimeOnly.changeCounts.mtimeOnly, 1);
+    assert.equal(mtimeOnly.mtimeOnlyFiles[0].generated, true);
+
+    fs.writeFileSync(generatedFile, 'export const ENV_NAME = "prod";\n');
+    const stale = buildKbFreshnessStatus({
+        root: workspaceRoot,
+        graph,
+        config,
+        recommendedAction: 'build_project_index',
+    });
+    assert.equal(stale.status, 'stale');
+    assert.ok(stale.reasonCodes.includes('source-files-changed'));
+    assert.ok(stale.changedFiles.some(item => item.path === 'cms-server/src/config/built-env.ts' && item.generated === true));
+}
+
+function testImportStatsClassifyExternalDependencies() {
+    const stats = computeImportResolutionStats({
+        scripts: [
+            {
+                methods: [],
+                imports: [
+                    { specifier: 'vue' },
+                    { specifier: 'vue-router' },
+                    { specifier: 'vue' },
+                    { specifier: 'element-plus/es/components' },
+                    { specifier: '@/utils/api' },
+                    { specifier: './local' },
+                    { specifier: 'cc' },
+                    { specifier: 'node:assert' },
+                ],
+            },
+        ],
+    });
+
+    assert.deepEqual(stats.externalImports.map(item => [item.specifier, item.count]), [
+        ['vue', 2],
+        ['element-plus', 1],
+        ['vue-router', 1],
+    ]);
+    assert.deepEqual(stats.unresolvedInternalImports.map(item => [item.specifier, item.count]), [
+        ['./local', 1],
+        ['@/utils/api', 1],
+    ]);
+    assert.equal(stats.unresolvedImports.includes('vue'), false);
+}
+
 testWorkspaceId();
 testExternalDataContext();
 testLegacyContext();
@@ -257,4 +352,6 @@ testDefaultDataRootIsOutsideToolSource();
 testInitAndTopologyUseExternalData();
 testProjectKbExternalData();
 testFeatureKbExternalData();
+testGeneratedSnapshotFilesUseContentHash();
+testImportStatsClassifyExternalDependencies();
 console.log('workspace-layout validation passed');

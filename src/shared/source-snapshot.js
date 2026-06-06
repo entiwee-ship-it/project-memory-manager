@@ -8,8 +8,15 @@ const {
     timestamp,
 } = require('./common');
 
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = 2;
 const CHANGE_SAMPLE_LIMIT = 25;
+const DEFAULT_SNAPSHOT_IGNORE = [
+    '**/dist/**',
+    '**/build/**',
+    '**/.vite/**',
+    '**/.turbo/**',
+    '**/.cache/**',
+];
 
 function asArray(value) {
     if (Array.isArray(value)) {
@@ -91,6 +98,98 @@ function expandConfiguredTarget(root, input) {
     return Array.from(new Set(expandGlobSegments(rootBase, segments)));
 }
 
+function normalizeSnapshotPath(value) {
+    return normalize(String(value || '').trim()).replace(/^\.\/+/, '');
+}
+
+function normalizeSnapshotPattern(root, value) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) {
+        return '';
+    }
+    if (path.isAbsolute(rawValue)) {
+        const relative = path.relative(root, path.resolve(rawValue));
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+            return normalize(path.resolve(rawValue));
+        }
+        return normalizeSnapshotPath(relative);
+    }
+    return normalizeSnapshotPath(rawValue);
+}
+
+function collectSnapshotPatterns(root, config, key) {
+    const snapshotConfig = config.snapshot && typeof config.snapshot === 'object'
+        ? config.snapshot
+        : {};
+    return Array.from(new Set([
+        ...asArray(config[key]),
+        ...asArray(snapshotConfig[key]),
+    ].map(item => normalizeSnapshotPattern(root, item)).filter(Boolean)));
+}
+
+function escapeRegex(value) {
+    return String(value).replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function globToRegex(pattern) {
+    const normalizedPattern = normalizeSnapshotPath(pattern);
+    let source = '';
+    for (let index = 0; index < normalizedPattern.length; index++) {
+        const char = normalizedPattern[index];
+        const next = normalizedPattern[index + 1];
+        if (char === '*' && next === '*') {
+            const after = normalizedPattern[index + 2];
+            if (after === '/') {
+                source += '(?:.*/)?';
+                index += 2;
+            } else {
+                source += '.*';
+                index++;
+            }
+            continue;
+        }
+        if (char === '*') {
+            source += '[^/]*';
+            continue;
+        }
+        if (char === '?') {
+            source += '[^/]';
+            continue;
+        }
+        source += escapeRegex(char);
+    }
+    return new RegExp(`^${source}$`);
+}
+
+function createSnapshotRules(root, config = {}) {
+    const ignorePatterns = Array.from(new Set([
+        ...DEFAULT_SNAPSHOT_IGNORE.map(item => normalizeSnapshotPattern(root, item)),
+        ...collectSnapshotPatterns(root, config, 'snapshotIgnore'),
+    ].filter(Boolean)));
+    const generatedPatterns = collectSnapshotPatterns(root, config, 'generatedFiles');
+    return {
+        ignorePatterns,
+        generatedPatterns,
+        ignoreRegexes: ignorePatterns.map(globToRegex),
+        generatedRegexes: generatedPatterns.map(globToRegex),
+    };
+}
+
+function matchesAny(relativePath, patterns, regexes) {
+    const normalizedPath = normalizeSnapshotPath(relativePath);
+    return patterns.some(pattern => normalizedPath === pattern)
+        || regexes.some(regex => regex.test(normalizedPath));
+}
+
+function isIgnoredSnapshotFile(root, filePath, rules) {
+    const relativePath = normalizeSnapshotPath(path.relative(root, path.resolve(filePath)));
+    return matchesAny(relativePath, rules.ignorePatterns, rules.ignoreRegexes);
+}
+
+function isGeneratedSnapshotFile(relativePath, rules) {
+    return matchesAny(relativePath, rules.generatedPatterns, rules.generatedRegexes);
+}
+
 function collectConfiguredSourceInputs(config = {}) {
     const scanTargets = config.scanTargets && typeof config.scanTargets === 'object' ? config.scanTargets : {};
     const inputs = [
@@ -111,62 +210,93 @@ function collectConfiguredSourceInputs(config = {}) {
         .sort((left, right) => left.localeCompare(right));
 }
 
-function collectFilesFromTarget(targetPath, files) {
+function collectFilesFromTarget(root, targetPath, files, rules) {
     if (!targetPath || hasDefaultIgnoredPathSegment(targetPath) || !fs.existsSync(targetPath)) {
         return;
     }
     const stat = fs.statSync(targetPath);
     if (stat.isFile()) {
-        files.add(path.resolve(targetPath));
+        if (!isIgnoredSnapshotFile(root, targetPath, rules)) {
+            files.add(path.resolve(targetPath));
+        }
         return;
     }
     if (!stat.isDirectory()) {
         return;
     }
     for (const filePath of listFilesRecursive(targetPath, () => true)) {
-        files.add(path.resolve(filePath));
+        if (!isIgnoredSnapshotFile(root, filePath, rules)) {
+            files.add(path.resolve(filePath));
+        }
     }
 }
 
 function collectSourceFiles(root, config = {}) {
+    const normalizedRoot = path.resolve(root);
+    const rules = createSnapshotRules(normalizedRoot, config);
     const files = new Set();
     const inputs = collectConfiguredSourceInputs(config);
     for (const input of inputs) {
-        for (const targetPath of expandConfiguredTarget(root, input)) {
-            collectFilesFromTarget(targetPath, files);
+        for (const targetPath of expandConfiguredTarget(normalizedRoot, input)) {
+            collectFilesFromTarget(normalizedRoot, targetPath, files, rules);
         }
     }
     return Array.from(files).sort((left, right) => left.localeCompare(right));
 }
 
-function fileSignature(root, filePath) {
+function fileContentHash(filePath) {
+    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+}
+
+function fileSignature(root, filePath, rules) {
     const stat = fs.statSync(filePath);
-    return {
-        path: normalize(path.relative(root, path.resolve(filePath))),
+    const relativePath = normalize(path.relative(root, path.resolve(filePath)));
+    const generated = isGeneratedSnapshotFile(relativePath, rules);
+    const signature = {
+        path: relativePath,
         size: stat.size,
         mtimeMs: Math.round(stat.mtimeMs),
+    };
+    if (generated) {
+        signature.generated = true;
+        signature.contentHash = fileContentHash(filePath);
+    }
+    return signature;
+}
+
+function fingerprintItem(item) {
+    if (item.generated && item.contentHash) {
+        return [item.path, 'generated-content', item.size, item.contentHash];
+    }
+    return {
+        path: item.path,
+        size: item.size,
+        mtimeMs: item.mtimeMs,
     };
 }
 
 function fingerprintFiles(files) {
     return crypto
         .createHash('sha256')
-        .update(JSON.stringify(files.map(item => [item.path, item.size, item.mtimeMs])))
+        .update(JSON.stringify(files.map(item => fingerprintItem(item))))
         .digest('hex');
 }
 
 function buildSourceSnapshot(root, config = {}) {
     const normalizedRoot = path.resolve(root);
+    const rules = createSnapshotRules(normalizedRoot, config);
     const inputs = collectConfiguredSourceInputs(config);
     const files = collectSourceFiles(normalizedRoot, config)
-        .map(filePath => fileSignature(normalizedRoot, filePath));
+        .map(filePath => fileSignature(normalizedRoot, filePath, rules));
     return {
         kind: 'source-snapshot',
         staleCheckVersion: SNAPSHOT_VERSION,
-        strategy: 'mtime-size',
+        strategy: 'mtime-size-generated-content',
         generatedAt: timestamp(),
         workspaceRoot: normalize(normalizedRoot),
         inputs,
+        snapshotIgnore: rules.ignorePatterns,
+        generatedFiles: rules.generatedPatterns,
         fileCount: files.length,
         fingerprint: fingerprintFiles(files),
         files,
@@ -183,6 +313,7 @@ function buildFreshnessResult({
     addedFiles = [],
     deletedFiles = [],
     changedFiles = [],
+    mtimeOnlyFiles = [],
 }) {
     const stale = status === 'stale' || status === 'unknown' || status === 'missing';
     return {
@@ -209,12 +340,58 @@ function buildFreshnessResult({
         addedFiles: addedFiles.slice(0, CHANGE_SAMPLE_LIMIT),
         deletedFiles: deletedFiles.slice(0, CHANGE_SAMPLE_LIMIT),
         changedFiles: changedFiles.slice(0, CHANGE_SAMPLE_LIMIT),
+        mtimeOnlyFiles: mtimeOnlyFiles.slice(0, CHANGE_SAMPLE_LIMIT),
         changeCounts: {
             added: addedFiles.length,
             deleted: deletedFiles.length,
             changed: changedFiles.length,
+            mtimeOnly: mtimeOnlyFiles.length,
         },
     };
+}
+
+function didFileContentChange(previous, current) {
+    if ((previous.generated || current.generated) && previous.contentHash && current.contentHash) {
+        return previous.contentHash !== current.contentHash || previous.size !== current.size;
+    }
+    return previous.size !== current.size || previous.mtimeMs !== current.mtimeMs;
+}
+
+function buildChangedFile(filePath, previous, current) {
+    return {
+        path: filePath,
+        generated: Boolean(previous.generated || current.generated),
+        previous: {
+            size: previous.size,
+            mtimeMs: previous.mtimeMs,
+            contentHash: previous.contentHash || undefined,
+        },
+        current: {
+            size: current.size,
+            mtimeMs: current.mtimeMs,
+            contentHash: current.contentHash || undefined,
+        },
+    };
+}
+
+function collectMtimeOnlyFiles(storedSnapshot, currentSnapshot) {
+    const storedByPath = new Map((storedSnapshot.files || []).map(item => [item.path, item]));
+    const mtimeOnlyFiles = [];
+    for (const current of currentSnapshot.files || []) {
+        const previous = storedByPath.get(current.path);
+        if (!previous) {
+            continue;
+        }
+        if (previous.size === current.size && previous.mtimeMs !== current.mtimeMs) {
+            mtimeOnlyFiles.push({
+                path: current.path,
+                generated: Boolean(previous.generated || current.generated),
+                previous: { size: previous.size, mtimeMs: previous.mtimeMs },
+                current: { size: current.size, mtimeMs: current.mtimeMs },
+            });
+        }
+    }
+    return mtimeOnlyFiles;
 }
 
 function compareSourceSnapshot(root, storedSnapshot, config = {}, options = {}) {
@@ -244,6 +421,7 @@ function compareSourceSnapshot(root, storedSnapshot, config = {}, options = {}) 
             status: 'fresh',
             sourceSnapshot: storedSnapshot,
             currentSnapshot,
+            mtimeOnlyFiles: collectMtimeOnlyFiles(storedSnapshot, currentSnapshot),
         });
     }
 
@@ -252,25 +430,39 @@ function compareSourceSnapshot(root, storedSnapshot, config = {}, options = {}) 
     const addedFiles = [];
     const deletedFiles = [];
     const changedFiles = [];
+    const mtimeOnlyFiles = [];
 
     for (const [filePath, current] of currentByPath.entries()) {
         const previous = storedByPath.get(filePath);
         if (!previous) {
-            addedFiles.push({ path: filePath, size: current.size, mtimeMs: current.mtimeMs });
+            addedFiles.push({ path: filePath, size: current.size, mtimeMs: current.mtimeMs, generated: Boolean(current.generated) });
             continue;
         }
-        if (previous.size !== current.size || previous.mtimeMs !== current.mtimeMs) {
-            changedFiles.push({
+        if (previous.size === current.size && previous.mtimeMs !== current.mtimeMs) {
+            mtimeOnlyFiles.push({
                 path: filePath,
+                generated: Boolean(previous.generated || current.generated),
                 previous: { size: previous.size, mtimeMs: previous.mtimeMs },
                 current: { size: current.size, mtimeMs: current.mtimeMs },
             });
         }
+        if (didFileContentChange(previous, current)) {
+            changedFiles.push(buildChangedFile(filePath, previous, current));
+        }
     }
     for (const [filePath, previous] of storedByPath.entries()) {
         if (!currentByPath.has(filePath)) {
-            deletedFiles.push({ path: filePath, size: previous.size, mtimeMs: previous.mtimeMs });
+            deletedFiles.push({ path: filePath, size: previous.size, mtimeMs: previous.mtimeMs, generated: Boolean(previous.generated) });
         }
+    }
+
+    if (addedFiles.length <= 0 && deletedFiles.length <= 0 && changedFiles.length <= 0) {
+        return buildFreshnessResult({
+            status: 'fresh',
+            sourceSnapshot: storedSnapshot,
+            currentSnapshot,
+            mtimeOnlyFiles,
+        });
     }
 
     const reasonCodes = [];
@@ -298,6 +490,7 @@ function compareSourceSnapshot(root, storedSnapshot, config = {}, options = {}) 
         addedFiles,
         deletedFiles,
         changedFiles,
+        mtimeOnlyFiles,
     });
 }
 

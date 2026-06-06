@@ -54,7 +54,7 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `get_current_state`：查看目标项目的 PMM 状态。
 - `check_kb_freshness`：判断 KB 是否仍与当前源码和 PMM 版本一致。
 - `build_project_index`：同步构建 project-global KB。
-- `start_build_project_index`：异步构建 project-global KB。
+- `start_build_project_index`：异步构建 project-global KB；传 `wait:true` 时会等待完成并返回最终 freshness。
 - `discover_features`：发现功能候选。
 - `build_feature_index`：生成并构建单个功能 KB。
 - `query_project_chain`：查询 project-global KB；默认会先确保 KB 为 `fresh`，必要时同步重建并等待完成。
@@ -83,6 +83,8 @@ node src/bin/validate-package.js
 需要看后端数据表影响时，用 `focus=data` 或 `mode=fullstack-data` 查询，并读取返回的 `dataAccessSummary`。
 
 查询结果会返回 `kbFreshness` 和 `_mcpFreshness`。MCP 查询默认 `freshnessPolicy=auto_rebuild`：状态为 `stale`、`missing`、`unknown` 时会先重建并等待 `fresh`，再返回查询结果。只有调试旧 KB 时才显式传 `freshnessPolicy=allow_stale`；想阻止自动重建时传 `freshnessPolicy=require_fresh`。
+
+如果目标项目有构建生成文件或缓存产物，在外置 `project-profile.json` 配置 `generatedFiles` / `snapshotIgnore`。生成文件会用内容哈希判断，内容未变但 mtime 变化时不会触发 stale。
 
 ## 数据分离
 

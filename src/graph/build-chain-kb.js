@@ -2077,12 +2077,17 @@ function computeImportResolutionStats(raw) {
         resolvedImports: 0,
         resolutionRate: 0,
         unresolvedImports: [],
+        unresolvedInternalImports: [],
+        externalImports: [],
+        externalImportCount: 0,
     };
     
     if (!raw?.scripts) {
         return stats;
     }
     
+    const unresolvedInternalCounts = new Map();
+    const externalImportCounts = new Map();
     for (const script of raw.scripts) {
         stats.scriptCount++;
         stats.methodCount += script.methods?.length || 0;
@@ -2091,9 +2096,11 @@ function computeImportResolutionStats(raw) {
             stats.totalImports++;
             if (imp.resolvedPath) {
                 stats.resolvedImports++;
-            } else if (!imp.specifier?.startsWith('cc') && !imp.specifier?.startsWith('db://') && !imp.specifier?.includes('node_modules')) {
-                // 只记录非库导入的未解析项
-                stats.unresolvedImports.push(imp.specifier);
+            } else if (isLikelyExternalImport(imp.specifier)) {
+                const packageName = externalPackageName(imp.specifier);
+                externalImportCounts.set(packageName, (externalImportCounts.get(packageName) || 0) + 1);
+            } else if (!isIgnoredImportSpecifier(imp.specifier)) {
+                unresolvedInternalCounts.set(imp.specifier, (unresolvedInternalCounts.get(imp.specifier) || 0) + 1);
             }
         }
     }
@@ -2102,7 +2109,40 @@ function computeImportResolutionStats(raw) {
         ? Math.round((stats.resolvedImports / stats.totalImports) * 100) 
         : 0;
     
+    stats.unresolvedInternalImports = Array.from(unresolvedInternalCounts.entries())
+        .map(([specifier, count]) => ({ specifier, count }))
+        .sort((left, right) => right.count - left.count || left.specifier.localeCompare(right.specifier));
+    stats.unresolvedImports = stats.unresolvedInternalImports.map(item => item.specifier);
+    stats.externalImports = Array.from(externalImportCounts.entries())
+        .map(([specifier, count]) => ({ specifier, count }))
+        .sort((left, right) => right.count - left.count || left.specifier.localeCompare(right.specifier));
+    stats.externalImportCount = stats.externalImports.reduce((sum, item) => sum + item.count, 0);
+
     return stats;
+}
+
+function isIgnoredImportSpecifier(specifier = '') {
+    const value = String(specifier || '').trim();
+    return !value || value.startsWith('cc') || value.startsWith('db://') || value.startsWith('node:') || value.includes('node_modules');
+}
+
+function isLikelyExternalImport(specifier = '') {
+    const value = String(specifier || '').trim();
+    if (isIgnoredImportSpecifier(value)) {
+        return false;
+    }
+    if (value.startsWith('.') || value.startsWith('/') || value.startsWith('@/') || value.startsWith('~/')) {
+        return false;
+    }
+    return !value.includes(':');
+}
+
+function externalPackageName(specifier = '') {
+    const value = String(specifier || '').trim();
+    if (value.startsWith('@')) {
+        return value.split('/').slice(0, 2).join('/');
+    }
+    return value.split('/')[0] || value;
 }
 
 function buildLookup(graph) {
@@ -2362,7 +2402,18 @@ function run(argv = process.argv.slice(2)) {
         console.log(`  - 脚本: ${importStats.scriptCount}, 方法: ${importStats.methodCount}`);
         console.log(`  - 导入解析: ${importStats.resolvedImports}/${importStats.totalImports} (${importStats.resolutionRate}%)`);
         if (importStats.unresolvedImports.length > 0) {
-            console.log(`  - 未解析导入: ${importStats.unresolvedImports.slice(0, 5).join(', ')}${importStats.unresolvedImports.length > 5 ? '...' : ''}`);
+            const sample = importStats.unresolvedInternalImports
+                .slice(0, 5)
+                .map(item => `${item.specifier}${item.count > 1 ? `(${item.count})` : ''}`)
+                .join(', ');
+            console.log(`  - 项目内未解析导入: ${sample}${importStats.unresolvedInternalImports.length > 5 ? '...' : ''}`);
+        }
+        if (importStats.externalImports.length > 0) {
+            const sample = importStats.externalImports
+                .slice(0, 5)
+                .map(item => `${item.specifier}(${item.count})`)
+                .join(', ');
+            console.log(`  - 外部依赖导入: ${sample}${importStats.externalImports.length > 5 ? '...' : ''}`);
         }
     } catch (error) {
         // 回滚事务
@@ -2377,6 +2428,7 @@ module.exports = {
     buildFeatureRecord,
     buildGraph,
     buildLookup,
+    computeImportResolutionStats,
     run,
 };
 

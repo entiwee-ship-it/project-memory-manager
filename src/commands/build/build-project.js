@@ -45,6 +45,13 @@ function unique(values) {
     return Array.from(new Set((values || []).filter(Boolean)));
 }
 
+function uniqueStrings(values) {
+    return unique((Array.isArray(values) ? values : [])
+        .map(item => String(item || '').trim())
+        .filter(Boolean))
+        .sort((left, right) => left.localeCompare(right));
+}
+
 function toConfigPath(root, targetPath) {
     const absoluteTarget = path.resolve(targetPath);
     const relative = path.relative(root, absoluteTarget);
@@ -150,6 +157,8 @@ function buildProjectGlobalConfig(root, projectProfile, context = null) {
         assetRoots: scanRoots.assetRoots,
         methodRoots: scanRoots.methodRoots,
         prefabs: scanRoots.prefabs,
+        snapshotIgnore: uniqueStrings(projectProfile?.snapshotIgnore),
+        generatedFiles: uniqueStrings(projectProfile?.generatedFiles),
         outputs: {
             scan: normalize(context ? path.join(context.paths.projectGlobalDir, 'scan.raw.json') : 'project-memory/kb/project-global/scan.raw.json'),
             graph: normalize(context ? path.join(context.paths.projectGlobalDir, 'chain.graph.json') : 'project-memory/kb/project-global/chain.graph.json'),

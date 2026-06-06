@@ -161,6 +161,13 @@ function detectIntegrations(root, adapters) {
     return integrations;
 }
 
+function uniqueStrings(values) {
+    return Array.from(new Set((Array.isArray(values) ? values : [])
+        .map(item => String(item || '').trim())
+        .filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right));
+}
+
 function mergeExistingProfile(root, outPath, areas, stacks) {
     const existingProfile = readJsonSafe(outPath, { required: false, defaultValue: null });
     if (!existingProfile || typeof existingProfile !== 'object') {
@@ -279,6 +286,14 @@ function run(argv = process.argv.slice(2)) {
         ),
         integration: detectIntegrations(root, adapters),
     };
+    const snapshotIgnore = uniqueStrings(existingProfile?.snapshotIgnore);
+    const generatedFiles = uniqueStrings(existingProfile?.generatedFiles);
+    if (snapshotIgnore.length > 0) {
+        profile.snapshotIgnore = snapshotIgnore;
+    }
+    if (generatedFiles.length > 0) {
+        profile.generatedFiles = generatedFiles;
+    }
 
     ensureDir(path.dirname(args.out));
     writeJson(args.out, profile);

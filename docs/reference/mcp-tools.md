@@ -39,9 +39,11 @@
 - `pmm-version-changed`：PMM 版本变化。
 - `source-files-added`：扫描范围内新增源码文件。
 - `source-files-deleted`：扫描范围内删除源码文件。
-- `source-files-changed`：扫描范围内文件 mtime 或 size 变化。
+- `source-files-changed`：扫描范围内文件内容、size 或普通文件 mtime 变化。
 - `missing-source-snapshot`：旧 KB 没有源码快照。
 - `missing-kb-config`：找不到构建配置，无法判断源码变化。
+
+`changeCounts.mtimeOnly` 表示文件 size 不变但 mtime 变化。对 `generatedFiles`，PMM 会优先比较内容哈希；内容不变时 KB 仍是 `fresh`，同时返回 `mtimeOnlyFiles` 作为诊断信息。
 
 查询结果会附带 `kbFreshness` 和 `_mcpFreshness`。默认情况下，`query_project_chain` 和 `query_feature_chain` 使用 `freshnessPolicy=auto_rebuild`：
 
@@ -83,3 +85,46 @@ Cocos prefab 相关查询：
 - `detail=counts|summary|grouped|full`：控制 Cocos 摘要详细程度。
 
 所有工具都接受 `workspaceRoot`；外置数据布局下多数工具还接受 `dataRoot`。
+
+## 构建参数
+
+`start_build_project_index` 支持两种用法：
+
+- 不传 `wait`：立即返回 queued job，需要继续调用 `get_job_status`，直到 `status=succeeded` 或 `status=failed`。
+- 传 `wait=true`：MCP 内部等待构建完成，并在返回值中附带 `projectGlobalFreshness`。
+
+示例：
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/qyProject",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "wait": true,
+  "timeoutMs": 120000
+}
+```
+
+`timeoutMs` 默认 120000，最大 600000。等待超时时返回 `timedOut=true`，job 会继续在后台运行，可以继续用 `get_job_status` 查询。
+
+`queued` / `running` 阶段的 `exitCode` 为 `null`；只有 `succeeded`、`failed` 或 `cancelled` 这类终态才返回最终 exit code。
+
+## 快照规则
+
+project-global 构建配置支持：
+
+- `snapshotIgnore`：这些文件不参与 freshness 快照。
+- `generatedFiles`：这些文件参与扫描，但用内容哈希判断是否变化。
+
+配置通常写在外置 `project-profile.json`，`build_project_index` 会透传到 `configs/project-global.json`：
+
+```json
+{
+  "snapshotIgnore": [
+    "cms-server/src/generated/**",
+    "**/.vite/**"
+  ],
+  "generatedFiles": [
+    "cms-server/src/config/built-env.ts"
+  ]
+}
+```

@@ -35,7 +35,27 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 只有调试旧 KB 时才传 `freshnessPolicy=allow_stale`。如果只想阻止旧 KB 查询但不希望自动重建，传 `freshnessPolicy=require_fresh`。
 
-如果调用 `start_build_project_index` 这种异步构建工具，必须轮询 `get_job_status` 直到 `status=succeeded`，再调用查询工具；不能启动任务后直接回源码大范围搜索。
+手动预热 project-global 时，可以调用 `start_build_project_index` 并传：
+
+```json
+{
+  "wait": true,
+  "timeoutMs": 120000
+}
+```
+
+这样返回值会直接包含最终 `projectGlobalFreshness`。如果不传 `wait:true`，必须轮询 `get_job_status` 直到 `status=succeeded`，再调用查询工具；不能启动任务后直接回源码大范围搜索。`queued` / `running` 阶段的 `exitCode` 应为 `null`，只有最终成功或失败后才看 `exitCode`。
+
+如果某些构建生成文件只改 mtime、不改内容，可以在外置 `project-profile.json` 中配置：
+
+```json
+{
+  "snapshotIgnore": ["**/.vite/**"],
+  "generatedFiles": ["cms-server/src/config/built-env.ts"]
+}
+```
+
+`generatedFiles` 会用内容哈希判断，内容不变时不会让 KB stale。
 
 MCP 服务入口：
 

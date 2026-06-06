@@ -7,6 +7,18 @@
 
 ## [未发布]
 
+## [0.30.0] - 2026-06-06
+
+### 新增
+- source snapshot 支持 `snapshotIgnore` 和 `generatedFiles`。`snapshotIgnore` 不参与 freshness 指纹；`generatedFiles` 参与扫描但使用内容哈希判断，内容未变时不会因为 mtime 变化触发 stale。
+- `check_kb_freshness` 返回 `mtimeOnlyFiles` 和 `changeCounts.mtimeOnly`，用于识别只改 mtime 的文件。
+- `start_build_project_index` 新增 `wait` / `timeoutMs` 参数，传 `wait:true` 时会等待 project-global 构建完成并直接返回最终 workspace state 和 freshness。
+
+### 改进
+- `queued` / `running` 状态下异步 job 的 `exitCode` 对外保持 `null`，只有终态才返回最终 exit code。
+- 导入解析统计区分项目内未解析导入和外部 npm 依赖，外部依赖按包名去重计数，降低 `vue`、`element-plus` 这类提示噪声。
+- `detect_topology` 会保留外置 project profile 中的 `snapshotIgnore` / `generatedFiles`，避免重新检测拓扑时抹掉手工规则。
+
 ## [0.29.0] - 2026-06-06
 
 ### 新增

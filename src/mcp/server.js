@@ -21,6 +21,8 @@ const DEFAULT_MCP_QUERY_LIMIT = 20;
 const MAX_MCP_QUERY_LIMIT = 100;
 const DEFAULT_MCP_QUERY_TIMEOUT_MS = 8000;
 const MAX_MCP_QUERY_TIMEOUT_MS = 30000;
+const DEFAULT_BUILD_WAIT_TIMEOUT_MS = 120000;
+const MAX_BUILD_WAIT_TIMEOUT_MS = 600000;
 const MAX_PROJECT_QUERY_CACHE_ENTRIES = 100;
 const DEFAULT_FRESHNESS_POLICY = 'auto_rebuild';
 const FRESHNESS_POLICIES = new Set(['auto_rebuild', 'require_fresh', 'allow_stale']);
@@ -123,6 +125,8 @@ const TOOL_DEFINITIONS = [
                 workspaceRoot: { type: 'string' },
                 dataRoot: { type: 'string' },
                 forceTopology: { type: 'boolean' },
+                wait: { type: 'boolean' },
+                timeoutMs: { type: 'number' },
             },
             required: ['workspaceRoot'],
         },
@@ -401,6 +405,10 @@ function clampInteger(value, fallback, max) {
     }
     const integer = Math.max(1, Math.floor(value));
     return Math.min(integer, max);
+}
+
+function resolveBuildWaitTimeoutMs(value) {
+    return clampInteger(value, DEFAULT_BUILD_WAIT_TIMEOUT_MS, MAX_BUILD_WAIT_TIMEOUT_MS);
 }
 
 function resolveMcpQueryOptions(args = {}) {
@@ -949,7 +957,27 @@ async function runBuildJob(job) {
     job.endedAt = new Date().toISOString();
 }
 
+function runBuildJobWithTimeout(job, timeoutMs) {
+    return new Promise(resolve => {
+        const timer = setTimeout(() => resolve('timeout'), timeoutMs);
+        runBuildJob(job)
+            .then(() => {
+                clearTimeout(timer);
+                resolve('finished');
+            })
+            .catch(error => {
+                clearTimeout(timer);
+                job.status = 'failed';
+                job.endedAt = new Date().toISOString();
+                job.error += `${error instanceof Error ? error.message : String(error)}\n`;
+                job.exitCode = job.exitCode ?? 1;
+                resolve('finished');
+            });
+    });
+}
+
 function publicJob(job) {
+    const isFinal = job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled';
     return {
         jobId: job.jobId,
         type: job.type,
@@ -957,16 +985,36 @@ function publicJob(job) {
         phase: job.phase,
         startedAt: job.startedAt,
         endedAt: job.endedAt,
-        exitCode: job.exitCode,
+        exitCode: isFinal ? job.exitCode : null,
         outputTail: job.output.slice(-4000),
         errorTail: job.error.slice(-4000),
     };
 }
 
-function startBuildProjectIndex(args) {
+async function startBuildProjectIndex(args) {
     const job = createJob('build_project_index', args);
+    if (args.wait === true) {
+        const timeoutMs = resolveBuildWaitTimeoutMs(args.timeoutMs);
+        const outcome = await runBuildJobWithTimeout(job, timeoutMs);
+        const payload = {
+            ...publicJob(job),
+            wait: true,
+            timeoutMs,
+            timedOut: outcome === 'timeout',
+        };
+        if (outcome === 'finished') {
+            return textResult({
+                ...payload,
+                ...buildWorkspaceState(job.args),
+            });
+        }
+        return textResult(payload);
+    }
     setImmediate(() => runBuildJob(job));
-    return textResult(publicJob(job));
+    return textResult({
+        ...publicJob(job),
+        wait: false,
+    });
 }
 
 function getJobStatus(args) {
@@ -1268,7 +1316,7 @@ async function handleMcpRequest(request) {
     if (request.method === 'tools/call') {
         const name = request.params?.name;
         const args = toolArgs(request.params);
-        const result = name === 'inspect_workspace'
+        const result = await (name === 'inspect_workspace'
             ? inspectWorkspace(args)
             : name === 'get_current_state'
                 ? getCurrentState(args)
@@ -1296,7 +1344,7 @@ async function handleMcpRequest(request) {
                                                             ? queryProjectChain(args)
                                                             : name === 'query_feature_chain'
                                                                 ? queryFeatureChain(args)
-                                                                : textResult({ error: `Unknown tool: ${name}` });
+                                                                : textResult({ error: `Unknown tool: ${name}` }));
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {
