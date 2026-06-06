@@ -43,6 +43,16 @@
 - `missing-source-snapshot`：旧 KB 没有源码快照。
 - `missing-kb-config`：找不到构建配置，无法判断源码变化。
 
+freshness 结果会包含门禁字段：
+
+- `querySafe`：是否可以直接使用当前 KB 查询。
+- `sourceFallbackAllowed`：是否允许在 PMM 之后回源码精确确认。
+- `mustRefreshBeforeQuery`：查询前是否必须刷新。
+- `mustRefreshBeforeSourceFallback`：读源码兜底前是否必须刷新。
+- `usageGate.instruction`：给 Codex 的执行指令。
+
+当 `sourceFallbackAllowed=false` 时，不能把“旧 KB 不可信”当成跳过 PMM 的理由；应先自动重建或 `start_build_project_index(wait:true)` 等到 fresh。
+
 `changeCounts.mtimeOnly` 表示文件 size 不变但 mtime 变化。对 `generatedFiles`，PMM 会优先比较内容哈希；内容不变时 KB 仍是 `fresh`，同时返回 `mtimeOnlyFiles` 作为诊断信息。
 
 查询结果会附带 `kbFreshness` 和 `_mcpFreshness`。默认情况下，`query_project_chain` 和 `query_feature_chain` 使用 `freshnessPolicy=auto_rebuild`：

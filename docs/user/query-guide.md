@@ -11,6 +11,8 @@
 
 MCP 查询默认 `freshnessPolicy=auto_rebuild`。`query_project_chain` / `query_feature_chain` 发现状态不是 `fresh` 时，会同步重建并等待完成；只有最终 `fresh` 才返回查询结果。返回的 `_mcpFreshness` 可用于确认是否发生了自动重建。
 
+`stale`、`missing`、`unknown` 是刷新门禁，不是源码兜底信号。freshness 返回 `sourceFallbackAllowed=false` 或 `mustRefreshBeforeSourceFallback=true` 时，先重建并等待 fresh；不能直接说“旧 KB 不可信，所以直接读源码”。
+
 如果返回 `changeCounts.mtimeOnly > 0` 且状态仍是 `fresh`，通常表示配置过的生成文件只更新了 mtime、内容哈希未变，不需要重建。需要把生成文件写入外置 `project-profile.json` 的 `generatedFiles`，把纯缓存或临时产物写入 `snapshotIgnore`。
 
 CLI 查询不会自动等待重建。使用 CLI 时，如果 `kbFreshness.status != fresh`，不要直接信任链路结论，先执行返回的 `recommendedAction` 或运行 `rebuild-kbs.js`。

@@ -365,10 +365,22 @@ function readFeatureRegistry(context) {
 function buildFeatureFreshness(context, featureKey) {
     const feature = readFeatureRegistry(context).find(item => item.featureKey === featureKey);
     if (!feature) {
+        const usageGate = {
+            querySafe: false,
+            sourceFallbackAllowed: false,
+            mustRefreshBeforeQuery: true,
+            mustRefreshBeforeSourceFallback: true,
+            instruction: '未找到功能 KB。不要绕开 PMM 直接查源码；先运行 discover_features/build_feature_index，或改用 project-global 查询并让 MCP 等到 fresh。',
+        };
         return {
             kind: 'kb-freshness',
             status: 'missing',
             stale: true,
+            querySafe: false,
+            sourceFallbackAllowed: false,
+            mustRefreshBeforeQuery: true,
+            mustRefreshBeforeSourceFallback: true,
+            usageGate,
             reasonCodes: ['missing-feature'],
             reasons: [`未找到功能 KB: ${featureKey}`],
             recommendedAction: 'discover_features',

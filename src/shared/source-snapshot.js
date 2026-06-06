@@ -316,10 +316,24 @@ function buildFreshnessResult({
     mtimeOnlyFiles = [],
 }) {
     const stale = status === 'stale' || status === 'unknown' || status === 'missing';
+    const usageGate = {
+        querySafe: !stale,
+        sourceFallbackAllowed: !stale,
+        mustRefreshBeforeQuery: stale,
+        mustRefreshBeforeSourceFallback: stale,
+        instruction: stale
+            ? 'KB 不是 fresh。不要绕开 PMM 直接查源码；先用 query_project_chain/query_feature_chain 的 auto_rebuild，或 start_build_project_index(wait:true) 等到 fresh。'
+            : 'KB 是 fresh。可以先查询 PMM；如果 fresh 结果仍不足，再精确读取相关源码确认。',
+    };
     return {
         kind: 'kb-freshness',
         status,
         stale,
+        querySafe: usageGate.querySafe,
+        sourceFallbackAllowed: usageGate.sourceFallbackAllowed,
+        mustRefreshBeforeQuery: usageGate.mustRefreshBeforeQuery,
+        mustRefreshBeforeSourceFallback: usageGate.mustRefreshBeforeSourceFallback,
+        usageGate,
         reasonCodes,
         reasons,
         recommendedAction: stale ? recommendedAction : '',

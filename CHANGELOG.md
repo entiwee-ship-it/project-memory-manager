@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+## [0.30.1] - 2026-06-06
+
+### 修复
+- freshness 返回新增 `querySafe`、`sourceFallbackAllowed`、`mustRefreshBeforeQuery`、`mustRefreshBeforeSourceFallback` 和 `usageGate`，明确 `stale`、`missing`、`unknown` 是刷新门禁，不是绕开 PMM 直接读源码的理由。
+- 强化 SKILL 和 MCP 文档：遇到过期 KB 时必须先自动重建或 `start_build_project_index(wait:true)` 等到 fresh，只有 MCP 不可用、重建失败或用户明确要求时才允许临时源码兜底。
+
 ## [0.30.0] - 2026-06-06
 
 ### 新增

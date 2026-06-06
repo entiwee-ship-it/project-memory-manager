@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.30.0",
+  "version": "0.30.1",
   "releaseDate": "2026-06-06",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -87,6 +87,7 @@
     "generated-file-content-fingerprint",
     "mcp-build-wait",
     "job-exit-code-final-state",
-    "external-import-classification"
+    "external-import-classification",
+    "freshness-source-fallback-gate"
   ]
 }

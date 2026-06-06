@@ -84,6 +84,8 @@ node src/bin/validate-package.js
 
 查询结果会返回 `kbFreshness` 和 `_mcpFreshness`。MCP 查询默认 `freshnessPolicy=auto_rebuild`：状态为 `stale`、`missing`、`unknown` 时会先重建并等待 `fresh`，再返回查询结果。只有调试旧 KB 时才显式传 `freshnessPolicy=allow_stale`；想阻止自动重建时传 `freshnessPolicy=require_fresh`。
 
+如果 freshness 返回 `sourceFallbackAllowed=false`，不要直接回源码追链路；先让 MCP 自动重建，或用 `start_build_project_index` 传 `wait:true` 等到 fresh。
+
 如果目标项目有构建生成文件或缓存产物，在外置 `project-profile.json` 配置 `generatedFiles` / `snapshotIgnore`。生成文件会用内容哈希判断，内容未变但 mtime 变化时不会触发 stale。
 
 ## 数据分离

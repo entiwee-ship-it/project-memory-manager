@@ -35,6 +35,8 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 只有调试旧 KB 时才传 `freshnessPolicy=allow_stale`。如果只想阻止旧 KB 查询但不希望自动重建，传 `freshnessPolicy=require_fresh`。
 
+`stale`、`missing`、`unknown` 不是“可以绕开 PMM”的理由，而是必须先刷新 KB 的门禁状态。看到 `sourceFallbackAllowed=false` 或 `mustRefreshBeforeSourceFallback=true` 时，Codex 不能直接回源码追链路；应先让查询工具自动重建，或调用 `start_build_project_index(wait:true)` 等到 fresh。
+
 手动预热 project-global 时，可以调用 `start_build_project_index` 并传：
 
 ```json

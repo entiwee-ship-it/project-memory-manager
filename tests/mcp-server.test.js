@@ -292,6 +292,9 @@ async function testProjectFreshnessDetectsSourceChanges() {
     const fresh = parseTextResult(freshResponse);
     assert.equal(fresh.projectGlobal.status, 'fresh');
     assert.equal(fresh.projectGlobal.stale, false);
+    assert.equal(fresh.projectGlobal.querySafe, true);
+    assert.equal(fresh.projectGlobal.sourceFallbackAllowed, true);
+    assert.equal(fresh.projectGlobal.mustRefreshBeforeSourceFallback, false);
     assert.equal(fresh.projectGlobal.reasonCodes.length, 0);
 
     fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function changed(){ return "changed"; }\n');
@@ -300,6 +303,11 @@ async function testProjectFreshnessDetectsSourceChanges() {
     const staleState = parseTextResult(staleStateResponse);
     assert.equal(staleState.projectGlobalFreshness.status, 'stale');
     assert.equal(staleState.projectGlobalFreshness.stale, true);
+    assert.equal(staleState.projectGlobalFreshness.querySafe, false);
+    assert.equal(staleState.projectGlobalFreshness.sourceFallbackAllowed, false);
+    assert.equal(staleState.projectGlobalFreshness.mustRefreshBeforeQuery, true);
+    assert.equal(staleState.projectGlobalFreshness.mustRefreshBeforeSourceFallback, true);
+    assert.ok(staleState.projectGlobalFreshness.usageGate.instruction.includes('不要绕开 PMM 直接查源码'));
     assert.ok(staleState.projectGlobalFreshness.reasonCodes.includes('source-files-changed'));
     assert.equal(staleState.suggestedNextAction, 'build_project_index');
 
