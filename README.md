@@ -82,6 +82,8 @@ node src/bin/validate-package.js
 
 需要看后端数据表影响时，用 `focus=data` 或 `mode=fullstack-data` 查询，并读取返回的 `dataAccessSummary`。
 
+查询时不要把整句自然语言问题传给 `message`。`message` 只表示项目里的协议消息名或事件消息名；中文业务问题要先抽取 `endpoint`、`request`、`method` 或关键词，再用对应 selector 查询。
+
 查询结果会返回 `kbFreshness` 和 `_mcpFreshness`。MCP 查询默认 `freshnessPolicy=auto_rebuild`：状态为 `stale`、`missing`、`unknown` 时会先重建并等待 `fresh`，再返回查询结果。只有调试旧 KB 时才显式传 `freshnessPolicy=allow_stale`；想阻止自动重建时传 `freshnessPolicy=require_fresh`。
 
 如果 freshness 返回 `sourceFallbackAllowed=false`，不要直接回源码追链路；先让 MCP 自动重建，或用 `start_build_project_index` 传 `wait:true` 等到 fresh。

@@ -72,7 +72,9 @@ freshness 结果会包含门禁字段：
 
 ## 查询参数
 
-查询 selector 包括 `type`、`file`、`name`、`request`、`endpoint`、`method`、`upstream` 和 `downstream`。
+查询 selector 包括 `type`、`file`、`name`、`request`、`endpoint`、`method`、`message`、`upstream` 和 `downstream`。
+
+`message` 是协议/事件消息名 selector，不是自然语言问题入口。遇到“购买成功后到底触发了哪条刷新”这类中文业务问题时，先提取 `endpoint`、`request`、`method` 或关键词，再改用对应 selector 查询；不要把整句问题传给 `message`。
 
 Cocos prefab 相关查询：
 

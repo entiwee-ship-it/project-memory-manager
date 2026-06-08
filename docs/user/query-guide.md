@@ -17,10 +17,34 @@ MCP 查询默认 `freshnessPolicy=auto_rebuild`。`query_project_chain` / `query
 
 CLI 查询不会自动等待重建。使用 CLI 时，如果 `kbFreshness.status != fresh`，不要直接信任链路结论，先执行返回的 `recommendedAction` 或运行 `rebuild-kbs.js`。
 
-项目全局查询：
+## selector 怎么选
+
+PMM 的 selector 是结构化入口，不是自然语言问答入口。尤其要注意：`message` 表示项目里的协议消息名或事件消息名，例如某个 Pinus 消息、前后端事件名；它不表示“把一整句中文问题作为消息查询”。
+
+如果用户问“购买成功后到底触发了哪条刷新”，不要直接传 `message="购买成功后到底触发了哪条刷新"`。应该先提取已知线索，例如接口 `GET /commodity/config/token`、方法 `MallApi.mallConfigToken`、关键词 `token` / `refresh`，再用 `endpoint`、`method`、`request` 或 `name/grouped` 查询。
+
+按业务词消歧义：
+
+```powershell
+node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --name token --grouped --json
+```
+
+按接口追全栈链路：
+
+```powershell
+node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --endpoint "GET /commodity/config/token" --upstream --mode fullstack --json
+```
+
+只有确认要查协议/事件消息名时才使用 `message`：
 
 ```powershell
 node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --message login --downstream --json
+```
+
+项目全局查询：
+
+```powershell
+node src/bin/query-project.js --workspace-root <project-root> --data-root <data-root> --name login --grouped --json
 ```
 
 Feature 查询：

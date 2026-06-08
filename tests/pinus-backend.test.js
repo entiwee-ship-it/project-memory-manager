@@ -584,9 +584,25 @@ function runAdminFullstackAssertions() {
         runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--message', 'login', '--json'], nestedCwd)
     );
     assert.equal(missingMessage.ok, false);
+    assert.equal(missingMessage.selectorMeaning, 'protocol-message');
+    assert.equal(missingMessage.naturalLanguageSupported, false);
+    assert.ok(String(missingMessage.selectorGuidance || '').includes('不是自然语言问题'));
     assert.ok(Array.isArray(missingMessage.suggestions));
     assert.ok(missingMessage.suggestions.some(item => String(item.query || '').includes('--type request --name login')));
     assert.ok(missingMessage.suggestions.some(item => String(item.query || '').includes('--type endpoint --name login')));
+
+    const naturalLanguageMessage = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'admin-fullstack-sample', '--message', '购买成功后到底触发了哪条刷新', '--json'], nestedCwd)
+    );
+    assert.equal(naturalLanguageMessage.ok, false);
+    assert.equal(naturalLanguageMessage.likelySelectorMisuse, true);
+    assert.equal(naturalLanguageMessage.selectorMeaning, 'protocol-message');
+    assert.equal(naturalLanguageMessage.naturalLanguageSupported, false);
+    assert.ok(String(naturalLanguageMessage.selectorGuidance || '').includes('请不要把整句自然语言问题传给 message'));
+    assert.ok(!naturalLanguageMessage.suggestions.some(item => String(item.query || '').includes('购买成功后到底触发了哪条刷新')));
+    assert.ok(naturalLanguageMessage.suggestions.some(item => String(item.query || '').includes('--name "<关键词>" --grouped')));
+    assert.ok(naturalLanguageMessage.suggestions.some(item => String(item.query || '').includes('--endpoint "<HTTP接口或路径>"')));
+    assert.ok(naturalLanguageMessage.suggestions.some(item => String(item.query || '').includes('--method "<方法名>"')));
 
     assert.equal(report.counts.nodesByType.script >= 4, true);
     assert.equal(report.counts.nodesByType.request >= 2, true);

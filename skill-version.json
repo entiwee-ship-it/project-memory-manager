@@ -1,7 +1,7 @@
 {
   "name": "project-memory-manager",
-  "version": "0.30.1",
-  "releaseDate": "2026-06-06",
+  "version": "0.30.2",
+  "releaseDate": "2026-06-08",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
   "upgradeMessage": "不要直接修改已安装的 skill 副本。先修改 GitHub 源码仓库并推送，再重装或更新 skill，最后按需重建项目 KB。",
@@ -88,6 +88,7 @@
     "mcp-build-wait",
     "job-exit-code-final-state",
     "external-import-classification",
-    "freshness-source-fallback-gate"
+    "freshness-source-fallback-gate",
+    "message-selector-guidance"
   ]
 }

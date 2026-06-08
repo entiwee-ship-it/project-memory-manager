@@ -1850,11 +1850,70 @@ function withAmbiguousRecommendations(result, graph, lookup, options = {}) {
     };
 }
 
+function looksLikeNaturalLanguageQuery(query) {
+    const value = String(query || '').trim();
+    if (!value) {
+        return false;
+    }
+    return /[\s?？,，.。;；、]/.test(value) || (/[\u4e00-\u9fff]/.test(value) && value.length >= 10);
+}
+
+function selectorUsageHint(selectorType, query) {
+    if (selectorType !== 'message') {
+        return {};
+    }
+    const likelySelectorMisuse = looksLikeNaturalLanguageQuery(query);
+    return {
+        selectorMeaning: 'protocol-message',
+        naturalLanguageSupported: false,
+        likelySelectorMisuse,
+        selectorGuidance: likelySelectorMisuse
+            ? 'PMM 的 message selector 表示项目里的协议消息/事件消息名，不是自然语言问题。请不要把整句自然语言问题传给 message；先提取 endpoint、request、method 或关键词，再用对应 selector 查询。'
+            : 'PMM 的 message selector 表示项目里的协议消息/事件消息名，不是自然语言问题。如果要按业务词搜索，请改用 type/name/grouped，或改用 endpoint/request/method 精确查询。',
+    };
+}
+
+function buildNaturalLanguageSelectorSuggestions(base) {
+    return [
+        {
+            query: `${base} --name "<关键词>" --grouped --json`,
+            reason: '先从自然语言问题里提取业务关键词，再用 name/grouped 做分组消歧义。',
+            matches: [],
+        },
+        {
+            query: `${base} --endpoint "<HTTP接口或路径>" --upstream --mode fullstack --json`,
+            reason: '如果问题里已经出现接口路径，优先用 endpoint 追前后端链路。',
+            matches: [],
+        },
+        {
+            query: `${base} --method "<方法名>" --downstream --mode fullstack --json`,
+            reason: '如果问题里已经出现前端或后端方法名，优先用 method 追调用链。',
+            matches: [],
+        },
+        {
+            query: `${base} --request "<HTTP方法和路径>" --downstream --mode fullstack --json`,
+            reason: '如果已知前端 HTTP request，使用 request 继续追到后端 endpoint。',
+            matches: [],
+        },
+    ];
+}
+
 function buildTypeAwareNotFoundResult(graph, featureKey, selectorType, query, options = {}) {
     const candidateTypes = selectorType === 'message'
         ? ['method', 'request', 'endpoint', 'route', 'script']
         : ['method', 'request', 'endpoint', 'route', 'script', 'message'];
     const base = buildQueryCommandBase(featureKey, options);
+    const usageHint = selectorUsageHint(selectorType, query);
+    if (usageHint.likelySelectorMisuse) {
+        return {
+            ok: false,
+            error: `未找到协议消息: ${query}`,
+            selectorType,
+            query,
+            ...usageHint,
+            suggestions: buildNaturalLanguageSelectorSuggestions(base),
+        };
+    }
     const suggestions = [];
 
     for (const type of candidateTypes) {
@@ -1888,9 +1947,12 @@ function buildTypeAwareNotFoundResult(graph, featureKey, selectorType, query, op
 
     return {
         ok: false,
-        error: `No nodes matched ${selectorType}=${query}`,
+        error: selectorType === 'message'
+            ? `未找到协议消息: ${query}`
+            : `No nodes matched ${selectorType}=${query}`,
         selectorType,
         query,
+        ...usageHint,
         suggestions,
     };
 }
