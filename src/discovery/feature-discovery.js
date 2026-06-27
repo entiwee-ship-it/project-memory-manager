@@ -239,6 +239,147 @@ function pathSeed(node) {
     };
 }
 
+function relativeFilePath(workspaceRoot, filePath = '') {
+    if (!filePath) {
+        return '';
+    }
+    const relative = path.relative(workspaceRoot, filePath);
+    if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+        return normalize(relative);
+    }
+    const normalizedRoot = normalize(workspaceRoot).replace(/\/+$/, '');
+    const normalizedFile = normalize(filePath);
+    if (normalizedFile.toLowerCase().startsWith(`${normalizedRoot.toLowerCase()}/`)) {
+        return normalizedFile.slice(normalizedRoot.length + 1);
+    }
+    return normalizedFile;
+}
+
+function nextApiRouteInfo(node, workspaceRoot) {
+    if (!['script', 'method', 'request'].includes(node.type)) {
+        return null;
+    }
+    const relativeFile = relativeFilePath(workspaceRoot, node.file);
+    const segments = normalizePathSegments(relativeFile);
+    if (segments[0] !== 'app' || segments[1] !== 'api' || segments[segments.length - 1] !== 'route.ts') {
+        return null;
+    }
+    const routeSegments = segments.slice(2, -1);
+    if (routeSegments.length <= 0) {
+        return null;
+    }
+    const keyParts = routeSegments[0] === 'facebook' && routeSegments[1]
+        ? routeSegments.slice(0, 2)
+        : routeSegments.slice(0, 1);
+    return {
+        featureKey: slugifyWords(keyParts),
+        featureName: titleizeKey(keyParts.join('-')),
+        methodRoot: normalize(['app', 'api', ...keyParts].join('/')),
+        area: 'backend',
+        reason: `Next.js API route ${routeSegments.join('/')}`,
+    };
+}
+
+function nextPageInfo(node, workspaceRoot) {
+    if (!['script', 'method', 'request'].includes(node.type)) {
+        return null;
+    }
+    const relativeFile = relativeFilePath(workspaceRoot, node.file);
+    const segments = normalizePathSegments(relativeFile);
+    if (segments[0] !== 'app' || segments[segments.length - 1] !== 'page.tsx') {
+        return null;
+    }
+    if (segments[1] === 'api') {
+        return null;
+    }
+    const pageSegment = segments.length === 2 ? 'home' : segments[1];
+    const featureKey = slugifyWords([pageSegment]);
+    if (!featureKey) {
+        return null;
+    }
+    return {
+        featureKey,
+        featureName: titleizeKey(featureKey),
+        methodRoot: pageSegment === 'home' ? 'app' : normalize(['app', pageSegment].join('/')),
+        area: 'frontend',
+        reason: `Next.js page ${pageSegment}`,
+    };
+}
+
+function addNextEvidence(candidate, node, info, workspaceRoot) {
+    addUnique(candidate.areas, info.area);
+    addUnique(candidate.methodRoots, info.methodRoot);
+    if (candidate.evidence.length < 12) {
+        candidate.evidence.push({
+            type: node.type,
+            name: node.name,
+            file: normalize(node.file || ''),
+            reason: info.reason,
+        });
+    }
+}
+
+function addRelatedRootsFromEdges(candidate, seedNodeIds, graph, workspaceRoot) {
+    const nodesById = new Map((graph.nodes || []).map(node => [node.id, node]));
+    const seedIds = new Set(seedNodeIds);
+    const relatedIds = new Set();
+
+    for (const edge of graph.edges || []) {
+        if (seedIds.has(edge.from)) {
+            relatedIds.add(edge.to);
+        }
+        if (seedIds.has(edge.to)) {
+            relatedIds.add(edge.from);
+        }
+    }
+
+    for (const relatedId of relatedIds) {
+        const node = nodesById.get(relatedId);
+        const relativeDir = relativeFileDir(workspaceRoot, node?.file || '');
+        if (!relativeDir) {
+            continue;
+        }
+        const firstSegment = normalizePathSegments(relativeDir)[0] || '';
+        if (firstSegment === 'lib' || firstSegment === 'components') {
+            addUnique(candidate.methodRoots, relativeDir);
+        }
+    }
+}
+
+function addNextAppRouterCandidates(candidatesByKey, graph, workspaceRoot) {
+    const grouped = new Map();
+
+    for (const node of graph.nodes || []) {
+        const info = nextApiRouteInfo(node, workspaceRoot) || nextPageInfo(node, workspaceRoot);
+        if (!info?.featureKey) {
+            continue;
+        }
+        if (!grouped.has(info.featureKey)) {
+            grouped.set(info.featureKey, {
+                info,
+                nodes: [],
+            });
+        }
+        grouped.get(info.featureKey).nodes.push({ node, info });
+    }
+
+    for (const [featureKey, group] of grouped.entries()) {
+        const candidate = candidatesByKey.get(featureKey) || createCandidate(featureKey);
+        candidate.featureName = candidate.featureName === titleizeKey(featureKey)
+            ? group.info.featureName
+            : candidate.featureName;
+        candidate.summary = candidate.summary || `Discovered Next.js App Router feature candidate ${group.info.featureName}.`;
+        candidate.reason = candidate.reason || group.info.reason;
+        candidate.score += 50 + Math.min(group.nodes.length * 6, 40);
+
+        for (const { node, info } of group.nodes) {
+            addNextEvidence(candidate, node, info, workspaceRoot);
+        }
+        addRelatedRootsFromEdges(candidate, group.nodes.map(item => item.node.id), graph, workspaceRoot);
+        candidatesByKey.set(featureKey, candidate);
+    }
+}
+
 function seedsForNode(node) {
     if (node.type === 'endpoint') {
         return [endpointSeed(node)].filter(Boolean);
@@ -424,6 +565,7 @@ function discoverFeatureCandidates(options = {}) {
         }
     }
     addAdminFullstackCandidates(candidatesByKey, graph, workspaceRoot);
+    addNextAppRouterCandidates(candidatesByKey, graph, workspaceRoot);
 
     return Array.from(candidatesByKey.values())
         .map(finalizeCandidate)

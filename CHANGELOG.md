@@ -7,6 +7,13 @@
 
 ## [未发布]
 
+### 新增
+- `discover-features` 支持 Next.js App Router 项目，可从 `app/api/**/route.ts` 和 `app/**/page.tsx` 自动发现 API、页面和前后端组合 feature，并把相关 `lib/`、`components/` 扫描根带入候选配置。
+
+### 改进
+- 导入解析支持读取 `tsconfig.json` / `jsconfig.json` 的 `compilerOptions.paths` 和 `baseUrl`，可解析 Next.js 常见的 `@/* -> ./*` 根目录别名。
+- 通用拓扑检测支持根目录 `package.json` + `src/` 的 Node/TypeScript 工具项目，PMM 可以顺滑索引自身这类 CLI/MCP 项目。
+
 ## [0.30.2] - 2026-06-08
 
 ### 修复

@@ -98,6 +98,67 @@ function adminFullstackGraph() {
     };
 }
 
+function nextAppRouterGraph() {
+    const root = 'E:/workspace/agent-facebook-manager';
+    return {
+        nodes: [
+            {
+                id: 'script:api-chat',
+                type: 'script',
+                name: 'route.ts',
+                file: `${root}/app/api/chat/route.ts`,
+                area: 'frontend',
+                meta: { tags: ['chat', 'api'] },
+            },
+            {
+                id: 'method:api-chat-post',
+                type: 'method',
+                name: 'route.POST',
+                file: `${root}/app/api/chat/route.ts`,
+                area: 'frontend',
+                meta: { methodName: 'POST' },
+            },
+            {
+                id: 'method:claude',
+                type: 'method',
+                name: 'claude-client.sendMessage',
+                file: `${root}/lib/claude-client.ts`,
+                area: 'frontend',
+                meta: { methodName: 'sendMessage' },
+            },
+            {
+                id: 'script:chat-page',
+                type: 'script',
+                name: 'page.tsx',
+                file: `${root}/app/chat/page.tsx`,
+                area: 'frontend',
+                meta: { tags: ['chat', 'page'] },
+            },
+            {
+                id: 'script:message-input',
+                type: 'script',
+                name: 'MessageInput.tsx',
+                file: `${root}/components/MessageInput.tsx`,
+                area: 'frontend',
+                meta: { tags: ['chat', 'component'] },
+            },
+            {
+                id: 'script:facebook-oauth',
+                type: 'script',
+                name: 'route.ts',
+                file: `${root}/app/api/facebook/oauth/callback/route.ts`,
+                area: 'frontend',
+                meta: { tags: ['facebook', 'oauth'] },
+            },
+        ],
+        edges: [
+            { from: 'script:api-chat', to: 'method:api-chat-post', type: 'contains' },
+            { from: 'script:api-chat', to: 'method:claude', type: 'depends_on' },
+            { from: 'script:chat-page', to: 'script:message-input', type: 'depends_on' },
+        ],
+    };
+}
+
 function testDiscoversCandidatesFromGraphSignals() {
     const candidates = discoverFeatureCandidates({
         graph: sampleGraph(),
@@ -116,6 +177,28 @@ function testDiscoversCandidatesFromGraphSignals() {
     assert.equal(activity.methodRoots.includes('qy-server/game-server/app/http/routes/activity'), true);
     assert.equal(activity.confidence, 'high');
     assert.equal(activity.evidence.length > 0, true);
+}
+
+function testDiscoversNextAppRouterCandidates() {
+    const candidates = discoverFeatureCandidates({
+        graph: nextAppRouterGraph(),
+        workspaceRoot: 'E:/workspace/agent-facebook-manager',
+        limit: 10,
+    });
+
+    const chat = candidates.find(candidate => candidate.featureKey === 'chat');
+    assert.ok(chat, 'expected chat feature candidate');
+    assert.equal(chat.confidence, 'high');
+    assert.equal(chat.areas.includes('backend'), true);
+    assert.equal(chat.areas.includes('frontend'), true);
+    assert.equal(chat.methodRoots.includes('app/api/chat'), true);
+    assert.equal(chat.methodRoots.includes('app/chat'), true);
+    assert.equal(chat.methodRoots.includes('lib'), true);
+    assert.equal(chat.methodRoots.includes('components'), true);
+
+    const facebookOauth = candidates.find(candidate => candidate.featureKey === 'facebook-oauth');
+    assert.ok(facebookOauth, 'expected facebook-oauth feature candidate');
+    assert.equal(facebookOauth.methodRoots.includes('app/api/facebook/oauth'), true);
 }
 
 function testDiscoversAdminFullstackCandidate() {
@@ -174,6 +257,7 @@ function testGeneratesFeatureConfigInExternalDataRoot() {
 }
 
 testDiscoversCandidatesFromGraphSignals();
+testDiscoversNextAppRouterCandidates();
 testDiscoversAdminFullstackCandidate();
 testDiscoversAdminCandidateInsideProjectRoot();
 testGeneratesFeatureConfigInExternalDataRoot();
