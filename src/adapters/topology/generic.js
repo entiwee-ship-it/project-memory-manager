@@ -314,6 +314,9 @@ function classifyAreaFromManifest({ manifestName, pkg }) {
     if (hasDependency(deps, ['express', 'koa', 'fastify', 'pinus', '@nestjs/core', '@nestjs/common'])) {
         return 'backend';
     }
+    if (hasDependency(deps, ['typescript']) || pkg?.bin || pkg?.main || pkg?.type) {
+        return 'shared';
+    }
     return 'unknown';
 }
 

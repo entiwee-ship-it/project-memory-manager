@@ -343,6 +343,77 @@ function testImportStatsClassifyExternalDependencies() {
     assert.equal(stats.unresolvedImports.includes('vue'), false);
 }
 
+function testTsconfigPathsResolveRootAlias() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-next-alias-'));
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-next-alias-data-'));
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    const kbDir = path.join(context.paths.featuresDir, 'next-alias');
+    const configPath = path.join(context.paths.configsDir, 'next-alias.json');
+
+    fs.mkdirSync(path.join(workspaceRoot, 'app', 'api', 'chat'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'lib'), { recursive: true });
+    fs.mkdirSync(context.paths.configsDir, { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"dependencies":{"next":"latest","typescript":"latest"}}\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'tsconfig.json'), JSON.stringify({
+        compilerOptions: {
+            paths: {
+                '@/*': ['./*'],
+            },
+        },
+    }, null, 2));
+    fs.writeFileSync(path.join(workspaceRoot, 'lib', 'auth.ts'), 'export function requireAuth(){ return true; }\n');
+    fs.writeFileSync(
+        path.join(workspaceRoot, 'app', 'api', 'chat', 'route.ts'),
+        'import { requireAuth } from "@/lib/auth";\nexport function POST(){ return requireAuth(); }\n'
+    );
+    fs.writeFileSync(configPath, JSON.stringify({
+        featureKey: 'next-alias',
+        featureName: 'Next Alias',
+        methodRoots: ['app', 'lib'],
+        outputs: {
+            scan: path.join(kbDir, 'scan.raw.json'),
+            graph: path.join(kbDir, 'chain.graph.json'),
+            lookup: path.join(kbDir, 'chain.lookup.json'),
+            report: path.join(kbDir, 'build.report.json'),
+        },
+    }, null, 2));
+
+    buildChainKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--config', configPath]);
+    const scan = JSON.parse(fs.readFileSync(path.join(kbDir, 'scan.raw.json'), 'utf8'));
+    const routeScript = scan.scripts.find(script => script.scriptPath.endsWith('app/api/chat/route.ts'));
+    const authImport = routeScript.imports.find(item => item.specifier === '@/lib/auth');
+
+    assert.ok(authImport.resolvedPath.endsWith('lib/auth.ts'));
+    assert.equal(authImport.resolvedVia, 'generic');
+}
+
+function testGenericNodeToolTopologyBuildsProjectKb() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-node-tool-'));
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-node-tool-data-'));
+    fs.mkdirSync(path.join(workspaceRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), JSON.stringify({
+        name: 'node-tool',
+        main: 'src/index.js',
+        dependencies: {
+            typescript: 'latest',
+        },
+    }, null, 2));
+    fs.writeFileSync(path.join(workspaceRoot, 'src', 'index.ts'), 'export function runTool(){ return "ok"; }\n');
+
+    initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'node-tool']);
+    detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+    buildProjectKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    const profile = JSON.parse(fs.readFileSync(context.paths.projectProfile, 'utf8'));
+    const graph = JSON.parse(fs.readFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), 'utf8'));
+
+    assert.deepEqual(profile.areas.shared, ['']);
+    assert.ok(profile.stacks.shared.includes('nodejs'));
+    assert.ok(profile.stacks.shared.includes('typescript'));
+    assert.ok(graph.nodes.some(node => node.type === 'method' && node.name.includes('runTool')));
+}
+
 testWorkspaceId();
 testExternalDataContext();
 testLegacyContext();
@@ -354,4 +425,6 @@ testProjectKbExternalData();
 testFeatureKbExternalData();
 testGeneratedSnapshotFilesUseContentHash();
 testImportStatsClassifyExternalDependencies();
+testTsconfigPathsResolveRootAlias();
+testGenericNodeToolTopologyBuildsProjectKb();
 console.log('workspace-layout validation passed');
