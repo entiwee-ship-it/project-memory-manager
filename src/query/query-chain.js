@@ -460,6 +460,9 @@ function nodeMatchesQueryFilters(node, args = {}) {
             meta.path,
             meta.route,
             meta.target,
+            meta.host,
+            meta.packageName,
+            meta.serviceKind,
             meta.prefabPath,
             meta.assetPath,
         ].filter(Boolean).join(' ');
@@ -672,6 +675,10 @@ function findMatchingNodes(graph, query) {
             matchContains(node.meta?.importPath, query) ||
             matchContains(node.meta?.kind, query) ||
             matchContains(node.meta?.protocol, query) ||
+            matchContains(node.meta?.serviceKind, query) ||
+            matchContains(node.meta?.target, query) ||
+            matchContains(node.meta?.host, query) ||
+            matchContains(node.meta?.packageName, query) ||
             (node.meta?.tags || []).some(tag => matchContains(tag, query))
         );
     });
@@ -721,6 +728,10 @@ function resolveNodeId(graph, lookup, query) {
     const table = getOwnEntry(lookup.tables, query);
     if (table?.id) {
         return table.id;
+    }
+    const externalService = getOwnEntry(lookup.externalServices, query);
+    if (externalService?.id) {
+        return externalService.id;
     }
     const state = getOwnEntry(lookup.states, query);
     if (state?.id) {
@@ -1016,6 +1027,12 @@ function summarizeNode(node, lookup) {
     }
     if (node.type === 'table') {
         summary.importPath = node.meta?.importPath || '';
+    }
+    if (node.type === 'external-service') {
+        summary.serviceKind = node.meta?.serviceKind || '';
+        summary.target = node.meta?.target || '';
+        summary.host = node.meta?.host || '';
+        summary.packageName = node.meta?.packageName || '';
     }
     if (node.type === 'ui-node') {
         summary.prefabPath = node.meta?.prefabPath || '';
@@ -1497,6 +1514,10 @@ function searchNodes(graph, lookup, args) {
                 matchContains(node.meta?.path, args.name) ||
                 matchContains(node.meta?.importPath, args.name) ||
                 matchContains(node.meta?.protocol, args.name) ||
+                matchContains(node.meta?.serviceKind, args.name) ||
+                matchContains(node.meta?.target, args.name) ||
+                matchContains(node.meta?.host, args.name) ||
+                matchContains(node.meta?.packageName, args.name) ||
                 matchContains(node.meta?.httpMethod, args.name) ||
                 matchContains(node.meta?.transport, args.name) ||
                 matchContains(node.meta?.callee, args.name) ||

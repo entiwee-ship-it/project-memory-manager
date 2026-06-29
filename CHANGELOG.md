@@ -7,12 +7,24 @@
 
 ## [未发布]
 
+## [0.40.0] - 2026-06-29
+
 ### 新增
 - `discover-features` 支持 Next.js App Router 项目，可从 `app/api/**/route.ts` 和 `app/**/page.tsx` 自动发现 API、页面和前后端组合 feature，并把相关 `lib/`、`components/` 扫描根带入候选配置。
+- project-global 和 feature KB 支持从 `app/api/**/route.ts` 自动生成 Next.js App Router endpoint 节点，并把 `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD`、`OPTIONS` handler 绑定到 endpoint。
+- 链路抽取支持 Prisma ORM 读写识别，可为 `prisma.<model>.findUnique/findMany/create/update/upsert/delete/count` 等调用生成 table/model 节点和 reads/writes 边。
+- 图谱新增 `external-service` 节点，支持识别 Anthropic Claude、Facebook Graph API、Prisma ORM、Next.js Runtime、NextAuth 以及明确的 HTTP API host。
+- 查询支持 `type=external-service`，可按服务名、host、package name 或 service kind 查找外部依赖。
+- Next API client 链路支持 `fetchJSON`、`EventSource` 等前端调用到 `/api/**` route 的匹配，并可在 `mode=fullstack-data` 中继续展开到 Prisma 和外部服务。
 
 ### 改进
 - 导入解析支持读取 `tsconfig.json` / `jsconfig.json` 的 `compilerOptions.paths` 和 `baseUrl`，可解析 Next.js 常见的 `@/* -> ./*` 根目录别名。
 - 通用拓扑检测支持根目录 `package.json` + `src/` 的 Node/TypeScript 工具项目，PMM 可以顺滑索引自身这类 CLI/MCP 项目。
+- 导入函数调用抽取会覆盖内联异步回调中的调用，并支持 TypeScript 泛型实参，便于识别 `ReadableStream`、React effect 和 API helper 中的服务层调用。
+- 动态 HTTP 目标过滤更稳健，避免把 `${API_BASE}${endpoint}`、`url`、`axios(config)` 这类无法静态确定的目标误报成 `GET /api` 或 `GET url`。
+
+### 修复
+- 修复 URL 字符串里的 `https://` 被行注释清理逻辑截断的问题，Facebook Graph 等绝对 URL 现在可正确归一化为外部服务 target。
 
 ## [0.30.2] - 2026-06-08
 

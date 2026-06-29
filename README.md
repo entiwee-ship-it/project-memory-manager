@@ -2,7 +2,7 @@
 
 ## 工具定位
 
-Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Pinus handler、Vue/Express 全栈链路、后端数据表读写摘要、Cocos prefab 绑定、状态、事件和项目协议。
+Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Next.js App Router endpoint、Pinus handler、Vue/Express 全栈链路、Prisma/后端数据表读写摘要、外部服务依赖、Cocos prefab 绑定、状态、事件和项目协议。
 
 PMM 的核心边界是三套目录分离：
 
@@ -81,6 +81,8 @@ node src/bin/validate-package.js
 更多命令见 `docs/reference/cli.md`。
 
 需要看后端数据表影响时，用 `focus=data` 或 `mode=fullstack-data` 查询，并读取返回的 `dataAccessSummary`。
+
+Next.js App Router 项目可以直接查 `app/api/**/route.ts` 生成的 endpoint，例如 `--endpoint "GET /api/chat" --downstream --mode fullstack-data`；前端 `fetchJSON` / `EventSource` 调用会尽量匹配到对应 `/api/**` route。Prisma 读写会生成 table/model 节点，可用 `--type table --name <model>` 查询。外部依赖可用 `--type external-service --name facebook`、`--type external-service --name anthropic` 等方式查询。
 
 查询时不要把整句自然语言问题传给 `message`。`message` 只表示项目里的协议消息名或事件消息名；中文业务问题要先抽取 `endpoint`、`request`、`method` 或关键词，再用对应 selector 查询。
 

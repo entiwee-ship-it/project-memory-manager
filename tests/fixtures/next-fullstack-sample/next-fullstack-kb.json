@@ -1,0 +1,24 @@
+{
+  "featureKey": "next-fullstack-sample",
+  "featureName": "Next Fullstack Sample",
+  "summary": "Fixture for Next.js App Router, API client requests, Prisma access, and external services",
+  "areas": [
+    "frontend",
+    "backend",
+    "data"
+  ],
+  "methodRoots": [
+    "app",
+    "lib"
+  ],
+  "outputs": {
+    "scan": "project-memory/kb/features/next-fullstack-sample/scan.raw.json",
+    "graph": "project-memory/kb/features/next-fullstack-sample/chain.graph.json",
+    "lookup": "project-memory/kb/features/next-fullstack-sample/chain.lookup.json",
+    "report": "project-memory/kb/features/next-fullstack-sample/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/next-fullstack-sample",
+    "featureIndex": "project-memory/docs/features/next-fullstack-sample/FEATURE.md"
+  }
+}

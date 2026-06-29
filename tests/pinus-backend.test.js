@@ -9,6 +9,7 @@ const cocosFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-http-sample');
 const cocosPrefabFixtureRoot = path.join(__dirname, 'fixtures', 'cocos-prefab-sample');
 const projectGlobalFixtureRoot = path.join(__dirname, 'fixtures', 'project-global-sample');
 const adminFullstackFixtureRoot = path.join(__dirname, 'fixtures', 'admin-fullstack-sample');
+const nextFullstackFixtureRoot = path.join(__dirname, 'fixtures', 'next-fullstack-sample');
 const { run: buildChainKb } = require('../src/graph/build-chain-kb');
 const { run: buildProjectKb } = require('../src/commands/build/build-project');
 const { buildLookup } = require('../src/graph/build-chain-kb');
@@ -607,6 +608,86 @@ function runAdminFullstackAssertions() {
     assert.equal(report.counts.nodesByType.script >= 4, true);
     assert.equal(report.counts.nodesByType.request >= 2, true);
     assert.equal(report.counts.nodesByType.endpoint >= 2, true);
+}
+
+function runNextFullstackAssertions() {
+    const tempRoot = copyFixtureToTemp(nextFullstackFixtureRoot, 'pmm-next-fullstack-');
+    const { graph, report } = buildFixture(tempRoot, 'next-fullstack-kb.json', 'next-fullstack-sample');
+
+    const endpointNames = graph.nodes.filter(node => node.type === 'endpoint').map(node => node.name);
+    assert.ok(endpointNames.includes('GET /api/chat'), 'indexes Next GET route endpoint');
+    assert.ok(endpointNames.includes('POST /api/chat'), 'indexes Next POST route endpoint');
+    assert.ok(endpointNames.includes('GET /api/ai/config'), 'indexes nested Next GET route endpoint');
+    assert.ok(endpointNames.includes('POST /api/ai/config'), 'indexes nested Next POST route endpoint');
+    assert.ok(endpointNames.includes('GET /api/facebook/oauth/callback'), 'indexes OAuth callback endpoint');
+
+    const requestNames = graph.nodes.filter(node => node.type === 'request').map(node => node.name);
+    assert.ok(requestNames.includes('GET /api/ai/config'), 'indexes API client GET request');
+    assert.ok(requestNames.includes('POST /api/ai/config'), 'indexes API client POST request');
+    assert.ok(requestNames.includes('GET /api/facebook/oauth/status'), 'indexes API client OAuth status request');
+    assert.ok(requestNames.includes('GET /api/chat'), 'indexes EventSource chat request');
+    assert.equal(requestNames.includes('GET /api'), false, 'skips dynamic API client helper target');
+
+    const tableNames = graph.nodes.filter(node => node.type === 'table').map(node => node.name);
+    assert.ok(tableNames.includes('aiConfig'), 'indexes Prisma model read/write');
+    assert.ok(tableNames.includes('conversation'), 'indexes Prisma conversation writes');
+    assert.ok(tableNames.includes('message'), 'indexes Prisma message writes');
+    assert.ok(tableNames.includes('facebookConnection'), 'indexes Prisma facebook connection access');
+
+    const serviceNames = graph.nodes.filter(node => node.type === 'external-service').map(node => node.name);
+    assert.ok(serviceNames.includes('Anthropic Claude'), 'indexes Anthropic external service');
+    assert.ok(serviceNames.includes('Facebook Graph API'), 'indexes Facebook Graph external service');
+    assert.ok(serviceNames.includes('Prisma ORM'), 'indexes Prisma external dependency');
+    assert.ok(serviceNames.includes('Next.js Runtime'), 'indexes Next runtime dependency');
+
+    const findNodes = (type, name, filePart = '') => graph.nodes.filter(node => (
+        node.type === type &&
+        node.name === name &&
+        (!filePart || String(node.file || '').replace(/\\/g, '/').includes(filePart))
+    ));
+    const hasEdge = (fromType, fromName, toType, toName, edgeType, options = {}) => {
+        const fromNodes = findNodes(fromType, fromName, options.fromFile || '');
+        const toNodes = findNodes(toType, toName, options.toFile || '');
+        return fromNodes.some(fromNode => toNodes.some(toNode => (
+            graph.edges.some(edge => edge.from === fromNode.id && edge.to === toNode.id && edge.type === edgeType)
+        )));
+    };
+
+    assert.ok(hasEdge('endpoint', 'GET /api/chat', 'method', 'route.GET', 'binds', { toFile: 'app/api/chat/route.ts' }));
+    assert.ok(hasEdge('endpoint', 'POST /api/chat', 'method', 'route.POST', 'binds', { toFile: 'app/api/chat/route.ts' }));
+    assert.ok(hasEdge('request', 'GET /api/ai/config', 'endpoint', 'GET /api/ai/config', 'matches_endpoint'));
+    assert.ok(hasEdge('method', 'apiClient.getAiConfig', 'request', 'GET /api/ai/config', 'requests'));
+
+    const nestedCwd = path.join(tempRoot, 'app', 'chat');
+    const chatTraversal = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'next-fullstack-sample', '--endpoint', 'GET /api/chat', '--downstream', '--mode', 'fullstack-data', '--depth', '5', '--json'], nestedCwd)
+    );
+    const chatNames = chatTraversal.traversal.map(item => item.node?.name).filter(Boolean);
+    assert.ok(chatNames.includes('route.GET'));
+    assert.ok(chatNames.includes('route.handleChat'));
+    assert.ok(chatNames.includes('claude-client.streamChatCompletion'));
+    assert.ok(chatNames.includes('Anthropic Claude'));
+    assert.ok(chatNames.includes('Facebook Graph API'));
+    assert.ok(chatTraversal.dataAccessSummary.tables.some(item => item.name === 'aiConfig'));
+    assert.ok(chatTraversal.dataAccessSummary.tables.some(item => item.name === 'message'));
+    assert.equal(chatTraversal.mode, 'fullstack-data');
+
+    const settingsTraversal = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'next-fullstack-sample', '--method', 'loadSettings', '--downstream', '--mode', 'fullstack', '--depth', '5', '--json'], nestedCwd)
+    );
+    assert.ok(settingsTraversal.includes('apiClient.getFacebookStatus'));
+    assert.ok(settingsTraversal.includes('GET /api/facebook/oauth/status'));
+    assert.ok(settingsTraversal.includes('route.GET'));
+
+    const serviceSearch = parseTraversal(
+        runWithCapturedOutput(queryChainKb, ['--feature', 'next-fullstack-sample', '--type', 'external-service', '--name', 'facebook', '--json'], nestedCwd)
+    );
+    assert.ok(Array.isArray(serviceSearch));
+    assert.ok(serviceSearch.some(item => item.name === 'Facebook Graph API'));
+
+    assert.equal(report.counts.nodesByType.endpoint >= 5, true);
+    assert.equal(report.counts.nodesByType.table >= 4, true);
+    assert.equal(report.counts.nodesByType['external-service'] >= 4, true);
 }
 
 function runCocosPrefabAssertions() {
@@ -1314,6 +1395,7 @@ try {
     runFixtureAssertions();
     runFrontendHttpAssertions();
     runAdminFullstackAssertions();
+    runNextFullstackAssertions();
     runCocosPrefabAssertions();
     runCocosQuerySummaryAssertions();
     runCocosAuthoringAssertions();

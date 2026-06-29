@@ -8,9 +8,12 @@ const { extractVueScriptContent } = require('./vue/vue-sfc');
 
 const DEFAULT_METHOD_SKIP = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'constructor']);
 const STATE_MUTATION_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'set', 'delete', 'clear']);
-const HTTP_ROUTE_METHODS = new Set(['get', 'post', 'put', 'delete']);
+const HTTP_ROUTE_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete']);
+const NEXT_ROUTE_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const DRIZZLE_READ_METHODS = new Set(['from', 'join', 'innerJoin', 'leftJoin', 'rightJoin']);
 const DRIZZLE_WRITE_METHODS = new Set(['insert', 'update', 'delete']);
+const PRISMA_READ_METHODS = new Set(['findUnique', 'findFirst', 'findMany', 'count', 'aggregate', 'groupBy']);
+const PRISMA_WRITE_METHODS = new Set(['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany']);
 
 function loadTypeScriptRuntime() {
     const candidates = [
@@ -865,15 +868,269 @@ function extractFieldTypes(source, scriptFile, imports) {
     return fieldTypes;
 }
 
+function stripCodeComments(content) {
+    const input = String(content || '');
+    let output = '';
+    let inString = false;
+    let quote = '';
+    let escaped = false;
+
+    for (let index = 0; index < input.length; index++) {
+        const char = input[index];
+        const next = input[index + 1];
+
+        if (inString) {
+            output += char;
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === quote) {
+                inString = false;
+                quote = '';
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'" || char === '`') {
+            inString = true;
+            quote = char;
+            output += char;
+            continue;
+        }
+
+        if (char === '/' && next === '/') {
+            while (index < input.length && input[index] !== '\n') {
+                index++;
+            }
+            output += '\n';
+            continue;
+        }
+
+        if (char === '/' && next === '*') {
+            index += 2;
+            while (index < input.length && !(input[index] === '*' && input[index + 1] === '/')) {
+                index++;
+            }
+            index++;
+            continue;
+        }
+
+        output += char;
+    }
+
+    return output;
+}
+
 function normalizeInlineExpression(expression) {
-    const normalized = String(expression || '')
-        .replace(/\/\*[\s\S]*?\*\//g, ' ')
-        .replace(/\/\/.*$/gm, ' ')
+    const raw = String(expression || '').trim();
+    if (/^https?:\/\//i.test(raw)) {
+        return raw;
+    }
+    const normalized = stripCodeComments(expression)
         .replace(/\s+/g, ' ')
         .trim();
 
     const quotedMatch = normalized.match(/^(['"`])([\s\S]*)\1$/);
     return quotedMatch ? quotedMatch[2] : normalized;
+}
+
+function normalizeHttpTargetExpression(expression, options = {}) {
+    let target = normalizeInlineExpression(expression || '');
+    if (!target) {
+        return '';
+    }
+    target = target
+        .replace(/\$\{\s*API_BASE\s*\}/g, '/api')
+        .replace(/\bAPI_BASE\b/g, '/api')
+        .replace(/\$\{[^}]+\}/g, '')
+        .replace(/[?&]$/, '');
+    const queryIndex = target.indexOf('?');
+    if (queryIndex !== -1) {
+        target = target.slice(0, queryIndex);
+    }
+    if (options.assumeApiBase && target.startsWith('/') && !target.startsWith('/api')) {
+        target = `/api${target}`;
+    }
+    return target.replace(/([^:])\/{2,}/g, '$1/').trim();
+}
+
+function isLikelyDynamicHttpTarget(target) {
+    const value = String(target || '').trim();
+    if (!value) {
+        return true;
+    }
+    if (value.includes('${') || /\bendpoint\b/.test(value)) {
+        return true;
+    }
+    return /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(value);
+}
+
+function isLikelyDynamicHttpExpression(expression, normalizedTarget = '') {
+    const raw = String(expression || '').trim();
+    const target = String(normalizedTarget || '').trim().replace(/\/+$/, '');
+    if (!raw) {
+        return true;
+    }
+    if (/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(raw)) {
+        return true;
+    }
+    if (/\bendpoint\b/.test(raw) && (!target || target === '/api')) {
+        return true;
+    }
+    if (raw.includes('${') && target === '/api') {
+        return true;
+    }
+    return false;
+}
+
+function isExternalImportSpecifier(specifier = '') {
+    const value = String(specifier || '').trim();
+    if (!value || value.startsWith('.') || value.startsWith('/') || value.startsWith('@/') || value.startsWith('~/')) {
+        return false;
+    }
+    if (value.startsWith('node:') || value.includes(':')) {
+        return false;
+    }
+    return true;
+}
+
+function externalPackageName(specifier = '') {
+    const value = String(specifier || '').trim();
+    if (value.startsWith('@')) {
+        return value.split('/').slice(0, 2).join('/');
+    }
+    return value.split('/')[0] || value;
+}
+
+function hostFromUrl(value = '') {
+    try {
+        return new URL(value).host;
+    } catch {
+        return '';
+    }
+}
+
+function buildExternalService(name, options = {}) {
+    const normalizedName = String(name || '').trim();
+    if (!normalizedName) {
+        return null;
+    }
+    const target = normalizeHttpTargetExpression(options.target || '');
+    return {
+        name: normalizedName,
+        serviceKind: options.serviceKind || 'external-service',
+        target,
+        host: options.host || hostFromUrl(target),
+        packageName: options.packageName || '',
+        source: options.source || '',
+    };
+}
+
+function inferExternalServiceFromTarget(target, source = 'http') {
+    const normalizedTarget = normalizeHttpTargetExpression(target || '');
+    const text = normalizedTarget.toLowerCase();
+    if (!text) {
+        return null;
+    }
+    if (text.includes('graph.facebook.com') || text.includes('facebook.com')) {
+        return buildExternalService('Facebook Graph API', {
+            serviceKind: 'http-api',
+            target: normalizedTarget,
+            source,
+        });
+    }
+    if (text.includes('anthropic.com') || text.includes('claude')) {
+        return buildExternalService('Anthropic Claude', {
+            serviceKind: 'ai-api',
+            target: normalizedTarget,
+            source,
+        });
+    }
+    if (/^https?:\/\//i.test(normalizedTarget)) {
+        const host = hostFromUrl(normalizedTarget);
+        return buildExternalService(host || normalizedTarget, {
+            serviceKind: 'http-api',
+            target: normalizedTarget,
+            host,
+            source,
+        });
+    }
+    return null;
+}
+
+function inferExternalServiceFromImport(importInfo, methodBody) {
+    const specifier = String(importInfo?.specifier || '').trim();
+    if (!isExternalImportSpecifier(specifier)) {
+        return null;
+    }
+    const packageName = externalPackageName(specifier);
+    const body = String(methodBody || '');
+    if (specifier === '@anthropic-ai/sdk' && /\b(?:new\s+Anthropic|Anthropic|messages\.create)\b/.test(body)) {
+        return buildExternalService('Anthropic Claude', {
+            serviceKind: 'ai-sdk',
+            packageName,
+            source: 'import',
+        });
+    }
+    if (specifier === '@prisma/client' || /\bPrismaClient\b/.test(body)) {
+        return buildExternalService('Prisma ORM', {
+            serviceKind: 'orm',
+            packageName,
+            source: 'import',
+        });
+    }
+    if (specifier === 'next/server' || specifier.startsWith('next/')) {
+        return buildExternalService('Next.js Runtime', {
+            serviceKind: 'framework',
+            packageName: 'next',
+            source: 'import',
+        });
+    }
+    if (specifier === 'next-auth' || specifier.startsWith('next-auth/') || specifier.startsWith('@auth/')) {
+        return buildExternalService('NextAuth', {
+            serviceKind: 'auth',
+            packageName,
+            source: 'import',
+        });
+    }
+    return null;
+}
+
+function extractExternalServices(methodBody, imports = [], networkRequests = []) {
+    const services = [];
+    const pushService = service => {
+        if (service) {
+            services.push(service);
+        }
+    };
+    const body = String(methodBody || '');
+
+    if (/\bFACEBOOK_GRAPH_API_BASE\b|graph\.facebook\.com|www\.facebook\.com\/v\d+\.\d+/i.test(body)) {
+        pushService(buildExternalService('Facebook Graph API', {
+            serviceKind: 'http-api',
+            target: 'https://graph.facebook.com',
+            source: 'literal',
+        }));
+    }
+    if (/\bprisma\.[A-Za-z_$][\w$]*\.|\btx\.[A-Za-z_$][\w$]*\./.test(body)) {
+        pushService(buildExternalService('Prisma ORM', {
+            serviceKind: 'orm',
+            source: 'prisma-call',
+        }));
+    }
+
+    for (const importInfo of imports || []) {
+        pushService(inferExternalServiceFromImport(importInfo, body));
+    }
+    for (const request of networkRequests || []) {
+        pushService(inferExternalServiceFromTarget(request.target || request.route || '', request.transport || request.protocol || 'network'));
+    }
+
+    return dedupeBy(
+        services,
+        service => `${service.name || ''}::${service.serviceKind || ''}::${service.target || ''}::${service.packageName || ''}`
+    );
 }
 
 function extractHandlerMaps(source) {
@@ -1688,6 +1945,7 @@ function createEmptyCallInfo() {
         notifyRoutes: [],
         dbReads: [],
         dbWrites: [],
+        externalServices: [],
     };
 }
 
@@ -1831,6 +2089,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
     const eventDispatches = [];
     const networkRequests = [];
     const timingSignals = [];
+    const externalServices = [];
     const importMap = new Map();
     const paramSet = new Set(paramNames || []);
 
@@ -2141,6 +2400,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
         notifyRoutes: [],
         dbReads: [],
         dbWrites: [],
+        externalServices,
     };
 }
 
@@ -2251,6 +2511,7 @@ function createInlineActionSummary(callInfo) {
         notifyRoutes: callInfo.notifyRoutes,
         dbReads: callInfo.dbReads,
         dbWrites: callInfo.dbWrites,
+        externalServices: callInfo.externalServices,
     };
 }
 
@@ -2324,6 +2585,24 @@ function extractDbAccesses(methodBody, imports = []) {
             continue;
         }
         pushAccess(writes, match[1], match[2]);
+    }
+
+    const prismaPattern = /\b(?:prisma|tx)\.([A-Za-z_$][\w$]*)\.(findUnique|findFirst|findMany|count|aggregate|groupBy|create|createMany|update|updateMany|upsert|delete|deleteMany)\s*\(/g;
+    while ((match = prismaPattern.exec(methodBody))) {
+        const modelName = match[1];
+        const operation = match[2];
+        const access = {
+            tableName: modelName,
+            importPath: 'prisma',
+            resolvedPath: '',
+            operation,
+            orm: 'prisma',
+        };
+        if (PRISMA_READ_METHODS.has(operation)) {
+            reads.push(access);
+        } else if (PRISMA_WRITE_METHODS.has(operation)) {
+            writes.push(access);
+        }
     }
 
     return {
@@ -2420,6 +2699,7 @@ function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, han
             notifyRoutes: [],
             dbReads: [],
             dbWrites: [],
+            externalServices: [],
             httpEndpoints: [],
             httpMounts: [
                 {
@@ -2508,6 +2788,7 @@ function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, han
             notifyRoutes: callInfo.notifyRoutes,
             dbReads: callInfo.dbReads,
             dbWrites: callInfo.dbWrites,
+            externalServices: callInfo.externalServices,
             httpEndpoints: [
                 {
                     method: endpointMethod,
@@ -2534,6 +2815,66 @@ function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, han
     return syntheticMethods;
 }
 
+function normalizeNextRouteSegment(segment) {
+    const value = String(segment || '').trim();
+    const optionalCatchAll = value.match(/^\[\[\.\.\.([A-Za-z_$][\w$-]*)\]\]$/);
+    if (optionalCatchAll) {
+        return `:${optionalCatchAll[1]}*`;
+    }
+    const catchAll = value.match(/^\[\.\.\.([A-Za-z_$][\w$-]*)\]$/);
+    if (catchAll) {
+        return `:${catchAll[1]}*`;
+    }
+    const dynamic = value.match(/^\[([A-Za-z_$][\w$-]*)\]$/);
+    if (dynamic) {
+        return `:${dynamic[1]}`;
+    }
+    return value;
+}
+
+function buildNextRouteEndpointPath(scriptFile) {
+    const normalizedScriptFile = normalize(scriptFile);
+    const match = normalizedScriptFile.match(/(?:^|\/)app\/api\/(.+)\/route\.(?:ts|tsx|js|jsx)$/i);
+    if (!match) {
+        return '';
+    }
+    const routePath = match[1]
+        .split('/')
+        .filter(Boolean)
+        .map(normalizeNextRouteSegment)
+        .join('/');
+    return joinHttpRoutePath('/api', routePath);
+}
+
+function enrichMethodRecordsWithNextRouteEndpoints(methods, scriptFile) {
+    const endpointPath = buildNextRouteEndpointPath(scriptFile);
+    if (!endpointPath) {
+        return;
+    }
+    for (const method of methods) {
+        const routeMethod = String(method.name || '').trim().toUpperCase();
+        if (!NEXT_ROUTE_METHODS.has(routeMethod)) {
+            continue;
+        }
+        method.httpEndpoints = Array.isArray(method.httpEndpoints) ? method.httpEndpoints : [];
+        method.httpEndpoints.push({
+            method: routeMethod,
+            path: endpointPath,
+            handlerName: method.ownerName ? `${method.ownerName}.${method.name}` : method.name,
+            handlerIdentifier: '',
+            handlerMethod: method.name,
+            handlerSourcePath: normalize(scriptFile),
+            handlerSourceSpecifier: '',
+            middlewares: [],
+            localCalls: method.localCalls || [],
+            importedCalls: method.importedCalls || [],
+            fieldCalls: method.fieldCalls || [],
+            sourceKind: 'next-app-route',
+        });
+        method.summary = method.summary || `Next.js ${routeMethod} ${endpointPath}`;
+    }
+}
+
 function enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source) {
     const tableBindings = extractTableMessageBindings(source);
     const dispatchMethod = methods.find(method => method.name === 'handleMsg') || null;
@@ -2544,6 +2885,7 @@ function enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source) {
         method.notifyRoutes = Array.isArray(method.notifyRoutes) ? method.notifyRoutes : [];
         method.dbReads = Array.isArray(method.dbReads) ? method.dbReads : [];
         method.dbWrites = Array.isArray(method.dbWrites) ? method.dbWrites : [];
+        method.externalServices = Array.isArray(method.externalServices) ? method.externalServices : [];
 
         method.messageRoutes.push(...inferPinusMessageRouteEntries(scriptFile, method.name));
 
@@ -2732,9 +3074,10 @@ function normalizeHttpMethodValue(rawMethod, fallback = 'GET') {
 }
 
 function buildHttpRequest(callee, target, httpMethod, transport) {
+    const normalizedTarget = normalizeHttpTargetExpression(target || '');
     return {
         callee,
-        target: normalizeInlineExpression(target || '') || callee,
+        target: normalizedTarget || callee,
         protocol: 'http',
         httpMethod: normalizeHttpMethodValue(httpMethod || 'GET'),
         transport,
@@ -2779,6 +3122,19 @@ function buildHttpRequestFromArgs(callee, args = [], transport, explicitMethod =
         args[0] || normalizedCallee,
         explicitMethod || 'GET',
         transport
+    );
+}
+
+function buildApiClientRequestFromArgs(callee, args = []) {
+    const target = normalizeHttpTargetExpression(args[0] || '', { assumeApiBase: true });
+    if (!target || isLikelyDynamicHttpTarget(target)) {
+        return null;
+    }
+    return buildHttpRequest(
+        callee,
+        target,
+        readObjectLiteralProperty(args[1] || '', 'method') || 'GET',
+        'api-client'
     );
 }
 
@@ -2995,13 +3351,37 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         httpClientPattern.lastIndex = openParenIndex + content.length + 2;
     }
 
+    const fetchJsonPattern = /\bfetchJSON(?:<[\s\S]*?>)?\s*\(/g;
+    while ((match = fetchJsonPattern.exec(methodBody))) {
+        const openParenIndex = fetchJsonPattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const request = buildApiClientRequestFromArgs('fetchJSON', args);
+        if (request) {
+            requests.push(request);
+        }
+        fetchJsonPattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
+    const eventSourcePattern = /\bnew\s+EventSource\s*\(/g;
+    while ((match = eventSourcePattern.exec(methodBody))) {
+        const openParenIndex = eventSourcePattern.lastIndex - 1;
+        const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
+        const args = splitTopLevelArgs(content);
+        const target = normalizeHttpTargetExpression(args[0] || '');
+        if (target && !isLikelyDynamicHttpTarget(target) && !isLikelyDynamicHttpExpression(args[0] || '', target)) {
+            requests.push(buildHttpRequest('EventSource', target, 'GET', 'eventsource'));
+        }
+        eventSourcePattern.lastIndex = openParenIndex + content.length + 2;
+    }
+
     const fetchPattern = /\bfetch\s*\(/g;
     while ((match = fetchPattern.exec(methodBody))) {
         const openParenIndex = fetchPattern.lastIndex - 1;
         const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
         const args = splitTopLevelArgs(content);
         const request = buildHttpRequestFromArgs('fetch', args, 'fetch');
-        if (request) {
+        if (request && !isLikelyDynamicHttpTarget(request.target) && !isLikelyDynamicHttpExpression(args[0] || '', request.target)) {
             requests.push(request);
         }
         fetchPattern.lastIndex = openParenIndex + content.length + 2;
@@ -3014,7 +3394,7 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         const args = splitTopLevelArgs(content);
         const httpMethod = match[1] === 'request' ? '' : match[1];
         const request = buildHttpRequestFromArgs(`axios.${match[1]}`, args, 'axios', httpMethod);
-        if (request) {
+        if (request && !isLikelyDynamicHttpTarget(request.target) && !isLikelyDynamicHttpExpression(args[0] || '', request.target)) {
             requests.push(request);
         }
         axiosMethodPattern.lastIndex = openParenIndex + content.length + 2;
@@ -3030,7 +3410,7 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
         const args = splitTopLevelArgs(content);
         const request = buildHttpRequestFromArgs('axios', args, 'axios');
-        if (request) {
+        if (request && !isLikelyDynamicHttpTarget(request.target) && !isLikelyDynamicHttpExpression(args[0] || '', request.target)) {
             requests.push(request);
         }
         axiosCallPattern.lastIndex = openParenIndex + content.length + 2;
@@ -3100,12 +3480,14 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     }
 
     const importedCalls = [];
+    const importScanBody = methodBody || directBody;
     for (const importInfo of imports) {
         for (const identifier of importInfo.identifiers) {
-            const directFunctionPattern = new RegExp(`\\b${identifier.replace(/\$/g, '\\$')}\\s*\\(`, 'g');
+            const escapedIdentifier = identifier.replace(/\$/g, '\\$');
+            const directFunctionPattern = new RegExp(`\\b${escapedIdentifier}(?:<[^;()]*>)?\\s*\\(`, 'g');
             let directFunctionMatch = null;
-            while ((directFunctionMatch = directFunctionPattern.exec(directBody))) {
-                const previousChar = directBody[Math.max(0, directFunctionMatch.index - 1)] || '';
+            while ((directFunctionMatch = directFunctionPattern.exec(importScanBody))) {
+                const previousChar = importScanBody[Math.max(0, directFunctionMatch.index - 1)] || '';
                 if (previousChar === '.') {
                     continue;
                 }
@@ -3113,9 +3495,9 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
                     callKind: 'function',
                 }));
             }
-            const callPattern = new RegExp(`\\b(${identifier.replace(/\$/g, '\\$')}(?:\\.[A-Za-z_$][\\w$]*)*)\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g');
+            const callPattern = new RegExp(`\\b(${escapedIdentifier}(?:\\.[A-Za-z_$][\\w$]*)*)\\.([A-Za-z_$][\\w$]*)(?:<[^;()]*>)?\\s*\\(`, 'g');
             let callMatch = null;
-            while ((callMatch = callPattern.exec(directBody))) {
+            while ((callMatch = callPattern.exec(importScanBody))) {
                 const qualifier = String(callMatch[1] || '').trim();
                 importedCalls.push(buildImportedCall(importInfo, identifier, callMatch[2], {
                     callKind: 'static-method',
@@ -3167,6 +3549,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
     const stateAccesses = extractStateAccesses(directBody, fieldTypes, knownMethodNames);
     const notifyRoutes = extractNotifyRoutes(directBody);
     const dbAccesses = extractDbAccesses(directBody, imports);
+    const externalServices = extractExternalServices(methodBody, imports, networkRequests);
     const unresolvedCalls = extractUnresolvedMemberCalls(directBody, imports);
 
     return {
@@ -3211,6 +3594,7 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
         notifyRoutes,
         dbReads: dbAccesses.reads,
         dbWrites: dbAccesses.writes,
+        externalServices,
     };
 }
 
@@ -3263,6 +3647,10 @@ function mergeCallInfo(regexInfo, astInfo) {
     const mergedDbWrites = dedupeBy(
         [...(regexInfo.dbWrites || []), ...(astInfo.dbWrites || [])],
         item => `${item.tableName || ''}::${item.importPath || ''}::${item.operation || ''}`
+    );
+    const mergedExternalServices = dedupeBy(
+        [...(regexInfo.externalServices || []), ...(astInfo.externalServices || [])],
+        item => `${item.name || ''}::${item.serviceKind || ''}::${item.target || ''}::${item.packageName || ''}`
     );
     const mergedNetworkRequestsMap = new Map();
     for (const item of [...(regexInfo.networkRequests || []), ...(astInfo.networkRequests || [])]) {
@@ -3341,6 +3729,7 @@ function mergeCallInfo(regexInfo, astInfo) {
         notifyRoutes: mergedNotifyRoutes,
         dbReads: mergedDbReads,
         dbWrites: mergedDbWrites,
+        externalServices: mergedExternalServices,
     };
 }
 
@@ -3390,6 +3779,10 @@ function normalizeFinalCallInfo(callInfo, knownMethodNames = []) {
         dbWrites: dedupeBy(
             [...(callInfo.dbWrites || [])],
             item => `${item.tableName || ''}::${item.importPath || ''}::${item.operation || ''}`
+        ),
+        externalServices: dedupeBy(
+            [...(callInfo.externalServices || [])],
+            item => `${item.name || ''}::${item.serviceKind || ''}::${item.target || ''}::${item.packageName || ''}`
         ),
     };
 
@@ -3674,6 +4067,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                     notifyRoutes: callInfo.notifyRoutes,
                     dbReads: callInfo.dbReads,
                     dbWrites: callInfo.dbWrites,
+                    externalServices: callInfo.externalServices,
                     syntheticKind: methodDef.syntheticKind || '',
                     ownerName: methodDef.ownerName || '',
                     ownerBasePath: methodDef.ownerBasePath || '',
@@ -3683,6 +4077,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
             methods.push(
                 ...extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames)
             );
+            enrichMethodRecordsWithNextRouteEndpoints(methods, scriptFile);
             enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source);
 
             result.push({

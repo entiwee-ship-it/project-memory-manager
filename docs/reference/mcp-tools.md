@@ -74,6 +74,8 @@ freshness 结果会包含门禁字段：
 
 查询 selector 包括 `type`、`file`、`name`、`request`、`endpoint`、`method`、`message`、`upstream` 和 `downstream`。
 
+Next.js App Router 项目可直接用 `endpoint="GET /api/chat"` 查询 `app/api/**/route.ts` 生成的 endpoint；搭配 `downstream=true` 和 `mode=fullstack-data` 时，会继续展开到前端 API client、route handler、Prisma model 和外部服务依赖。
+
 `message` 是协议/事件消息名 selector，不是自然语言问题入口。遇到“购买成功后到底触发了哪条刷新”这类中文业务问题时，先提取 `endpoint`、`request`、`method` 或关键词，再改用对应 selector 查询；不要把整句问题传给 `message`。
 
 Cocos prefab 相关查询：
@@ -92,6 +94,7 @@ Cocos prefab 相关查询：
 - `focus=data`：附加按表分组的 `dataAccessSummary`。
 - `mode=fullstack-data`：全栈遍历深度加数据表读写摘要。
 - `type=table` 配合 `name=<table>`：直接查表节点。
+- `type=external-service` 配合 `name=<service>`：直接查 Anthropic Claude、Facebook Graph API、Prisma ORM、Next.js Runtime 等外部依赖节点。
 - `includeUnresolved=true`：显示安全跳过的动态/member call。
 - `grouped=true`：宽泛搜索按子系统分组，并返回推荐收窄参数。
 - `detail=counts|summary|grouped|full`：控制 Cocos 摘要详细程度。

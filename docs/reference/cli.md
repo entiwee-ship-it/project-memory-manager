@@ -43,12 +43,21 @@ node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --dat
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method Login.resetAuthState --downstream --include-unresolved --json
 ```
 
+Next.js App Router 项目会从 `app/api/**/route.ts` 自动生成 endpoint，并把前端 API client 调用接到后端 route：
+
+```powershell
+node src/bin/query-project.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --endpoint "GET /api/chat" --downstream --mode fullstack-data --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --method loadAiConfig --downstream --mode fullstack-data --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --type external-service --name facebook --json
+```
+
 数据表影响面查询会在 JSON 中返回 `dataAccessSummary`：
 
 ```powershell
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --method LoginExecuteService.loginExecute --downstream --focus data --json
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --endpoint "GET /activity/goldenEgg/getGoldenEggReward" --downstream --mode fullstack-data --json
 node src/bin/query-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --type table --name tbUser --json
+node src/bin/query-project.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --type table --name aiConfig --json
 ```
 
 Cocos summary 可控制输出体积：

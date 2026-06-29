@@ -1050,6 +1050,7 @@ function buildGraph(raw, config, projectProfile, root) {
                 middlewares: endpointInfo.middlewares || [],
                 mountBasePath: endpointInfo.mountBasePath || '',
                 originalPath: endpointInfo.originalPath || '',
+                sourceKind: endpointInfo.sourceKind || '',
             },
         });
         appendNodeTags(endpointNode, endpointInfo.method, endpointInfo.path, endpointInfo.handlerName || '', 'endpoint');
@@ -1138,6 +1139,38 @@ function buildGraph(raw, config, projectProfile, root) {
         });
         appendNodeTags(tableNode, tableAccess.tableName, tableAccess.importPath || '', 'table');
         return tableNode;
+    };
+
+    const ensureExternalServiceNode = service => {
+        const serviceName = String(service?.name || '').trim();
+        if (!serviceName) {
+            return null;
+        }
+        const serviceNode = addNode({
+            id: makeNodeId('external-service', serviceName, service.serviceKind || '', service.target || service.packageName || ''),
+            type: 'external-service',
+            name: serviceName,
+            file: '',
+            area: 'ops',
+            stack: inferStacks('ops', projectProfile),
+            meta: {
+                serviceKind: service.serviceKind || 'external-service',
+                target: service.target || '',
+                host: service.host || '',
+                packageName: service.packageName || '',
+                source: service.source || '',
+            },
+        });
+        appendNodeTags(
+            serviceNode,
+            serviceName,
+            service.serviceKind || '',
+            service.target || '',
+            service.host || '',
+            service.packageName || '',
+            'external-service'
+        );
+        return serviceNode;
     };
 
     const makeComponentKey = (prefabPath, nodePath, componentName) => [prefabPath, nodePath || '', componentName || ''].join('::');
@@ -1572,7 +1605,10 @@ function buildGraph(raw, config, projectProfile, root) {
                         },
                     });
 
-                    if (mountedEndpointInfo.handlerSourcePath && mountedEndpointInfo.handlerMethod) {
+                    const handlerTargetsCurrentMethod =
+                        normalize(mountedEndpointInfo.handlerSourcePath || '') === normalize(script.scriptPath)
+                        && mountedEndpointInfo.handlerMethod === method.name;
+                    if (mountedEndpointInfo.handlerSourcePath && mountedEndpointInfo.handlerMethod && !handlerTargetsCurrentMethod) {
                         const handlerMethodNode = ensureMethodNode(mountedEndpointInfo.handlerSourcePath, mountedEndpointInfo.handlerMethod);
                         addEdge({
                             from: endpointNode.id,
@@ -2004,6 +2040,28 @@ function buildGraph(raw, config, projectProfile, root) {
                 });
             }
 
+            for (const service of method.externalServices || []) {
+                const serviceNode = ensureExternalServiceNode(service);
+                if (!serviceNode) {
+                    continue;
+                }
+                addEdge({
+                    from: currentMethodId,
+                    to: serviceNode.id,
+                    type: 'depends_on',
+                    sourceKind: 'external-service',
+                    area: methodArea,
+                    meta: {
+                        serviceName: service.name || '',
+                        serviceKind: service.serviceKind || '',
+                        target: service.target || '',
+                        host: service.host || '',
+                        packageName: service.packageName || '',
+                        source: service.source || '',
+                    },
+                });
+            }
+
             for (const statePath of method.stateReads || []) {
                 const stateNode = ensureStateNode(script.scriptPath, statePath);
                 addEdge({
@@ -2158,6 +2216,7 @@ function buildLookup(graph) {
     const endpoints = Object.create(null);
     const states = Object.create(null);
     const tables = Object.create(null);
+    const externalServices = Object.create(null);
     const nodesByType = Object.create(null);
 
     for (const node of graph.nodes) {
@@ -2269,6 +2328,17 @@ function buildLookup(graph) {
                 writers: (incoming[node.id] || []).filter(edge => edge.type === 'writes').map(edge => nodesById[edge.from]?.name || edge.from),
             };
         }
+
+        if (node.type === 'external-service') {
+            externalServices[node.name] = {
+                id: node.id,
+                serviceKind: node.meta?.serviceKind || '',
+                target: node.meta?.target || '',
+                host: node.meta?.host || '',
+                packageName: node.meta?.packageName || '',
+                dependents: (incoming[node.id] || []).filter(edge => edge.type === 'depends_on').map(edge => nodesById[edge.from]?.name || edge.from),
+            };
+        }
     }
 
     return {
@@ -2290,6 +2360,7 @@ function buildLookup(graph) {
         endpoints,
         states,
         tables,
+        externalServices,
         nodesByType,
     };
 }
