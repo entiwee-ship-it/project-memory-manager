@@ -6,6 +6,7 @@ Focused tests:
 npm test
 npm run test:layout
 npm run test:mcp
+npm run test:agent
 npm run test:feature
 npm run test:path
 npm run test:summary

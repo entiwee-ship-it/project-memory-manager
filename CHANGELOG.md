@@ -7,6 +7,22 @@
 
 ## [未发布]
 
+## [0.50.0] - 2026-06-29
+
+### 新增
+- 新增 Agent Context Pack 核心模块，面向 AI 开发任务输出短、准、可行动的上下文包，包含任务理解、相关 feature、入口、关键文件、调用链、数据表、外部服务、编辑边界、验证命令和不确定点。
+- 新增 MCP 工具 `prepare_task_context`，可直接输入自然语言任务，例如“修改 settings 页 AI 配置保存逻辑”，自动匹配 feature、endpoint、method、Prisma model 和 external-service。
+- 新增 MCP 工具 `explain_feature_for_agent`，可按 feature key 生成 AI 记忆卡片，包含功能职责、页面入口、API endpoints、核心方法、Prisma models、外部服务、主要数据流、风险点和测试建议。
+- 新增 MCP 工具 `analyze_change_impact`，可按 changed files 或 git diff 分析受影响 feature、endpoint、method、table、external-service，返回风险等级、复核重点、验证命令和 KB 重建建议。
+- 新增 CLI 兜底入口 `prepare-task-context.js`、`explain-feature-for-agent.js`、`analyze-change-impact.js`，用于 MCP 不可用或维护调试场景。
+
+### 改进
+- 高层 Agent 输出新增统一证据格式，保留 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`，便于注入 AI prompt 时追溯来源。
+- feature KB 产物加载优先尊重 registry 中的 `outputs.graph` / `outputs.lookup`，修复 external-data 布局下 feature registry 记录相对 `kbDir` 时可能找错产物的问题。
+
+### 测试
+- 新增 `npm run test:agent`，覆盖 settings、chat、facebook-oauth、changed files、CLI 兜底和 MCP 工具接入等 v0.50 验收场景。
+
 ## [0.40.0] - 2026-06-29
 
 ### 新增

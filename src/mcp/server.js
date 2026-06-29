@@ -13,6 +13,11 @@ const { run: buildFeatureIndexCli } = require('../commands/build/build-feature')
 const { loadSkillVersion } = require('../maintenance/show-version');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../graph/feature-kb');
 const { buildKbFreshnessStatus } = require('../shared/source-snapshot');
+const {
+    analyzeChangeImpact,
+    explainFeatureForAgent,
+    prepareTaskContext,
+} = require('../agent/context-pack');
 
 const jobs = new Map();
 let nextJobId = 1;
@@ -180,6 +185,59 @@ const TOOL_DEFINITIONS = [
                 dryRun: { type: 'boolean' },
             },
             required: ['workspaceRoot', 'featureKey'],
+        },
+    },
+    {
+        name: 'prepare_task_context',
+        description: 'Prepare a concise, evidence-backed AI context pack from a natural-language development task.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                depth: { type: 'number' },
+                limit: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'explain_feature_for_agent',
+        description: 'Return an AI-oriented feature memory card with endpoints, methods, Prisma models, services, risks, and evidence.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                featureKey: { type: 'string' },
+                feature: { type: 'string' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'analyze_change_impact',
+        description: 'Analyze changed files or git diff and return affected features, endpoints, methods, tables, external services, risks, and tests.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                diff: { type: 'string' },
+                diffFile: { type: 'string' },
+                depth: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+            required: ['workspaceRoot'],
         },
     },
     {
@@ -1075,6 +1133,92 @@ function buildFeatureIndex(args) {
     });
 }
 
+function agentQueryMeta(args = {}, toolName = '') {
+    const options = resolveMcpQueryOptions(args);
+    return {
+        tool: toolName,
+        limit: options.limit,
+        depth: options.depth,
+        freshnessPolicy: resolveFreshnessPolicy(args),
+    };
+}
+
+function attachAgentMcpMetadata(payload, freshnessMeta, queryMeta) {
+    return {
+        ...payload,
+        _mcpFreshness: freshnessMeta,
+        _mcpQuery: queryMeta,
+    };
+}
+
+function runAgentProjectTool(args, toolName, fn) {
+    const freshnessPolicy = resolveFreshnessPolicy(args);
+    const freshnessGate = ensureProjectFreshForQuery(args, freshnessPolicy);
+    if (!freshnessGate.ok) {
+        return freshnessGate.result;
+    }
+    const options = resolveMcpQueryOptions(args);
+    const payload = fn({
+        ...args,
+        layout: 'external-data',
+        limit: options.limit,
+        depth: options.depth || args.depth,
+    });
+    return textResult(attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, toolName)));
+}
+
+function prepareTaskContextTool(args) {
+    if (!String(args.task || args.query || '').trim()) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_TASK',
+            message: 'prepare_task_context 需要 task 或 query。',
+        });
+    }
+    return runAgentProjectTool(args, 'prepare_task_context', prepareTaskContext);
+}
+
+function analyzeChangeImpactTool(args) {
+    const hasInput = Boolean(
+        (Array.isArray(args.changedFiles) && args.changedFiles.length)
+        || String(args.changedFiles || '').trim()
+        || String(args.changedFile || '').trim()
+        || String(args.diff || '').trim()
+        || String(args.diffFile || '').trim()
+    );
+    if (!hasInput) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_CHANGE_INPUT',
+            message: 'analyze_change_impact 需要 changedFiles、changedFile、diff 或 diffFile。',
+        });
+    }
+    return runAgentProjectTool(args, 'analyze_change_impact', analyzeChangeImpact);
+}
+
+function explainFeatureForAgentTool(args) {
+    const feature = String(args.featureKey || args.feature || '').trim();
+    if (!feature) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_FEATURE',
+            message: 'explain_feature_for_agent 需要 featureKey 或 feature。',
+        });
+    }
+    const freshnessPolicy = resolveFreshnessPolicy(args);
+    const freshnessGate = ensureFeatureFreshForQuery({ ...args, feature }, freshnessPolicy);
+    if (!freshnessGate.ok) {
+        return freshnessGate.result;
+    }
+    const payload = explainFeatureForAgent({
+        ...args,
+        featureKey: feature,
+        feature,
+        layout: 'external-data',
+    });
+    return textResult(attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, 'explain_feature_for_agent')));
+}
+
 function runQueryScript(scriptName, argv, timeoutMs) {
     const startedAt = Date.now();
     const child = spawnSync(process.execPath, [path.resolve(__dirname, '..', 'bin', scriptName), ...argv], {
@@ -1352,11 +1496,17 @@ async function handleMcpRequest(request) {
                                                     ? discoverFeatures(args)
                                                     : name === 'build_feature_index'
                                                         ? buildFeatureIndex(args)
-                                                        : name === 'query_project_chain'
-                                                            ? queryProjectChain(args)
-                                                            : name === 'query_feature_chain'
-                                                                ? queryFeatureChain(args)
-                                                                : textResult({ error: `Unknown tool: ${name}` }));
+                                                        : name === 'prepare_task_context'
+                                                            ? prepareTaskContextTool(args)
+                                                            : name === 'explain_feature_for_agent'
+                                                                ? explainFeatureForAgentTool(args)
+                                                                : name === 'analyze_change_impact'
+                                                                    ? analyzeChangeImpactTool(args)
+                                                                    : name === 'query_project_chain'
+                                                                        ? queryProjectChain(args)
+                                                                        : name === 'query_feature_chain'
+                                                                            ? queryFeatureChain(args)
+                                                                            : textResult({ error: `Unknown tool: ${name}` }));
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {

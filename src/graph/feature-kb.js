@@ -156,15 +156,19 @@ function normalizeFeatureRecord(entry = {}) {
 
 function resolveExistingKbArtifacts(root, record = {}) {
     const kbDir = path.resolve(root, record.kbDir || '');
+    const outputGraph = String(record.outputs?.graph || '').trim();
+    const outputLookup = String(record.outputs?.lookup || '').trim();
     const candidates = {
         graph: [
+            outputGraph ? path.resolve(root, outputGraph) : '',
             path.join(kbDir, 'chain.graph.json'),
             path.join(kbDir, 'graph.json'),
-        ],
+        ].filter(Boolean),
         lookup: [
+            outputLookup ? path.resolve(root, outputLookup) : '',
             path.join(kbDir, 'chain.lookup.json'),
             path.join(kbDir, 'lookup.json'),
-        ],
+        ].filter(Boolean),
     };
 
     return {

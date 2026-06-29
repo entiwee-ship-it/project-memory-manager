@@ -21,6 +21,7 @@ function testRequiredSourceDirectories() {
     for (const dir of [
         'src/bin',
         'src/commands',
+        'src/agent',
         'src/mcp',
         'src/lifecycle',
         'src/extraction',
@@ -46,6 +47,9 @@ function testRequiredBins() {
         'src/bin/query-project.js',
         'src/bin/query-feature.js',
         'src/bin/query-chain.js',
+        'src/bin/prepare-task-context.js',
+        'src/bin/explain-feature-for-agent.js',
+        'src/bin/analyze-change-impact.js',
         'src/bin/rebuild-kbs.js',
         'src/bin/validate-package.js',
     ]) {

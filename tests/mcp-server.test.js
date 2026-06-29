@@ -160,6 +160,9 @@ async function testToolsList() {
         'get_job_result',
         'discover_features',
         'build_feature_index',
+        'prepare_task_context',
+        'explain_feature_for_agent',
+        'analyze_change_impact',
         'query_project_chain',
         'query_feature_chain',
     ]) {

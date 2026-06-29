@@ -20,8 +20,60 @@
 
 查询：
 
+- `prepare_task_context`
+- `explain_feature_for_agent`
+- `analyze_change_impact`
 - `query_project_chain`
 - `query_feature_chain`
+
+## Agent Context Pack
+
+AI 接到开发任务时，优先使用 Agent Context Pack 工具获取短、准、可行动的上下文，再决定是否继续用 selector 追链路。
+
+### `prepare_task_context`
+
+输入自然语言任务，自动匹配相关 feature、endpoint、request、method、Prisma model 和 external-service。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "修改 settings 页 AI 配置保存逻辑"
+}
+```
+
+返回内容包括任务理解、相关 feature、关键入口、关键文件、调用链摘要、数据表影响、外部服务、建议编辑边界、推荐验证命令、不确定点和 `evidence`。
+
+### `explain_feature_for_agent`
+
+输入 feature key，返回面向 AI 的功能记忆卡片。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "featureKey": "facebook-oauth"
+}
+```
+
+返回内容包括功能职责、页面入口、API endpoints、核心方法、Prisma models、external services、主要数据流、修改风险点和推荐测试方式。
+
+### `analyze_change_impact`
+
+输入 changed files 或 git diff，返回影响范围、风险等级、重点复核链路、推荐测试命令，以及是否需要重建 project / feature KB。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "changedFiles": [
+    "app/settings/page.tsx",
+    "app/api/chat/route.ts"
+  ]
+}
+```
+
+三个工具都会返回 `_mcpFreshness`，并遵守 `freshnessPolicy=auto_rebuild|require_fresh|allow_stale`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`，用于 AI 计划、编辑边界和 review 依据。
 
 ## 新鲜度判断
 

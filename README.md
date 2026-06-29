@@ -57,8 +57,21 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `start_build_project_index`：异步构建 project-global KB；传 `wait:true` 时会等待完成并返回最终 freshness。
 - `discover_features`：发现功能候选。
 - `build_feature_index`：生成并构建单个功能 KB。
+- `prepare_task_context`：输入自然语言任务，返回 AI 可直接使用的上下文包。
+- `explain_feature_for_agent`：按 feature key 返回面向 AI 的功能记忆卡片。
+- `analyze_change_impact`：按 changed files 或 git diff 分析影响范围和验证建议。
 - `query_project_chain`：查询 project-global KB；默认会先确保 KB 为 `fresh`，必要时同步重建并等待完成。
 - `query_feature_chain`：查询单个功能 KB；默认会先确保 feature KB 为 `fresh`，必要时同步重建并等待完成。
+
+## Agent Context Pack
+
+PMM v0.50 起，AI 接到开发任务时优先使用 Agent Context Pack，而不是先把自然语言问题拆成一串手写 selector。
+
+- `prepare_task_context` / `prepare-task-context.js`：适合任务开始前使用，例如“修改 settings 页 AI 配置保存逻辑”。输出会给出任务理解、相关 feature、关键入口、关键文件、调用链、数据表影响、外部服务、建议编辑边界和验证命令。
+- `explain_feature_for_agent` / `explain-feature-for-agent.js`：适合进入某个功能前使用，例如 `featureKey=chat`、`settings`、`facebook-oauth`。输出是功能记忆卡片。
+- `analyze_change_impact` / `analyze-change-impact.js`：适合提交前或 review 前使用，输入 changed files 或 git diff，输出影响范围、风险等级、重点复核链路、推荐测试和是否需要重建 feature KB。
+
+这些输出都会带 AI 证据字段，例如 `file`、`method`、`endpoint`、`nodeId`、`edgeType` 和 `confidence`，便于把 PMM 结果注入计划或 review prompt。
 
 ## CLI 入口
 
@@ -74,6 +87,9 @@ node src/bin/build-feature.js
 node src/bin/query-project.js
 node src/bin/query-feature.js
 node src/bin/query-chain.js
+node src/bin/prepare-task-context.js
+node src/bin/explain-feature-for-agent.js
+node src/bin/analyze-change-impact.js
 node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```
@@ -130,6 +146,7 @@ PMM 运行文件会写到：
 npm test
 npm run test:layout
 npm run test:mcp
+npm run test:agent
 npm run test:feature
 npm run test:path
 npm run test:summary
