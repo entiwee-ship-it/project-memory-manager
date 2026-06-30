@@ -5,6 +5,10 @@ Primary commands:
 ```text
 node src/bin/mcp.js
 node src/bin/init-workspace.js
+node src/bin/register-workspace.js
+node src/bin/list-workspaces.js
+node src/bin/resolve-workspace.js
+node src/bin/diagnose-data-root.js
 node src/bin/detect-topology.js
 node src/bin/build-project.js
 node src/bin/discover-features.js
@@ -48,6 +52,20 @@ node src/bin/review-patch-for-agent.js --workspace-root E:/xile-workspace/next-a
 node src/bin/record-task-outcome.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --outcome "完成保存逻辑并通过相关测试" --changed-file app/settings/page.tsx --validation "npm test" --json
 git diff -- app/settings/page.tsx | node src/bin/analyze-change-impact.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --stdin-diff --json
 ```
+
+## 多项目数据根
+
+这些命令用于维护一个 `PMM_DATA_ROOT` 下的多个项目记忆。日常 AI 开发优先使用 MCP 的同名工具；CLI 适合部署、排查或 MCP 暂不可用时兜底。
+
+```powershell
+node src/bin/register-workspace.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --name qyProject --json
+node src/bin/list-workspaces.js --data-root E:/xile-workspace/codex-tools/project-memory-data --json
+node src/bin/resolve-workspace.js --data-root E:/xile-workspace/codex-tools/project-memory-data --workspace-root E:/xile-workspace/qyProject --json
+node src/bin/resolve-workspace.js --data-root E:/xile-workspace/codex-tools/project-memory-data --workspace-hash <workspace-hash> --json
+node src/bin/diagnose-data-root.js --data-root E:/xile-workspace/codex-tools/project-memory-data --json
+```
+
+`register-workspace.js` 会写入 `<data-root>/workspace-registry.json`，并刷新对应 `workspace-manifest.json`。`diagnose-data-root.js` 会提示缺失工作区、缺失 manifest 和 `workspaceId` 碰撞。
 
 输出面向 AI prompt 注入，包含 PMM 使用决策、任务理解、历史任务召回、项目 playbook、相关 feature、入口、关键文件、调用链摘要、数据表影响、外部服务、编辑边界、验证命令、不确定点、复核 verdict、任务结果记录和 `evidence`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`。
 

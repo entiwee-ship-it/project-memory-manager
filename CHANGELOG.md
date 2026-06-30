@@ -7,6 +7,22 @@
 
 ## [未发布]
 
+## [0.71.0] - 2026-06-30
+
+### 新增
+- 新增共享数据根 `workspace-registry.json`，记录每个项目的 `workspaceRoot`、兼容旧布局的 `workspaceId`、稳定 `workspaceHash`、`memoryRoot`、manifest 路径、项目名和 Git 远端摘要，便于一个 `PMM_DATA_ROOT` 同时服务多个项目。
+- 新增 MCP 工具 `register_workspace`、`list_workspaces`、`resolve_workspace`、`diagnose_data_root`，AI 可以先登记、列出、定位和诊断项目记忆位置，再进入 KB 查询或开发任务。
+- 新增 CLI 入口 `register-workspace.js`、`list-workspaces.js`、`resolve-workspace.js`、`diagnose-data-root.js`，用于 MCP 不可用时维护共享数据根。
+
+### 改进
+- `init_workspace` 和 `detect_topology` 会自动刷新 workspace registry，并在 `workspace-manifest.json` 中补充 `workspaceHash`、`registryPath`、`memoryRoot`、项目名、包名和 Git 摘要。
+- `get_current_state` 返回 `workspaceHash`、`registryPath` 和 `workspaceIdentity`，减少 AI 在多项目共享数据根中的路径猜测。
+- 保留原有 `<dataRoot>/workspaces/<workspace-id>` 布局，避免破坏已有项目记忆；新 registry 先提供可见性、解析和碰撞诊断。
+
+### 测试
+- 新增 `tests/workspace-registry.test.js`，覆盖 registry 写入、manifest 升级、项目解析、workspaceId 碰撞诊断、生命周期自动登记和 CLI JSON 输出。
+- 扩展 MCP 与源码布局测试，覆盖新的 registry MCP 工具和 CLI 入口。
+
 ## [0.70.0] - 2026-06-30
 
 ### 新增

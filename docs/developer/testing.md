@@ -5,6 +5,7 @@ Focused tests:
 ```powershell
 npm test
 npm run test:layout
+npm run test:registry
 npm run test:mcp
 npm run test:agent
 npm run test:feature

@@ -150,6 +150,10 @@ async function testToolsList() {
     for (const expectedName of [
         'inspect_workspace',
         'get_current_state',
+        'register_workspace',
+        'list_workspaces',
+        'resolve_workspace',
+        'diagnose_data_root',
         'init_workspace',
         'detect_topology',
         'diagnose_workspace',
@@ -205,6 +209,39 @@ async function testDiagnoseUninitializedWorkspace() {
     assert.equal(result.legacyProjectMemoryExists, false);
     assert.equal(fs.existsSync(path.join(workspaceRoot, 'project-memory')), false);
     assert.equal(result.suggestedNextAction, 'init_workspace');
+}
+
+async function testWorkspaceRegistryToolsViaMcp() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"name":"mcp-registry-sample"}\n');
+
+    const registerResponse = await callTool('register_workspace', { workspaceRoot, dataRoot, name: 'mcp-registry-sample' });
+    const registered = parseTextResult(registerResponse);
+    assert.equal(registered.ok, true);
+    assert.ok(registered.workspace.workspaceHash);
+    assert.equal(registered.workspace.projectName, 'mcp-registry-sample');
+    assert.equal(fs.existsSync(registered.registryPath), true);
+
+    const stateResponse = await callTool('get_current_state', { workspaceRoot, dataRoot });
+    const state = parseTextResult(stateResponse);
+    assert.equal(state.workspaceHash, registered.workspace.workspaceHash);
+    assert.equal(state.registryPath, registered.registryPath);
+    assert.equal(state.workspaceIdentity.workspaceHash, registered.workspace.workspaceHash);
+
+    const listResponse = await callTool('list_workspaces', { dataRoot });
+    const listed = parseTextResult(listResponse);
+    assert.equal(listed.count, 1);
+    assert.equal(listed.workspaces[0].workspaceHash, registered.workspace.workspaceHash);
+
+    const resolveResponse = await callTool('resolve_workspace', { dataRoot, workspaceRoot });
+    const resolved = parseTextResult(resolveResponse);
+    assert.equal(resolved.ok, true);
+    assert.equal(resolved.resolved.workspaceHash, registered.workspace.workspaceHash);
+
+    const diagnoseResponse = await callTool('diagnose_data_root', { dataRoot });
+    const diagnosis = parseTextResult(diagnoseResponse);
+    assert.equal(diagnosis.ok, true);
+    assert.equal(diagnosis.workspaceCount, 1);
 }
 
 async function testInitAndDetectTopologyViaMcp() {
@@ -633,6 +670,7 @@ Promise.all([
     testInitialize(),
     testToolsList(),
     testDiagnoseUninitializedWorkspace(),
+    testWorkspaceRegistryToolsViaMcp(),
     testInitAndDetectTopologyViaMcp(),
     testDetectTopologyKeepsManualAreaRoots(),
     testBuildProjectIndexAutoPreparesWorkspace(),

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureDir, pathExists, writeJsonAtomic, writeTextAtomic } = require('../../shared/common');
 const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
+const { registerWorkspace } = require('../../shared/workspace-registry');
 
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
@@ -57,6 +58,9 @@ function run(argv = process.argv.slice(2)) {
         const profilePath = path.join(stateDir, 'project-profile.json');
         
         if (pathExists(profilePath)) {
+            if (context.layout === 'external-data') {
+                registerWorkspace(context, { name: args.name });
+            }
             console.log(`[SKILL-INFO] 项目记忆已存在: ${memoryRoot}`);
             console.log(`[SKILL-INFO] 如需重新初始化，使用 --force 参数`);
             console.log(`[SKILL-INFO] 或运行重建: node src/bin/rebuild-kbs.js --workspace-root ${args.root}`);
@@ -137,6 +141,9 @@ function run(argv = process.argv.slice(2)) {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         });
+        if (context.layout === 'external-data') {
+            registerWorkspace(context, { name: args.name });
+        }
     } catch (err) {
         throw new Error(
             `[SKILL-DIAGNOSIS] 写入初始文件失败\n` +

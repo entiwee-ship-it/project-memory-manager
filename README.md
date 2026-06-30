@@ -29,6 +29,8 @@ Codex 已加载 PMM MCP 后，日常查询优先使用 MCP。CLI 主要用于部
 ```powershell
 npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --skill project-memory-manager -g -a codex -y --full-depth
 node src/bin/init-workspace.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data
+node src/bin/register-workspace.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --json
+node src/bin/list-workspaces.js --data-root E:/xile-workspace/codex-tools/project-memory-data --json
 node src/bin/detect-topology.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data
 node src/bin/build-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --json
 node src/bin/discover-features.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --json
@@ -52,6 +54,10 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 常用 MCP 工具：
 
 - `get_current_state`：查看目标项目的 PMM 状态。
+- `register_workspace`：把当前项目登记到共享 PMM 数据根，刷新 `workspaceHash`、`memoryRoot` 和 manifest。
+- `list_workspaces`：列出同一个 `PMM_DATA_ROOT` 下已登记或可从 manifest 发现的项目。
+- `resolve_workspace`：按 `workspaceRoot`、`workspaceId`、`workspaceHash`、Git 远端或项目名定位对应记忆目录。
+- `diagnose_data_root`：诊断共享数据根的登记册、manifest、缺失路径和 `workspaceId` 碰撞。
 - `check_kb_freshness`：判断 KB 是否仍与当前源码和 PMM 版本一致。
 - `build_project_index`：同步构建 project-global KB。
 - `start_build_project_index`：异步构建 project-global KB；传 `wait:true` 时会等待完成并返回最终 freshness。
@@ -98,6 +104,10 @@ PMM v0.70 起，AI 接到开发任务时优先使用 `prepare_agent_brief`，一
 ```powershell
 node src/bin/mcp.js
 node src/bin/init-workspace.js
+node src/bin/register-workspace.js
+node src/bin/list-workspaces.js
+node src/bin/resolve-workspace.js
+node src/bin/diagnose-data-root.js
 node src/bin/detect-topology.js
 node src/bin/build-project.js
 node src/bin/discover-features.js
@@ -149,6 +159,8 @@ PMM 运行文件会写到：
 <pmm-data-root>/workspaces/<workspace-id>/
 ```
 
+同一个 `PMM_DATA_ROOT` 可以服务多个项目。PMM 会继续使用兼容旧版本的 `workspaceId` 作为目录名，同时在 `<pmm-data-root>/workspace-registry.json` 维护项目登记册，并在每个项目的 `workspace-manifest.json` 中记录 `workspaceHash`、`registryPath` 和 `memoryRoot`。如果项目移动位置或怀疑数据根混用，先用 `list_workspaces` / `resolve_workspace` / `diagnose_data_root` 确认再查询 KB。
+
 目标项目保持干净。以后从 Codex 移除 PMM 时，不需要到业务仓库里清理一堆生成文件。
 
 ## 文档索引
@@ -172,6 +184,7 @@ PMM 运行文件会写到：
 ```powershell
 npm test
 npm run test:layout
+npm run test:registry
 npm run test:mcp
 npm run test:agent
 npm run test:feature

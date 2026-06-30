@@ -12,6 +12,22 @@ PMM 固定拆分为三类目录：
 <data-root>/workspaces/<workspace-id>/
 ```
 
+从 v0.71 起，一个 `<data-root>` 可以明确承载多个项目。PMM 会额外维护：
+
+```text
+<data-root>/workspace-registry.json
+<data-root>/workspaces/<workspace-id>/workspace-manifest.json
+```
+
+`workspaceId` 继续保持旧版本路径映射，保证已有记忆目录不搬迁；`workspaceHash` 用项目绝对路径生成短哈希，用于登记、解析和碰撞诊断。AI 或维护人员需要确认数据根状态时，优先使用：
+
+```powershell
+node src/bin/register-workspace.js --workspace-root <project-root> --data-root <data-root> --json
+node src/bin/list-workspaces.js --data-root <data-root> --json
+node src/bin/resolve-workspace.js --data-root <data-root> --workspace-root <project-root> --json
+node src/bin/diagnose-data-root.js --data-root <data-root> --json
+```
+
 如果省略 `--data-root`，PMM 会读取 `PMM_DATA_ROOT`。如果也没有配置 `PMM_DATA_ROOT`，PMM 会使用源码仓库同级的 `project-memory-data` 目录。
 
 命令示例：

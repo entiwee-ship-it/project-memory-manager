@@ -19,6 +19,7 @@ $project = "E:/xile-workspace/qyProject"
 $data = "E:/xile-workspace/codex-tools/project-memory-data"
 
 node src/bin/init-workspace.js --workspace-root $project --data-root $data
+node src/bin/register-workspace.js --workspace-root $project --data-root $data --json
 node src/bin/detect-topology.js --workspace-root $project --data-root $data
 node src/bin/build-project.js --workspace-root $project --data-root $data --json
 node src/bin/discover-features.js --workspace-root $project --data-root $data --json

@@ -4,6 +4,10 @@
 
 - `inspect_workspace`
 - `get_current_state`
+- `register_workspace`
+- `list_workspaces`
+- `resolve_workspace`
+- `diagnose_data_root`
 - `init_workspace`
 - `detect_topology`
 - `diagnose_workspace`
@@ -34,6 +38,62 @@
 - `record_task_outcome`
 - `query_project_chain`
 - `query_feature_chain`
+
+## 多项目数据根治理
+
+一个 `PMM_DATA_ROOT` 可以承载多个项目的 PMM 数据。生命周期工具会继续把数据写到 `<dataRoot>/workspaces/<workspaceId>`，同时维护 `<dataRoot>/workspace-registry.json` 作为项目登记册。`get_current_state` 会返回 `workspaceHash`、`registryPath` 和 `workspaceIdentity`，用于让 AI 明确当前项目对应哪份记忆。
+
+### `register_workspace`
+
+登记或刷新一个项目在共享数据根中的身份信息。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/qyProject",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "name": "qyProject"
+}
+```
+
+返回 `workspace.workspaceHash`、`workspace.workspaceId`、`workspace.memoryRoot`、`registryPath` 和 `manifestPath`。该工具会写入 registry 和 manifest，但不会把 PMM 数据写进目标项目。
+
+### `list_workspaces`
+
+列出共享数据根里已登记或可从 manifest 发现的项目。
+
+```json
+{
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "includeMissing": true
+}
+```
+
+返回每个项目的 `workspaceRoot`、`workspaceHash`、`workspaceId`、`memoryRoot`、`workspaceRootExists`、`memoryRootExists` 和 `manifestExists`。
+
+### `resolve_workspace`
+
+按路径、哈希、旧 `workspaceId`、Git 远端或项目名定位项目记忆。
+
+```json
+{
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "workspaceRoot": "E:/xile-workspace/qyProject"
+}
+```
+
+如果命中多个候选，会返回 `ambiguous=true` 和带 `matchReasons` 的候选列表，AI 应先收窄条件再查询 KB。
+
+### `diagnose_data_root`
+
+诊断共享数据根的登记册、manifest、缺失路径和 `workspaceId` 碰撞。
+
+```json
+{
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data"
+}
+```
+
+返回 `issues`、`suggestedActions`、`workspaceCount` 和每个工作区的存在性状态。发现 `WORKSPACE_ID_COLLISION` 时，优先用 `resolve_workspace` 明确目标项目，不要直接猜目录。
 
 ## Agent 执行闭环
 

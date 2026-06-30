@@ -31,6 +31,13 @@ const {
     summarizeProjectMemory,
     updateProjectPlaybook,
 } = require('../agent/memory-recall');
+const {
+    buildWorkspaceIdentity,
+    diagnoseDataRoot,
+    listRegisteredWorkspaces,
+    registerWorkspace,
+    resolveWorkspace,
+} = require('../shared/workspace-registry');
 
 const jobs = new Map();
 let nextJobId = 1;
@@ -69,6 +76,55 @@ const TOOL_DEFINITIONS = [
                 dataRoot: { type: 'string' },
             },
             required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'register_workspace',
+        description: 'Register or refresh a workspace entry in the shared PMM data-root registry.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                name: { type: 'string' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'list_workspaces',
+        description: 'List workspaces known to the shared PMM data root.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                dataRoot: { type: 'string' },
+                includeMissing: { type: 'boolean' },
+            },
+        },
+    },
+    {
+        name: 'resolve_workspace',
+        description: 'Resolve a workspace from PMM registry metadata such as root, id, hash, remote, or name.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                dataRoot: { type: 'string' },
+                workspaceRoot: { type: 'string' },
+                workspaceId: { type: 'string' },
+                workspaceHash: { type: 'string' },
+                gitRemote: { type: 'string' },
+                name: { type: 'string' },
+            },
+        },
+    },
+    {
+        name: 'diagnose_data_root',
+        description: 'Diagnose shared PMM data-root registry, manifests, missing projects, and workspace-id collisions.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                dataRoot: { type: 'string' },
+            },
         },
     },
     {
@@ -872,6 +928,7 @@ function buildWorkspaceState(args) {
         dataRoot: args.dataRoot,
         layout: 'external-data',
     });
+    const identity = buildWorkspaceIdentity(context);
     const projectProfile = readJsonSafe(context.paths.projectProfile, null);
     const hasProjectProfile = Boolean(projectProfile);
     const hasAreaRoots = hasConfiguredAreaRoots(projectProfile);
@@ -892,8 +949,10 @@ function buildWorkspaceState(args) {
         dataRoot: context.dataRoot,
         layout: context.layout,
         workspaceId: context.workspaceId,
+        workspaceHash: identity.workspaceHash,
         memoryRoot: context.memoryRoot,
         manifest: context.paths.manifest,
+        registryPath: identity.registryPath,
         projectProfile: context.paths.projectProfile,
         featureRegistry: context.paths.featureRegistry,
         projectGlobalDir: context.paths.projectGlobalDir,
@@ -903,6 +962,7 @@ function buildWorkspaceState(args) {
         hasProjectGlobalKb,
         projectGlobalFreshness,
         legacyProjectMemoryExists: fs.existsSync(path.join(context.workspaceRoot, 'project-memory')),
+        workspaceIdentity: identity,
         areas: projectProfile?.areas || null,
         stacks: projectProfile?.stacks || null,
         suggestedNextAction,
@@ -926,6 +986,30 @@ function inspectWorkspace(args) {
 
 function getCurrentState(args) {
     return textResult(buildWorkspaceState(args));
+}
+
+function registerWorkspaceTool(args) {
+    const context = createWorkspaceContext({
+        workspaceRoot: args.workspaceRoot,
+        dataRoot: args.dataRoot,
+        layout: 'external-data',
+    });
+    return textResult(registerWorkspace(context, { name: args.name }));
+}
+
+function listWorkspacesTool(args) {
+    return textResult(listRegisteredWorkspaces({
+        dataRoot: args.dataRoot,
+        includeMissing: args.includeMissing !== false,
+    }));
+}
+
+function resolveWorkspaceTool(args) {
+    return textResult(resolveWorkspace(args));
+}
+
+function diagnoseDataRootTool(args) {
+    return textResult(diagnoseDataRoot({ dataRoot: args.dataRoot }));
 }
 
 function initWorkspace(args) {
@@ -1917,55 +2001,63 @@ async function handleMcpRequest(request) {
             ? inspectWorkspace(args)
             : name === 'get_current_state'
                 ? getCurrentState(args)
-                : name === 'init_workspace'
-                    ? initWorkspace(args)
-                    : name === 'detect_topology'
-                        ? detectTopology(args)
-                        : name === 'diagnose_workspace'
-                            ? diagnoseWorkspace(args)
-                            : name === 'check_kb_freshness'
-                                ? checkKbFreshness(args)
-                                : name === 'build_project_index'
-                                    ? buildProjectIndex(args)
-                                    : name === 'start_build_project_index'
-                                        ? startBuildProjectIndex(args)
-                                        : name === 'get_job_status'
-                                            ? getJobStatus(args)
-                                            : name === 'get_job_result'
-                                                ? getJobResult(args)
-                                                : name === 'discover_features'
-                                                    ? discoverFeatures(args)
-                                                    : name === 'build_feature_index'
-                                                        ? buildFeatureIndex(args)
-                                                        : name === 'prepare_task_context'
-                                                            ? prepareTaskContextTool(args)
-                                                            : name === 'explain_feature_for_agent'
-                                                                ? explainFeatureForAgentTool(args)
-                                                                : name === 'analyze_change_impact'
-                                                                    ? analyzeChangeImpactTool(args)
-                                                                    : name === 'decide_pmm_usage'
-                                                                        ? decidePmmUsageTool(args)
-                                                                        : name === 'plan_task_execution'
-                                                                            ? planTaskExecutionTool(args)
-                                                                            : name === 'validate_edit_scope'
-                                                                                ? validateEditScopeTool(args)
-                                                                                : name === 'review_patch_for_agent'
-                                                                                    ? reviewPatchForAgentTool(args)
-                                                                                    : name === 'record_task_outcome'
-                                                                                        ? recordTaskOutcomeTool(args)
-                                                                                        : name === 'recall_task_memory'
-                                                                                            ? recallTaskMemoryTool(args)
-                                                                                            : name === 'prepare_agent_brief'
-                                                                                                ? prepareAgentBriefTool(args)
-                                                                                                : name === 'summarize_project_memory'
-                                                                                                    ? summarizeProjectMemoryTool(args)
-                                                                                                    : name === 'update_project_playbook'
-                                                                                                        ? updateProjectPlaybookTool(args)
-                                                                                                        : name === 'query_project_chain'
-                                                                                                            ? queryProjectChain(args)
-                                                                                                            : name === 'query_feature_chain'
-                                                                                                                ? queryFeatureChain(args)
-                                                                                                                : textResult({ error: `Unknown tool: ${name}` }));
+                : name === 'register_workspace'
+                    ? registerWorkspaceTool(args)
+                    : name === 'list_workspaces'
+                        ? listWorkspacesTool(args)
+                        : name === 'resolve_workspace'
+                            ? resolveWorkspaceTool(args)
+                            : name === 'diagnose_data_root'
+                                ? diagnoseDataRootTool(args)
+                                : name === 'init_workspace'
+                                    ? initWorkspace(args)
+                                    : name === 'detect_topology'
+                                        ? detectTopology(args)
+                                        : name === 'diagnose_workspace'
+                                            ? diagnoseWorkspace(args)
+                                            : name === 'check_kb_freshness'
+                                                ? checkKbFreshness(args)
+                                                : name === 'build_project_index'
+                                                    ? buildProjectIndex(args)
+                                                    : name === 'start_build_project_index'
+                                                        ? startBuildProjectIndex(args)
+                                                        : name === 'get_job_status'
+                                                            ? getJobStatus(args)
+                                                            : name === 'get_job_result'
+                                                                ? getJobResult(args)
+                                                                : name === 'discover_features'
+                                                                    ? discoverFeatures(args)
+                                                                    : name === 'build_feature_index'
+                                                                        ? buildFeatureIndex(args)
+                                                                        : name === 'prepare_task_context'
+                                                                            ? prepareTaskContextTool(args)
+                                                                            : name === 'explain_feature_for_agent'
+                                                                                ? explainFeatureForAgentTool(args)
+                                                                                : name === 'analyze_change_impact'
+                                                                                    ? analyzeChangeImpactTool(args)
+                                                                                    : name === 'decide_pmm_usage'
+                                                                                        ? decidePmmUsageTool(args)
+                                                                                        : name === 'plan_task_execution'
+                                                                                            ? planTaskExecutionTool(args)
+                                                                                            : name === 'validate_edit_scope'
+                                                                                                ? validateEditScopeTool(args)
+                                                                                                : name === 'review_patch_for_agent'
+                                                                                                    ? reviewPatchForAgentTool(args)
+                                                                                                    : name === 'record_task_outcome'
+                                                                                                        ? recordTaskOutcomeTool(args)
+                                                                                                        : name === 'recall_task_memory'
+                                                                                                            ? recallTaskMemoryTool(args)
+                                                                                                            : name === 'prepare_agent_brief'
+                                                                                                                ? prepareAgentBriefTool(args)
+                                                                                                                : name === 'summarize_project_memory'
+                                                                                                                    ? summarizeProjectMemoryTool(args)
+                                                                                                                    : name === 'update_project_playbook'
+                                                                                                                        ? updateProjectPlaybookTool(args)
+                                                                                                                        : name === 'query_project_chain'
+                                                                                                                            ? queryProjectChain(args)
+                                                                                                                            : name === 'query_feature_chain'
+                                                                                                                                ? queryFeatureChain(args)
+                                                                                                                                : textResult({ error: `Unknown tool: ${name}` }));
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {

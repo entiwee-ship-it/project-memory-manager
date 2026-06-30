@@ -40,6 +40,10 @@ function testRequiredBins() {
     for (const file of [
         'src/bin/mcp.js',
         'src/bin/init-workspace.js',
+        'src/bin/register-workspace.js',
+        'src/bin/list-workspaces.js',
+        'src/bin/resolve-workspace.js',
+        'src/bin/diagnose-data-root.js',
         'src/bin/detect-topology.js',
         'src/bin/build-project.js',
         'src/bin/discover-features.js',

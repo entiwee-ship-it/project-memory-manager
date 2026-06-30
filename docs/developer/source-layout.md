@@ -7,6 +7,7 @@ Command modules own argument parsing and user-facing output. Domain modules shou
 Use these ownership boundaries:
 
 - lifecycle setup: `src/commands/lifecycle`
+- workspace registry and external data-root identity helpers: `src/shared/workspace-registry.js`
 - build/discovery: `src/commands/build`
 - Agent Context Pack、Agent Execution Loop 与 Agent Memory Recall 领域逻辑: `src/agent`
 - query commands: `src/commands/query` and `src/query`

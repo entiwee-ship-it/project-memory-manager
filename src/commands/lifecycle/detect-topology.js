@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureDir, listFilesRecursive, normalize, pathExists, readJsonSafe, writeJson } = require('../../shared/common');
 const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
+const { registerWorkspace } = require('../../shared/workspace-registry');
 const { getTopologyAdapters } = require('../../adapters/topology');
 
 const MANIFEST_BASENAMES = new Set([
@@ -297,6 +298,9 @@ function run(argv = process.argv.slice(2)) {
 
     ensureDir(path.dirname(args.out));
     writeJson(args.out, profile);
+    if (args.context.layout === 'external-data') {
+        registerWorkspace(args.context, { name: profile.projectName });
+    }
     console.log(`项目画像已输出: ${args.out}`);
 }
 
