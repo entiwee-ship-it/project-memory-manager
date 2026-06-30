@@ -163,6 +163,11 @@ async function testToolsList() {
         'prepare_task_context',
         'explain_feature_for_agent',
         'analyze_change_impact',
+        'decide_pmm_usage',
+        'plan_task_execution',
+        'validate_edit_scope',
+        'review_patch_for_agent',
+        'record_task_outcome',
         'query_project_chain',
         'query_feature_chain',
     ]) {

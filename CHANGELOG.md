@@ -7,6 +7,26 @@
 
 ## [未发布]
 
+## [0.60.0] - 2026-06-30
+
+### 新增
+- 新增 Agent 执行闭环核心模块，覆盖 PMM 使用门禁、任务执行计划、改动范围复核、AI patch review 和任务结果记录。
+- 新增 MCP 工具 `decide_pmm_usage`，用于在任务开始时判断必须深度使用 PMM、建议使用 PMM，还是只允许少量明确 UI 文件走轻量门禁。
+- 新增 MCP 工具 `plan_task_execution`，把 usage gate、Agent Context Pack、目标文件、编辑边界、步骤和验证命令组合成 AI 可执行计划。
+- 新增 MCP 工具 `validate_edit_scope`，提交前按 changed files / diff 复核越界文件、高风险文件和疑似漏改关键文件。
+- 新增 MCP 工具 `review_patch_for_agent`，按 PMM 证据输出 review verdict、findings 和 AI 自检清单。
+- 新增 MCP 工具 `record_task_outcome`，把任务结果、改动文件、验证命令和观察写入外置 PMM 数据根目录，供后续会话参考。
+- 新增 CLI 兜底入口 `decide-pmm-usage.js`、`plan-task-execution.js`、`validate-edit-scope.js`、`review-patch-for-agent.js`、`record-task-outcome.js`。
+
+### 改进
+- Usage Gate 针对“少量明确 UI 源文件小改”返回 `optional_skip_allowed`，要求保留 PMM 门禁证据并在提交前复核，避免 AI 凭感觉跳过 PMM。
+- `plan_task_execution`、`validate_edit_scope` 和 `review_patch_for_agent` 在需要深度 PMM 上下文时继续遵守 MCP freshness gate；轻量门禁场景不强制重建 KB。
+- SKILL、README、CLI/MCP 参考和 MCP 优先文档更新为“先门禁、后上下文、再复核、最后记录”的 AI 工作流。
+
+### 测试
+- 新增 `tests/agent-execution-loop.test.js`，覆盖截图暴露的小 UI 跳过场景、settings 跨端任务、范围复核、patch review、任务结果记录、CLI 兜底和 MCP 工具接入。
+- `npm run test:agent` 现在同时运行 Agent Context Pack 与 Agent 执行闭环测试。
+
 ## [0.50.0] - 2026-06-29
 
 ### 新增

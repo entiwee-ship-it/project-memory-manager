@@ -12,11 +12,18 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 1. `get_current_state`
 2. `check_kb_freshness`
-3. `query_project_chain`
-4. `query_feature_chain`
-5. 如果需要手动维护，再调用 `build_project_index` / `build_feature_index`
-6. `discover_features`
-7. MCP 不可用时，再使用 `src/bin` 下的 CLI 命令兜底
+3. `decide_pmm_usage`
+4. `plan_task_execution` / `prepare_task_context`
+5. `explain_feature_for_agent` / `analyze_change_impact`
+6. `validate_edit_scope` / `review_patch_for_agent`
+7. `record_task_outcome`
+8. `query_project_chain`
+9. `query_feature_chain`
+10. 如果需要手动维护，再调用 `build_project_index` / `build_feature_index`
+11. `discover_features`
+12. MCP 不可用时，再使用 `src/bin` 下的 CLI 命令兜底
+
+`decide_pmm_usage` 是任务级门禁：少量明确 UI 源文件可以只走轻量 PMM 证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应继续使用深度 PMM 上下文。`plan_task_execution`、`validate_edit_scope` 和 `review_patch_for_agent` 在需要深度上下文时会继续遵守 freshness gate。
 
 `get_current_state` 会返回 `projectGlobalFreshness`。Codex 查询前应先看这个状态：
 

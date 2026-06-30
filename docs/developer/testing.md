@@ -13,6 +13,8 @@ npm run test:summary
 npm run test:source-layout
 ```
 
+`test:agent` 会同时覆盖 Agent Context Pack 和 v0.60 Agent 执行闭环，包括 Usage Gate、执行计划、范围复核、patch review、任务结果记录、CLI 兜底和 MCP 工具接入。
+
 Package validation:
 
 ```powershell

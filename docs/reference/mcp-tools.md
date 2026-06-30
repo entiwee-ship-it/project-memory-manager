@@ -20,15 +20,50 @@
 
 查询：
 
+- `decide_pmm_usage`
+- `plan_task_execution`
 - `prepare_task_context`
 - `explain_feature_for_agent`
 - `analyze_change_impact`
+- `validate_edit_scope`
+- `review_patch_for_agent`
+- `record_task_outcome`
 - `query_project_chain`
 - `query_feature_chain`
 
-## Agent Context Pack
+## Agent 执行闭环
 
-AI 接到开发任务时，优先使用 Agent Context Pack 工具获取短、准、可行动的上下文，再决定是否继续用 selector 追链路。
+AI 接到开发任务时，先用 Agent 执行闭环判断 PMM 使用强度，再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
+
+### `decide_pmm_usage`
+
+输入任务和已知文件，返回 `required`、`recommended` 或 `optional_skip_allowed`。
+
+```json
+{
+  "task": "赠送活动 UI 小改",
+  "knownFiles": [
+    "cms-client/src/views/mall/gift-activity/components/ProductStep.vue",
+    "cms-client/src/views/mall/gift-activity/components/ConfigStep.vue"
+  ]
+}
+```
+
+返回内容包括 `pmmRequired`、`deepPmmRequired`、推荐下一步工具、风险信号、允许跳过深度 PMM 的条件和证据。
+
+### `plan_task_execution`
+
+输入自然语言任务，先跑 usage gate；如果需要深度 PMM，会在 freshness gate 通过后调用上下文包并返回执行计划。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "修改 settings 页 AI 配置保存逻辑"
+}
+```
+
+返回内容包括 `pmmGate`、`contextStatus`、`targetFiles`、`editBoundary`、步骤、验证命令、不确定点和证据。
 
 ### `prepare_task_context`
 
@@ -73,7 +108,53 @@ AI 接到开发任务时，优先使用 Agent Context Pack 工具获取短、准
 }
 ```
 
-三个工具都会返回 `_mcpFreshness`，并遵守 `freshnessPolicy=auto_rebuild|require_fresh|allow_stale`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`，用于 AI 计划、编辑边界和 review 依据。
+### `validate_edit_scope`
+
+输入任务和 changed files / diff，检查改动是否落在 PMM 建议边界内。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "修改 settings 页 AI 配置保存逻辑",
+  "changedFiles": [
+    "app/settings/page.tsx",
+    "app/api/ai/config/route.ts"
+  ]
+}
+```
+
+返回 `verdict`、越界文件、高风险文件、疑似漏改文件、影响摘要和必须跟进的复核项。
+
+### `review_patch_for_agent`
+
+输入任务和 changed files / diff，返回 AI patch review verdict、findings 和检查清单。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "修复 chat 流式回复",
+  "changedFiles": ["app/api/chat/route.ts"]
+}
+```
+
+### `record_task_outcome`
+
+任务完成后记录结果、改动文件、验证命令和观察信息，写入外置 PMM 数据根目录。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/next-app",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "修改 settings 页 AI 配置保存逻辑",
+  "outcome": "完成保存逻辑并通过相关测试",
+  "changedFiles": ["app/settings/page.tsx"],
+  "validation": ["npm test"]
+}
+```
+
+需要读取 KB 的工具会返回 `_mcpFreshness`，并遵守 `freshnessPolicy=auto_rebuild|require_fresh|allow_stale`。轻量门禁场景会返回 `policy=gate-only`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`，用于 AI 计划、编辑边界和 review 依据。
 
 ## 新鲜度判断
 

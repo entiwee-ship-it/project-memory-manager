@@ -2,7 +2,7 @@
 
 ## 工具定位
 
-Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Next.js App Router endpoint、Pinus handler、Vue/Express 全栈链路、Prisma/后端数据表读写摘要、外部服务依赖、Cocos prefab 绑定、状态、事件和项目协议。
+Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Next.js App Router endpoint、Pinus handler、Vue/Express 全栈链路、Prisma/后端数据表读写摘要、外部服务依赖、Cocos prefab 绑定、状态、事件和项目协议，并在 AI 开发任务中提供 PMM 使用门禁、执行计划、改动范围复核和结果记忆。
 
 PMM 的核心边界是三套目录分离：
 
@@ -57,19 +57,29 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `start_build_project_index`：异步构建 project-global KB；传 `wait:true` 时会等待完成并返回最终 freshness。
 - `discover_features`：发现功能候选。
 - `build_feature_index`：生成并构建单个功能 KB。
+- `decide_pmm_usage`：任务开始时判断必须深度使用 PMM、建议使用 PMM，还是只允许小范围 UI 门禁通过。
+- `plan_task_execution`：结合门禁和 PMM 上下文生成 AI 执行计划。
 - `prepare_task_context`：输入自然语言任务，返回 AI 可直接使用的上下文包。
 - `explain_feature_for_agent`：按 feature key 返回面向 AI 的功能记忆卡片。
 - `analyze_change_impact`：按 changed files 或 git diff 分析影响范围和验证建议。
+- `validate_edit_scope`：提交前按 changed files / diff 复核是否越过 PMM 建议边界。
+- `review_patch_for_agent`：按 PMM 证据给 AI patch 生成复核结论和检查清单。
+- `record_task_outcome`：把任务结果、改动文件和验证命令写入外置 PMM 数据，供后续会话参考。
 - `query_project_chain`：查询 project-global KB；默认会先确保 KB 为 `fresh`，必要时同步重建并等待完成。
 - `query_feature_chain`：查询单个功能 KB；默认会先确保 feature KB 为 `fresh`，必要时同步重建并等待完成。
 
-## Agent Context Pack
+## Agent 执行闭环
 
-PMM v0.50 起，AI 接到开发任务时优先使用 Agent Context Pack，而不是先把自然语言问题拆成一串手写 selector。
+PMM v0.60 起，AI 接到开发任务时先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。这样“小改动”也会留下 PMM 证据，而不是凭感觉跳过。
 
+- `decide_pmm_usage` / `decide-pmm-usage.js`：适合任务开始时使用。少量明确 UI 源文件可以得到 `optional_skip_allowed`，但必须保留门禁证据并在提交前复核；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时会要求深度 PMM。
+- `plan_task_execution` / `plan-task-execution.js`：适合动手前使用。它会把门禁、PMM 上下文、目标文件、编辑边界和验证命令组合成 AI 可执行计划。
 - `prepare_task_context` / `prepare-task-context.js`：适合任务开始前使用，例如“修改 settings 页 AI 配置保存逻辑”。输出会给出任务理解、相关 feature、关键入口、关键文件、调用链、数据表影响、外部服务、建议编辑边界和验证命令。
 - `explain_feature_for_agent` / `explain-feature-for-agent.js`：适合进入某个功能前使用，例如 `featureKey=chat`、`settings`、`facebook-oauth`。输出是功能记忆卡片。
 - `analyze_change_impact` / `analyze-change-impact.js`：适合提交前或 review 前使用，输入 changed files 或 git diff，输出影响范围、风险等级、重点复核链路、推荐测试和是否需要重建 feature KB。
+- `validate_edit_scope` / `validate-edit-scope.js`：适合提交前使用。它会检查 changed files 是否落在 PMM 建议边界内，并指出越界文件、高风险文件或疑似漏改文件。
+- `review_patch_for_agent` / `review-patch-for-agent.js`：适合 AI 自检和 code review 前使用，返回 review verdict、findings 和检查清单。
+- `record_task_outcome` / `record-task-outcome.js`：适合完成任务后使用，把结果摘要、改动文件、验证命令和观察写进外置数据根目录。
 
 这些输出都会带 AI 证据字段，例如 `file`、`method`、`endpoint`、`nodeId`、`edgeType` 和 `confidence`，便于把 PMM 结果注入计划或 review prompt。
 
@@ -90,6 +100,11 @@ node src/bin/query-chain.js
 node src/bin/prepare-task-context.js
 node src/bin/explain-feature-for-agent.js
 node src/bin/analyze-change-impact.js
+node src/bin/decide-pmm-usage.js
+node src/bin/plan-task-execution.js
+node src/bin/validate-edit-scope.js
+node src/bin/review-patch-for-agent.js
+node src/bin/record-task-outcome.js
 node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```

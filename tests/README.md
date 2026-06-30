@@ -13,6 +13,8 @@ tests/
 │   └── project-global-sample/  # Project-global 样本
 ├── path-resolution.test.js     # 路径解析测试
 ├── pinus-backend.test.js       # Pinus 后端功能测试
+├── agent-context-pack.test.js  # Agent Context Pack 测试
+├── agent-execution-loop.test.js # Agent 执行闭环测试
 └── structured-summary.test.js  # 结构化摘要测试
 ```
 
@@ -41,6 +43,9 @@ node tests/structured-summary.test.js
 
 # 路径解析测试
 node tests/path-resolution.test.js
+
+# Agent Context Pack 与执行闭环测试
+npm run test:agent
 ```
 
 ## 测试内容
@@ -77,6 +82,20 @@ node tests/path-resolution.test.js
 - Windows/Unix 路径处理
 - 相对/绝对路径转换
 - 导入路径解析
+
+### agent-context-pack.test.js / agent-execution-loop.test.js
+
+测试 AI 使用 PMM 的高层入口：
+
+- 自然语言任务上下文包
+- feature 记忆卡片
+- changed files 影响面分析
+- Usage Gate 小 UI 场景判断
+- 任务执行计划
+- 改动范围复核
+- AI patch review
+- 任务结果记录
+- MCP 工具接入和 CLI 兜底
 
 ## 测试固件
 

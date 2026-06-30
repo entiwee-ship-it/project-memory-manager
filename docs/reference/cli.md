@@ -15,23 +15,33 @@ node src/bin/query-chain.js
 node src/bin/prepare-task-context.js
 node src/bin/explain-feature-for-agent.js
 node src/bin/analyze-change-impact.js
+node src/bin/decide-pmm-usage.js
+node src/bin/plan-task-execution.js
+node src/bin/validate-edit-scope.js
+node src/bin/review-patch-for-agent.js
+node src/bin/record-task-outcome.js
 node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```
 
-## Agent Context Pack
+## Agent 执行闭环
 
-这些命令是 MCP 工具不可用时的兜底入口。AI 日常开发应优先用 MCP 的 `prepare_task_context`、`explain_feature_for_agent`、`analyze_change_impact`。
+这些命令是 MCP 工具不可用时的兜底入口。AI 日常开发应优先用 MCP 的 `decide_pmm_usage`、`plan_task_execution`、`prepare_task_context`、`explain_feature_for_agent`、`analyze_change_impact`、`validate_edit_scope`、`review_patch_for_agent` 和 `record_task_outcome`。
 
 ```powershell
+node src/bin/decide-pmm-usage.js --task "赠送活动 UI 小改" --known-file cms-client/src/views/mall/gift-activity/components/ProductStep.vue --known-file cms-client/src/views/mall/gift-activity/components/ConfigStep.vue --json
+node src/bin/plan-task-execution.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --json
 node src/bin/prepare-task-context.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --json
 node src/bin/prepare-task-context.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 chat 流式回复" --json
 node src/bin/explain-feature-for-agent.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --feature-key facebook-oauth --json
 node src/bin/analyze-change-impact.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --changed-file app/settings/page.tsx --changed-file app/api/chat/route.ts --json
+node src/bin/validate-edit-scope.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --changed-file app/settings/page.tsx --changed-file app/api/ai/config/route.ts --json
+node src/bin/review-patch-for-agent.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 chat 流式回复" --changed-file app/api/chat/route.ts --json
+node src/bin/record-task-outcome.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --outcome "完成保存逻辑并通过相关测试" --changed-file app/settings/page.tsx --validation "npm test" --json
 git diff -- app/settings/page.tsx | node src/bin/analyze-change-impact.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --stdin-diff --json
 ```
 
-输出面向 AI prompt 注入，包含任务理解、相关 feature、入口、关键文件、调用链摘要、数据表影响、外部服务、编辑边界、验证命令、不确定点和 `evidence`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`。
+输出面向 AI prompt 注入，包含 PMM 使用决策、任务理解、相关 feature、入口、关键文件、调用链摘要、数据表影响、外部服务、编辑边界、验证命令、不确定点、复核 verdict、任务结果记录和 `evidence`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`。
 
 Cocos prefab query examples:
 

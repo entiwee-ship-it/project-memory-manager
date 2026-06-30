@@ -50,6 +50,11 @@ function testRequiredBins() {
         'src/bin/prepare-task-context.js',
         'src/bin/explain-feature-for-agent.js',
         'src/bin/analyze-change-impact.js',
+        'src/bin/decide-pmm-usage.js',
+        'src/bin/plan-task-execution.js',
+        'src/bin/validate-edit-scope.js',
+        'src/bin/review-patch-for-agent.js',
+        'src/bin/record-task-outcome.js',
         'src/bin/rebuild-kbs.js',
         'src/bin/validate-package.js',
     ]) {

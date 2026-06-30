@@ -18,6 +18,13 @@ const {
     explainFeatureForAgent,
     prepareTaskContext,
 } = require('../agent/context-pack');
+const {
+    decidePmmUsage,
+    planTaskExecution,
+    recordTaskOutcome,
+    reviewPatchForAgent,
+    validateEditScope,
+} = require('../agent/execution-loop');
 
 const jobs = new Map();
 let nextJobId = 1;
@@ -238,6 +245,146 @@ const TOOL_DEFINITIONS = [
                 freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
             },
             required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'decide_pmm_usage',
+        description: 'Decide whether an AI task must use deep PMM context, can use a light PMM gate, or can proceed with a bounded edit.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                files: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                file: { type: 'string' },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                diff: { type: 'string' },
+                diffFile: { type: 'string' },
+                featureKey: { type: 'string' },
+                feature: { type: 'string' },
+            },
+        },
+    },
+    {
+        name: 'plan_task_execution',
+        description: 'Create an AI execution plan from PMM usage gate and, when needed, PMM context evidence.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                diff: { type: 'string' },
+                diffFile: { type: 'string' },
+                depth: { type: 'number' },
+                limit: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+        },
+    },
+    {
+        name: 'validate_edit_scope',
+        description: 'Validate changed files against the PMM usage gate and task context before submission.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                diff: { type: 'string' },
+                diffFile: { type: 'string' },
+                depth: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+        },
+    },
+    {
+        name: 'review_patch_for_agent',
+        description: 'Review an AI patch with PMM scope evidence, impact risk, and a focused checklist.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                diff: { type: 'string' },
+                diffFile: { type: 'string' },
+                depth: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+        },
+    },
+    {
+        name: 'record_task_outcome',
+        description: 'Record a concise AI task outcome into PMM external data for later cross-session context.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                outcome: { type: 'string' },
+                summary: { type: 'string' },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                validation: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                observations: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                confidence: { type: 'string' },
+            },
+            required: ['workspaceRoot', 'task'],
         },
     },
     {
@@ -1219,6 +1366,102 @@ function explainFeatureForAgentTool(args) {
     return textResult(attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, 'explain_feature_for_agent')));
 }
 
+function hasWorkspaceRoot(args = {}) {
+    return Boolean(String(args.workspaceRoot || '').trim());
+}
+
+function attachGateOnlyMcpMetadata(payload, args, toolName) {
+    return textResult({
+        ...payload,
+        _mcpFreshness: {
+            scope: 'usage-gate',
+            policy: 'gate-only',
+            initialStatus: 'not-required',
+            finalStatus: 'not-required',
+            rebuilt: false,
+            blocked: false,
+        },
+        _mcpQuery: agentQueryMeta(args, toolName),
+    });
+}
+
+function runExecutionLoopTool(args, toolName, fn) {
+    const gate = decidePmmUsage(args);
+    if (gate.deepPmmRequired && !hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: `${toolName} 需要 workspaceRoot 才能读取深度 PMM 上下文。`,
+            pmmGate: gate,
+        });
+    }
+    if (!gate.deepPmmRequired) {
+        const payload = fn({
+            ...args,
+            layout: 'external-data',
+        });
+        return attachGateOnlyMcpMetadata(payload, args, toolName);
+    }
+
+    const freshnessPolicy = resolveFreshnessPolicy(args);
+    const freshnessGate = ensureProjectFreshForQuery(args, freshnessPolicy);
+    if (!freshnessGate.ok) {
+        return freshnessGate.result;
+    }
+    const options = resolveMcpQueryOptions(args);
+    const payload = fn({
+        ...args,
+        layout: 'external-data',
+        limit: options.limit,
+        depth: options.depth || args.depth,
+    });
+    return textResult(attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, toolName)));
+}
+
+function decidePmmUsageTool(args) {
+    return textResult({
+        ...decidePmmUsage(args),
+        _mcpQuery: agentQueryMeta(args, 'decide_pmm_usage'),
+    });
+}
+
+function planTaskExecutionTool(args) {
+    return runExecutionLoopTool(args, 'plan_task_execution', planTaskExecution);
+}
+
+function validateEditScopeTool(args) {
+    return runExecutionLoopTool(args, 'validate_edit_scope', validateEditScope);
+}
+
+function reviewPatchForAgentTool(args) {
+    return runExecutionLoopTool(args, 'review_patch_for_agent', reviewPatchForAgent);
+}
+
+function recordTaskOutcomeTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'record_task_outcome 需要 workspaceRoot。',
+        });
+    }
+    if (!String(args.task || args.query || '').trim() || !String(args.outcome || args.summary || '').trim()) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_OUTCOME',
+            message: 'record_task_outcome 需要 task 和 outcome/summary。',
+        });
+    }
+    const payload = recordTaskOutcome({
+        ...args,
+        layout: 'external-data',
+    });
+    return textResult({
+        ...payload,
+        _mcpQuery: agentQueryMeta(args, 'record_task_outcome'),
+    });
+}
+
 function runQueryScript(scriptName, argv, timeoutMs) {
     const startedAt = Date.now();
     const child = spawnSync(process.execPath, [path.resolve(__dirname, '..', 'bin', scriptName), ...argv], {
@@ -1502,11 +1745,21 @@ async function handleMcpRequest(request) {
                                                                 ? explainFeatureForAgentTool(args)
                                                                 : name === 'analyze_change_impact'
                                                                     ? analyzeChangeImpactTool(args)
-                                                                    : name === 'query_project_chain'
-                                                                        ? queryProjectChain(args)
-                                                                        : name === 'query_feature_chain'
-                                                                            ? queryFeatureChain(args)
-                                                                            : textResult({ error: `Unknown tool: ${name}` }));
+                                                                    : name === 'decide_pmm_usage'
+                                                                        ? decidePmmUsageTool(args)
+                                                                        : name === 'plan_task_execution'
+                                                                            ? planTaskExecutionTool(args)
+                                                                            : name === 'validate_edit_scope'
+                                                                                ? validateEditScopeTool(args)
+                                                                                : name === 'review_patch_for_agent'
+                                                                                    ? reviewPatchForAgentTool(args)
+                                                                                    : name === 'record_task_outcome'
+                                                                                        ? recordTaskOutcomeTool(args)
+                                                                                        : name === 'query_project_chain'
+                                                                                            ? queryProjectChain(args)
+                                                                                            : name === 'query_feature_chain'
+                                                                                                ? queryFeatureChain(args)
+                                                                                                : textResult({ error: `Unknown tool: ${name}` }));
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {
