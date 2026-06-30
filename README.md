@@ -2,7 +2,7 @@
 
 ## 工具定位
 
-Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Next.js App Router endpoint、Pinus handler、Vue/Express 全栈链路、Prisma/后端数据表读写摘要、外部服务依赖、Cocos prefab 绑定、状态、事件和项目协议，并在 AI 开发任务中提供 PMM 使用门禁、执行计划、改动范围复核和结果记忆。
+Project Memory Manager（PMM）为目标项目构建外置知识库，让 Codex 可以查询项目结构、功能链路、HTTP 路由、Next.js App Router endpoint、Pinus handler、Vue/Express 全栈链路、Prisma/后端数据表读写摘要、外部服务依赖、Cocos prefab 绑定、状态、事件和项目协议，并在 AI 开发任务中提供 PMM 使用门禁、执行计划、历史任务召回、项目 playbook、改动范围复核和结果记忆。
 
 PMM 的核心边界是三套目录分离：
 
@@ -59,6 +59,10 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `build_feature_index`：生成并构建单个功能 KB。
 - `decide_pmm_usage`：任务开始时判断必须深度使用 PMM、建议使用 PMM，还是只允许小范围 UI 门禁通过。
 - `plan_task_execution`：结合门禁和 PMM 上下文生成 AI 执行计划。
+- `recall_task_memory`：按任务召回历史 outcome、相关文件、验证命令、观察和 playbook 规则。
+- `prepare_agent_brief`：任务开始前聚合 usage gate、执行计划、历史记忆、playbook、推荐文件和验证命令。
+- `summarize_project_memory`：汇总当前项目已沉淀的任务记录和规则。
+- `update_project_playbook`：把稳定项目规则写入外置 PMM playbook，或从任务结果中确定性推断规则。
 - `prepare_task_context`：输入自然语言任务，返回 AI 可直接使用的上下文包。
 - `explain_feature_for_agent`：按 feature key 返回面向 AI 的功能记忆卡片。
 - `analyze_change_impact`：按 changed files 或 git diff 分析影响范围和验证建议。
@@ -70,8 +74,12 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 ## Agent 执行闭环
 
-PMM v0.60 起，AI 接到开发任务时先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。这样“小改动”也会留下 PMM 证据，而不是凭感觉跳过。
+PMM v0.70 起，AI 接到开发任务时优先使用 `prepare_agent_brief`，一次拿到 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
 
+- `prepare_agent_brief` / `prepare-agent-brief.js`：适合任务开始前使用，是 v0.70 的首选高层入口。
+- `recall_task_memory` / `recall-task-memory.js`：适合只想查历史任务时使用，例如“之前 OAuth token 怎么验证过”。
+- `summarize_project_memory` / `summarize-project-memory.js`：适合跨会话接力或阶段复盘时查看 PMM 已记住什么。
+- `update_project_playbook` / `update-project-playbook.js`：适合把稳定项目规则沉淀成可召回 playbook。
 - `decide_pmm_usage` / `decide-pmm-usage.js`：适合任务开始时使用。少量明确 UI 源文件可以得到 `optional_skip_allowed`，但必须保留门禁证据并在提交前复核；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时会要求深度 PMM。
 - `plan_task_execution` / `plan-task-execution.js`：适合动手前使用。它会把门禁、PMM 上下文、目标文件、编辑边界和验证命令组合成 AI 可执行计划。
 - `prepare_task_context` / `prepare-task-context.js`：适合任务开始前使用，例如“修改 settings 页 AI 配置保存逻辑”。输出会给出任务理解、相关 feature、关键入口、关键文件、调用链、数据表影响、外部服务、建议编辑边界和验证命令。
@@ -105,6 +113,10 @@ node src/bin/plan-task-execution.js
 node src/bin/validate-edit-scope.js
 node src/bin/review-patch-for-agent.js
 node src/bin/record-task-outcome.js
+node src/bin/recall-task-memory.js
+node src/bin/prepare-agent-brief.js
+node src/bin/summarize-project-memory.js
+node src/bin/update-project-playbook.js
 node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```

@@ -15,6 +15,7 @@ tests/
 ├── pinus-backend.test.js       # Pinus 后端功能测试
 ├── agent-context-pack.test.js  # Agent Context Pack 测试
 ├── agent-execution-loop.test.js # Agent 执行闭环测试
+├── agent-memory-recall.test.js # Agent 记忆召回测试
 └── structured-summary.test.js  # 结构化摘要测试
 ```
 
@@ -95,6 +96,9 @@ npm run test:agent
 - 改动范围复核
 - AI patch review
 - 任务结果记录
+- 历史任务召回
+- Agent brief 聚合
+- 项目 playbook 更新
 - MCP 工具接入和 CLI 兜底
 
 ## 测试固件

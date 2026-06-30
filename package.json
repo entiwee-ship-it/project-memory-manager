@@ -7,7 +7,7 @@
     "test": "node tests/pinus-backend.test.js",
     "test:layout": "node tests/workspace-layout.test.js",
     "test:mcp": "node tests/mcp-server.test.js",
-    "test:agent": "node tests/agent-context-pack.test.js && node tests/agent-execution-loop.test.js",
+    "test:agent": "node tests/agent-context-pack.test.js && node tests/agent-execution-loop.test.js && node tests/agent-memory-recall.test.js",
     "test:feature": "node tests/feature-discovery.test.js",
     "test:path": "node tests/path-resolution.test.js",
     "test:summary": "node tests/structured-summary.test.js",

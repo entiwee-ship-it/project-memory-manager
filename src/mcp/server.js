@@ -25,6 +25,12 @@ const {
     reviewPatchForAgent,
     validateEditScope,
 } = require('../agent/execution-loop');
+const {
+    prepareAgentBrief,
+    recallTaskMemory,
+    summarizeProjectMemory,
+    updateProjectPlaybook,
+} = require('../agent/memory-recall');
 
 const jobs = new Map();
 let nextJobId = 1;
@@ -385,6 +391,114 @@ const TOOL_DEFINITIONS = [
                 confidence: { type: 'string' },
             },
             required: ['workspaceRoot', 'task'],
+        },
+    },
+    {
+        name: 'recall_task_memory',
+        description: 'Recall similar prior AI task outcomes, related files, validation commands, observations, and playbook rules.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                files: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                file: { type: 'string' },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                limit: { type: 'number' },
+                scanLimit: { type: 'number' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'prepare_agent_brief',
+        description: 'Prepare a single AI brief that combines PMM usage gate, execution plan, recalled task memory, playbook rules, files, and validation.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                diff: { type: 'string' },
+                diffFile: { type: 'string' },
+                depth: { type: 'number' },
+                limit: { type: 'number' },
+                freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+            },
+            required: ['workspaceRoot', 'task'],
+        },
+    },
+    {
+        name: 'summarize_project_memory',
+        description: 'Summarize PMM agent memory: latest outcomes, frequent files, validation commands, and playbook rules.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                limit: { type: 'number' },
+                scanLimit: { type: 'number' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'update_project_playbook',
+        description: 'Add or infer stable project rules into the external PMM agent playbook.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                rule: { type: 'string' },
+                rules: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                category: { type: 'string' },
+                source: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                outcome: { type: 'string' },
+                summary: { type: 'string' },
+                changedFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                changedFile: { type: 'string' },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                observations: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+            },
+            required: ['workspaceRoot'],
         },
     },
     {
@@ -1462,6 +1576,90 @@ function recordTaskOutcomeTool(args) {
     });
 }
 
+function recallTaskMemoryTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'recall_task_memory 需要 workspaceRoot。',
+        });
+    }
+    const payload = recallTaskMemory({
+        ...args,
+        layout: 'external-data',
+    });
+    return textResult({
+        ...payload,
+        _mcpQuery: agentQueryMeta(args, 'recall_task_memory'),
+    });
+}
+
+function prepareAgentBriefTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'prepare_agent_brief 需要 workspaceRoot。',
+        });
+    }
+    if (!String(args.task || args.query || '').trim()) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_TASK',
+            message: 'prepare_agent_brief 需要 task 或 query。',
+        });
+    }
+    return runExecutionLoopTool(args, 'prepare_agent_brief', prepareAgentBrief);
+}
+
+function summarizeProjectMemoryTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'summarize_project_memory 需要 workspaceRoot。',
+        });
+    }
+    const payload = summarizeProjectMemory({
+        ...args,
+        layout: 'external-data',
+    });
+    return textResult({
+        ...payload,
+        _mcpQuery: agentQueryMeta(args, 'summarize_project_memory'),
+    });
+}
+
+function updateProjectPlaybookTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'update_project_playbook 需要 workspaceRoot。',
+        });
+    }
+    const hasInput = String(args.rule || '').trim()
+        || (Array.isArray(args.rules) && args.rules.length)
+        || String(args.task || args.query || args.outcome || args.summary || '').trim()
+        || (Array.isArray(args.changedFiles) && args.changedFiles.length)
+        || String(args.changedFile || '').trim();
+    if (!hasInput) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_PLAYBOOK_INPUT',
+            message: 'update_project_playbook 需要 rule/rules，或可推断规则的 task/outcome/changedFiles。',
+        });
+    }
+    const payload = updateProjectPlaybook({
+        ...args,
+        layout: 'external-data',
+    });
+    return textResult({
+        ...payload,
+        _mcpQuery: agentQueryMeta(args, 'update_project_playbook'),
+    });
+}
+
 function runQueryScript(scriptName, argv, timeoutMs) {
     const startedAt = Date.now();
     const child = spawnSync(process.execPath, [path.resolve(__dirname, '..', 'bin', scriptName), ...argv], {
@@ -1755,11 +1953,19 @@ async function handleMcpRequest(request) {
                                                                                     ? reviewPatchForAgentTool(args)
                                                                                     : name === 'record_task_outcome'
                                                                                         ? recordTaskOutcomeTool(args)
-                                                                                        : name === 'query_project_chain'
-                                                                                            ? queryProjectChain(args)
-                                                                                            : name === 'query_feature_chain'
-                                                                                                ? queryFeatureChain(args)
-                                                                                                : textResult({ error: `Unknown tool: ${name}` }));
+                                                                                        : name === 'recall_task_memory'
+                                                                                            ? recallTaskMemoryTool(args)
+                                                                                            : name === 'prepare_agent_brief'
+                                                                                                ? prepareAgentBriefTool(args)
+                                                                                                : name === 'summarize_project_memory'
+                                                                                                    ? summarizeProjectMemoryTool(args)
+                                                                                                    : name === 'update_project_playbook'
+                                                                                                        ? updateProjectPlaybookTool(args)
+                                                                                                        : name === 'query_project_chain'
+                                                                                                            ? queryProjectChain(args)
+                                                                                                            : name === 'query_feature_chain'
+                                                                                                                ? queryFeatureChain(args)
+                                                                                                                : textResult({ error: `Unknown tool: ${name}` }));
         return { jsonrpc: '2.0', id: request.id, result };
     }
     if (request.id == null) {

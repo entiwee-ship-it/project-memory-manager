@@ -27,6 +27,9 @@ function parseExecutionArgs(argv = []) {
         summary: '',
         validation: [],
         observations: [],
+        rules: [],
+        category: '',
+        source: '',
         confidence: 'medium',
         json: false,
     };
@@ -97,6 +100,18 @@ function parseExecutionArgs(argv = []) {
         }
         if (token === '--observation' || token === '--note') {
             pushArg(args, 'observations', argv[++index]);
+            continue;
+        }
+        if (token === '--rule') {
+            pushArg(args, 'rules', argv[++index]);
+            continue;
+        }
+        if (token === '--category') {
+            args.category = argv[++index] || '';
+            continue;
+        }
+        if (token === '--source') {
+            args.source = argv[++index] || '';
             continue;
         }
         if (token === '--confidence') {

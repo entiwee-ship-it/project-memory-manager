@@ -20,15 +20,23 @@ node src/bin/plan-task-execution.js
 node src/bin/validate-edit-scope.js
 node src/bin/review-patch-for-agent.js
 node src/bin/record-task-outcome.js
+node src/bin/recall-task-memory.js
+node src/bin/prepare-agent-brief.js
+node src/bin/summarize-project-memory.js
+node src/bin/update-project-playbook.js
 node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```
 
 ## Agent 执行闭环
 
-这些命令是 MCP 工具不可用时的兜底入口。AI 日常开发应优先用 MCP 的 `decide_pmm_usage`、`plan_task_execution`、`prepare_task_context`、`explain_feature_for_agent`、`analyze_change_impact`、`validate_edit_scope`、`review_patch_for_agent` 和 `record_task_outcome`。
+这些命令是 MCP 工具不可用时的兜底入口。AI 日常开发应优先用 MCP 的 `prepare_agent_brief`、`recall_task_memory`、`summarize_project_memory`、`update_project_playbook`、`decide_pmm_usage`、`plan_task_execution`、`prepare_task_context`、`explain_feature_for_agent`、`analyze_change_impact`、`validate_edit_scope`、`review_patch_for_agent` 和 `record_task_outcome`。
 
 ```powershell
+node src/bin/prepare-agent-brief.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 Facebook OAuth token 保存逻辑" --json
+node src/bin/recall-task-memory.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 Facebook OAuth token 保存逻辑" --json
+node src/bin/summarize-project-memory.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --json
+node src/bin/update-project-playbook.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --rule "涉及 Facebook OAuth 时必须同时复核 authorize、callback、status route 和 token 加密边界" --category oauth --json
 node src/bin/decide-pmm-usage.js --task "赠送活动 UI 小改" --known-file cms-client/src/views/mall/gift-activity/components/ProductStep.vue --known-file cms-client/src/views/mall/gift-activity/components/ConfigStep.vue --json
 node src/bin/plan-task-execution.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --json
 node src/bin/prepare-task-context.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修改 settings 页 AI 配置保存逻辑" --json
@@ -41,7 +49,7 @@ node src/bin/record-task-outcome.js --workspace-root E:/xile-workspace/next-app 
 git diff -- app/settings/page.tsx | node src/bin/analyze-change-impact.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --stdin-diff --json
 ```
 
-输出面向 AI prompt 注入，包含 PMM 使用决策、任务理解、相关 feature、入口、关键文件、调用链摘要、数据表影响、外部服务、编辑边界、验证命令、不确定点、复核 verdict、任务结果记录和 `evidence`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`。
+输出面向 AI prompt 注入，包含 PMM 使用决策、任务理解、历史任务召回、项目 playbook、相关 feature、入口、关键文件、调用链摘要、数据表影响、外部服务、编辑边界、验证命令、不确定点、复核 verdict、任务结果记录和 `evidence`。证据字段会尽量提供 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence`。
 
 Cocos prefab query examples:
 

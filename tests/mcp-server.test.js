@@ -168,6 +168,10 @@ async function testToolsList() {
         'validate_edit_scope',
         'review_patch_for_agent',
         'record_task_outcome',
+        'recall_task_memory',
+        'prepare_agent_brief',
+        'summarize_project_memory',
+        'update_project_playbook',
         'query_project_chain',
         'query_feature_chain',
     ]) {

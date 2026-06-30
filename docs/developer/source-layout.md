@@ -8,7 +8,7 @@ Use these ownership boundaries:
 
 - lifecycle setup: `src/commands/lifecycle`
 - build/discovery: `src/commands/build`
-- Agent Context Pack 与 Agent Execution Loop 领域逻辑: `src/agent`
+- Agent Context Pack、Agent Execution Loop 与 Agent Memory Recall 领域逻辑: `src/agent`
 - query commands: `src/commands/query` and `src/query`
 - MCP transport: `src/mcp`
 - Cocos authoring: `src/commands/cocos` plus `src/extraction/cocos`

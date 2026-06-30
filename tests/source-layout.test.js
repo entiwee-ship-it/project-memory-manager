@@ -55,6 +55,10 @@ function testRequiredBins() {
         'src/bin/validate-edit-scope.js',
         'src/bin/review-patch-for-agent.js',
         'src/bin/record-task-outcome.js',
+        'src/bin/recall-task-memory.js',
+        'src/bin/prepare-agent-brief.js',
+        'src/bin/summarize-project-memory.js',
+        'src/bin/update-project-playbook.js',
         'src/bin/rebuild-kbs.js',
         'src/bin/validate-package.js',
     ]) {

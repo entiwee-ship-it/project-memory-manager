@@ -7,6 +7,24 @@
 
 ## [未发布]
 
+## [0.70.0] - 2026-06-30
+
+### 新增
+- 新增 Agent Memory Recall 核心模块，可从 `record_task_outcome` 写入的 JSONL 记录中召回相似历史任务、相关文件、验证命令、观察和 playbook 规则。
+- 新增 MCP 工具 `recall_task_memory`，输入自然语言任务即可召回相关历史 outcome，用于跨会话恢复项目经验。
+- 新增 MCP 工具 `prepare_agent_brief`，聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件、验证命令和风险提示，作为 AI 动手前的一站式简报。
+- 新增 MCP 工具 `summarize_project_memory`，汇总当前项目已沉淀的任务记录、常改文件、常用验证命令和 playbook 规则。
+- 新增 MCP 工具 `update_project_playbook`，支持手工写入项目规则，也可从 task/outcome/changedFiles 中确定性推断 OAuth、auth/token、Prisma/API 等项目惯例。
+- 新增 CLI 兜底入口 `recall-task-memory.js`、`prepare-agent-brief.js`、`summarize-project-memory.js`、`update-project-playbook.js`。
+
+### 改进
+- Agent 工作流升级为“任务开始 brief、执行中复核、任务结束记录、阶段性沉淀 playbook”，让 PMM 不只查询项目，也能反哺 AI 的项目工作记忆。
+- 记忆召回采用确定性关键词、文件路径、风险信号和 playbook 规则评分，保持结果可解释，不引入向量数据库依赖。
+
+### 测试
+- 新增 `tests/agent-memory-recall.test.js`，覆盖 outcome 召回、Agent brief 聚合、project playbook 更新、CLI 兜底和 MCP 工具接入。
+- `npm run test:agent` 现在同时运行 Agent Context Pack、Agent 执行闭环和 Agent Memory Recall 测试。
+
 ## [0.60.0] - 2026-06-30
 
 ### 新增
