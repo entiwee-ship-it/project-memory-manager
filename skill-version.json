@@ -1,6 +1,6 @@
 {
   "name": "project-memory-manager",
-  "version": "0.71.0",
+  "version": "0.80.0",
   "releaseDate": "2026-06-30",
   "repo": "https://github.com/entiwee-ship-it/project-memory-manager.git",
   "upgradePolicy": "edit-source-repo-only",
@@ -122,6 +122,11 @@
     "job-exit-code-final-state",
     "external-import-classification",
     "freshness-source-fallback-gate",
-    "message-selector-guidance"
+    "message-selector-guidance",
+    "agent-preflight",
+    "agent-environment-health",
+    "mcp-agent-preflight",
+    "cli-agent-preflight",
+    "pmm-self-diagnosis-repair-plan"
   ]
 }

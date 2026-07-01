@@ -27,6 +27,7 @@
 - `decide_pmm_usage`
 - `plan_task_execution`
 - `recall_task_memory`
+- `agent_preflight`
 - `prepare_agent_brief`
 - `summarize_project_memory`
 - `update_project_playbook`
@@ -97,11 +98,34 @@
 
 ## Agent 执行闭环
 
-AI 接到开发任务时，先用 Agent 执行闭环判断 PMM 使用强度，再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
+AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
+
+### `agent_preflight`
+
+v0.80 的开发任务自检入口。它用于在调用 `prepare_agent_brief` 前确认 MCP tool 能力、数据根、目标项目 KB freshness 和 skill 版本是否可用，避免在旧 MCP 进程、错误数据根或 stale KB 下返回看似可用的 PMM 上下文。
+
+输入：
+
+```json
+{
+  "workspaceRoot": "<project-root>",
+  "dataRoot": "<pmm-data-root>",
+  "task": "修复登录接口"
+}
+```
+
+输出字段：
+
+- `kind`：固定为 `agent-preflight`。
+- `status`：`ready`、`needs_action` 或 `blocked`。
+- `health.checks`：环境检查项和检查结果。
+- `findings`：发现的问题，例如 `mcp_capability_mismatch` 或 `kb_freshness_not_ready`。
+- `repairPlan`：建议修复步骤。需要用户介入的重启 Codex、改 MCP 配置、重装 skill 等动作只给明确步骤，不自动执行。
+- `nextAction`：AI 下一步动作。`status=blocked` 时应先修复，不继续返回或信任旧 PMM 上下文。
 
 ### `prepare_agent_brief`
 
-v0.70 的首选任务入口。它聚合 Usage Gate、执行计划、历史任务召回、项目 playbook、推荐文件、验证命令和风险提示。
+preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划、历史任务召回、项目 playbook、推荐文件、验证命令和风险提示。preflight blocked 时，它不应继续返回看似可用的旧 PMM 上下文。
 
 ```json
 {

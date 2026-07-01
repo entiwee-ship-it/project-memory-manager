@@ -173,6 +173,7 @@ async function testToolsList() {
         'review_patch_for_agent',
         'record_task_outcome',
         'recall_task_memory',
+        'agent_preflight',
         'prepare_agent_brief',
         'summarize_project_memory',
         'update_project_playbook',
@@ -181,6 +182,51 @@ async function testToolsList() {
     ]) {
         assert.ok(names.includes(expectedName), `missing MCP tool: ${expectedName}`);
     }
+}
+
+async function testAgentPreflightViaMcp() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+
+    const response = await callTool('agent_preflight', { workspaceRoot, dataRoot });
+    const result = parseTextResult(response);
+
+    assert.equal(result.kind, 'agent-preflight');
+    assert.ok(['blocked', 'needs_action', 'ready'].includes(result.status));
+    assert.equal(result._mcpQuery.tool, 'agent_preflight');
+    assert.equal(Array.isArray(result.health.checks), true);
+}
+
+async function testAgentPreflightRequiresWorkspaceRoot() {
+    const { dataRoot } = makeWorkspace();
+
+    const response = await callTool('agent_preflight', { dataRoot });
+    const result = parseTextResult(response);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'MISSING_WORKSPACE_ROOT');
+}
+
+function findHealthCheck(result, code) {
+    const checks = result.preflight?.health?.checks || [];
+    const check = checks.find(item => item.code === code);
+    assert.ok(check, `missing preflight health check: ${code}`);
+    return check;
+}
+
+async function testPrepareAgentBriefInjectsMcpRuntime() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+
+    const response = await callTool('prepare_agent_brief', {
+        workspaceRoot,
+        dataRoot,
+        task: '赠送活动 UI 小改',
+        knownFiles: ['cms-client/src/views/mall/gift-activity/components/ProductStep.vue'],
+    });
+    const result = parseTextResult(response);
+
+    assert.equal(result.preflight.kind, 'agent-preflight');
+    assert.equal(findHealthCheck(result, 'mcp_runtime_version_detected').status, 'ok');
+    assert.equal(findHealthCheck(result, 'mcp_capability_match').status, 'ok');
 }
 
 async function testInitialize() {
@@ -669,6 +715,9 @@ async function testQueryFeatureChainAutoRebuildsStaleKb() {
 Promise.all([
     testInitialize(),
     testToolsList(),
+    testAgentPreflightViaMcp(),
+    testAgentPreflightRequiresWorkspaceRoot(),
+    testPrepareAgentBriefInjectsMcpRuntime(),
     testDiagnoseUninitializedWorkspace(),
     testWorkspaceRegistryToolsViaMcp(),
     testInitAndDetectTopologyViaMcp(),

@@ -10,22 +10,25 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 推荐工具顺序：
 
-1. `get_current_state`
-2. 路径或数据根不确定时，先用 `list_workspaces` / `resolve_workspace` / `diagnose_data_root`
-3. `check_kb_freshness`
-4. `prepare_agent_brief`
-5. `decide_pmm_usage` / `plan_task_execution` / `prepare_task_context`
-6. `recall_task_memory` / `summarize_project_memory`
-7. `explain_feature_for_agent` / `analyze_change_impact`
-8. `validate_edit_scope` / `review_patch_for_agent`
-9. `record_task_outcome` / `update_project_playbook`
-10. `query_project_chain`
-11. `query_feature_chain`
-12. 如果需要手动维护，再调用 `build_project_index` / `build_feature_index`
-13. `discover_features`
-14. MCP 不可用时，再使用 `src/bin` 下的 CLI 命令兜底
+1. `agent_preflight`
+2. `get_current_state`
+3. 路径或数据根不确定时，先用 `list_workspaces` / `resolve_workspace` / `diagnose_data_root`
+4. `check_kb_freshness`
+5. `prepare_agent_brief`
+6. `decide_pmm_usage` / `plan_task_execution` / `prepare_task_context`
+7. `recall_task_memory` / `summarize_project_memory`
+8. `explain_feature_for_agent` / `analyze_change_impact`
+9. `validate_edit_scope` / `review_patch_for_agent`
+10. `record_task_outcome` / `update_project_playbook`
+11. `query_project_chain`
+12. `query_feature_chain`
+13. 如果需要手动维护，再调用 `build_project_index` / `build_feature_index`
+14. `discover_features`
+15. MCP 不可用时，再使用 `src/bin` 下的 CLI 命令兜底
 
-`prepare_agent_brief` 是 v0.70 的任务级首选入口：它会聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。`decide_pmm_usage` 仍是底层门禁：少量明确 UI 源文件可以只走轻量 PMM 证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应继续使用深度 PMM 上下文。`prepare_agent_brief`、`plan_task_execution`、`validate_edit_scope` 和 `review_patch_for_agent` 在需要深度上下文时会继续遵守 freshness gate。
+`agent_preflight` 是 v0.80 的任务级自检入口：它会先判断 MCP tool、数据根、KB freshness 和 skill 版本是否 ready，并返回 `health.checks`、`findings`、`repairPlan` 和 `nextAction`。只有 `status=ready` 后才继续调用 `prepare_agent_brief`；如果返回 `blocked` 或 `needs_action`，先按 `nextAction` 修复环境，不要把旧 PMM 上下文当成可用结果。
+
+`prepare_agent_brief` 会聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。`decide_pmm_usage` 仍是底层门禁：少量明确 UI 源文件可以只走轻量 PMM 证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应继续使用深度 PMM 上下文。`prepare_agent_brief`、`plan_task_execution`、`validate_edit_scope` 和 `review_patch_for_agent` 在需要深度上下文时会继续遵守 freshness gate。
 
 `get_current_state` 会返回 `projectGlobalFreshness`。Codex 查询前应先看这个状态：
 

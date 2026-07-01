@@ -9,6 +9,7 @@ const {
     summarizeProjectMemory,
     updateProjectPlaybook,
 } = require('../src/agent/memory-recall');
+const { requiredMcpToolsForVersion } = require('../src/agent/environment-health');
 const { recordTaskOutcome } = require('../src/agent/execution-loop');
 const { handleMcpRequest } = require('../src/mcp/server');
 
@@ -103,6 +104,24 @@ function testPrepareAgentBrief(fixture) {
     assert.ok(result.risksAndNotes.some(note => note.includes('Facebook OAuth')));
 }
 
+function testPrepareAgentBriefPreflightBlocked() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-memory-blocked-workspace-'));
+    const dataRoot = path.join(os.tmpdir(), `pmm-memory-blocked-data-${Date.now()}`);
+    const result = prepareAgentBrief({
+        workspaceRoot,
+        dataRoot,
+        installedSkillRoot: repoRoot,
+        runtimeTools: requiredMcpToolsForVersion(),
+        task: '修复 API 鉴权写路径',
+    });
+    assert.equal(result.kind, 'agent-brief');
+    assert.equal(result.preflight.status, 'blocked');
+    assert.equal(result.executionPlan.contextStatus, 'preflight-blocked');
+    assert.deepEqual(result.recommendedFiles, []);
+    assert.equal(result.nextActions[0].type, result.preflight.nextAction.type);
+    assert.equal(result.nextActions[0].action, result.preflight.nextAction.action);
+}
+
 function testSummarizeProjectMemory(fixture) {
     const result = summarizeProjectMemory({
         workspaceRoot: fixture.workspaceRoot,
@@ -186,6 +205,7 @@ async function testMcpTools(fixture) {
     const fixture = createMemoryFixture();
     testRecallTaskMemory(fixture);
     testPrepareAgentBrief(fixture);
+    testPrepareAgentBriefPreflightBlocked();
     testSummarizeProjectMemory(fixture);
     testUpdateProjectPlaybookInference(fixture);
     testCliFallback(fixture);

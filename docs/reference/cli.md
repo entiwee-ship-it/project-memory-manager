@@ -25,6 +25,7 @@ node src/bin/validate-edit-scope.js
 node src/bin/review-patch-for-agent.js
 node src/bin/record-task-outcome.js
 node src/bin/recall-task-memory.js
+node src/bin/agent-preflight.js
 node src/bin/prepare-agent-brief.js
 node src/bin/summarize-project-memory.js
 node src/bin/update-project-playbook.js
@@ -34,7 +35,23 @@ node src/bin/validate-package.js
 
 ## Agent 执行闭环
 
-这些命令是 MCP 工具不可用时的兜底入口。AI 日常开发应优先用 MCP 的 `prepare_agent_brief`、`recall_task_memory`、`summarize_project_memory`、`update_project_playbook`、`decide_pmm_usage`、`plan_task_execution`、`prepare_task_context`、`explain_feature_for_agent`、`analyze_change_impact`、`validate_edit_scope`、`review_patch_for_agent` 和 `record_task_outcome`。
+这些命令是 MCP 工具不可用时的兜底入口。AI 日常开发应优先用 MCP 的 `agent_preflight`；`status=ready` 后再进入 `prepare_agent_brief`、`recall_task_memory`、`summarize_project_memory`、`update_project_playbook`、`decide_pmm_usage`、`plan_task_execution`、`prepare_task_context`、`explain_feature_for_agent`、`analyze_change_impact`、`validate_edit_scope`、`review_patch_for_agent` 和 `record_task_outcome`。
+
+### `agent-preflight.js`
+
+开发任务开始前的 PMM 自检 CLI。它检查 MCP tool 能力、数据根、目标项目 KB freshness 和 skill 版本状态，返回 `kind=agent-preflight`。
+
+```powershell
+node src/bin/agent-preflight.js --workspace-root <project-root> --data-root <pmm-data-root> --task "修复登录接口" --json
+```
+
+主要返回字段：
+
+- `status`：`ready`、`needs_action` 或 `blocked`。
+- `health.checks`：环境检查项和结果。
+- `findings`：发现的问题，例如 MCP 能力不匹配或 KB freshness 未就绪。
+- `repairPlan`：建议修复步骤。需要用户介入的动作只给步骤，不自动执行。
+- `nextAction`：AI 下一步应该做什么。`blocked` 时不要继续使用旧 PMM 上下文。
 
 ```powershell
 node src/bin/prepare-agent-brief.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 Facebook OAuth token 保存逻辑" --json

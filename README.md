@@ -66,6 +66,7 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `decide_pmm_usage`：任务开始时判断必须深度使用 PMM、建议使用 PMM，还是只允许小范围 UI 门禁通过。
 - `plan_task_execution`：结合门禁和 PMM 上下文生成 AI 执行计划。
 - `recall_task_memory`：按任务召回历史 outcome、相关文件、验证命令、观察和 playbook 规则。
+- `agent_preflight`：AI 开发任务开始前的 PMM 自检入口，返回 health、findings、repairPlan 和 nextAction。
 - `prepare_agent_brief`：任务开始前聚合 usage gate、执行计划、历史记忆、playbook、推荐文件和验证命令。
 - `summarize_project_memory`：汇总当前项目已沉淀的任务记录和规则。
 - `update_project_playbook`：把稳定项目规则写入外置 PMM playbook，或从任务结果中确定性推断规则。
@@ -80,9 +81,10 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 ## Agent 执行闭环
 
-PMM v0.70 起，AI 接到开发任务时优先使用 `prepare_agent_brief`，一次拿到 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
+PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
 
-- `prepare_agent_brief` / `prepare-agent-brief.js`：适合任务开始前使用，是 v0.70 的首选高层入口。
+- `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。
+- `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。
 - `recall_task_memory` / `recall-task-memory.js`：适合只想查历史任务时使用，例如“之前 OAuth token 怎么验证过”。
 - `summarize_project_memory` / `summarize-project-memory.js`：适合跨会话接力或阶段复盘时查看 PMM 已记住什么。
 - `update_project_playbook` / `update-project-playbook.js`：适合把稳定项目规则沉淀成可召回 playbook。
@@ -124,6 +126,7 @@ node src/bin/validate-edit-scope.js
 node src/bin/review-patch-for-agent.js
 node src/bin/record-task-outcome.js
 node src/bin/recall-task-memory.js
+node src/bin/agent-preflight.js
 node src/bin/prepare-agent-brief.js
 node src/bin/summarize-project-memory.js
 node src/bin/update-project-playbook.js

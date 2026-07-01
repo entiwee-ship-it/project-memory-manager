@@ -31,6 +31,7 @@ const {
     summarizeProjectMemory,
     updateProjectPlaybook,
 } = require('../agent/memory-recall');
+const { agentPreflight } = require('../agent/environment-health');
 const {
     buildWorkspaceIdentity,
     diagnoseDataRoot,
@@ -475,6 +476,20 @@ const TOOL_DEFINITIONS = [
                 changedFile: { type: 'string' },
                 limit: { type: 'number' },
                 scanLimit: { type: 'number' },
+            },
+            required: ['workspaceRoot'],
+        },
+    },
+    {
+        name: 'agent_preflight',
+        description: 'Diagnose whether PMM is ready for an AI task and return health checks, findings, repair actions, and next action.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
             },
             required: ['workspaceRoot'],
         },
@@ -1678,6 +1693,33 @@ function recallTaskMemoryTool(args) {
     });
 }
 
+function mcpRuntimeContext() {
+    const runtimeVersion = currentSkillSummary();
+    return {
+        runtimeTools: TOOL_DEFINITIONS.map(tool => tool.name),
+        runtimeVersion: runtimeVersion?.version || runtimeVersion || '',
+    };
+}
+
+function agentPreflightTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'agent_preflight 需要 workspaceRoot。',
+        });
+    }
+    const payload = agentPreflight({
+        ...args,
+        layout: 'external-data',
+        ...mcpRuntimeContext(),
+    });
+    return textResult({
+        ...payload,
+        _mcpQuery: agentQueryMeta(args, 'agent_preflight'),
+    });
+}
+
 function prepareAgentBriefTool(args) {
     if (!hasWorkspaceRoot(args)) {
         return textResult({
@@ -1693,7 +1735,11 @@ function prepareAgentBriefTool(args) {
             message: 'prepare_agent_brief 需要 task 或 query。',
         });
     }
-    return runExecutionLoopTool(args, 'prepare_agent_brief', prepareAgentBrief);
+    return runExecutionLoopTool(args, 'prepare_agent_brief', briefArgs => prepareAgentBrief({
+        ...briefArgs,
+        layout: 'external-data',
+        ...mcpRuntimeContext(),
+    }));
 }
 
 function summarizeProjectMemoryTool(args) {
@@ -2044,9 +2090,11 @@ async function handleMcpRequest(request) {
                                                                                                 : name === 'review_patch_for_agent'
                                                                                                     ? reviewPatchForAgentTool(args)
                                                                                                     : name === 'record_task_outcome'
-                                                                                                        ? recordTaskOutcomeTool(args)
-                                                                                                        : name === 'recall_task_memory'
-                                                                                                            ? recallTaskMemoryTool(args)
+                                                                                                    ? recordTaskOutcomeTool(args)
+                                                                                                    : name === 'recall_task_memory'
+                                                                                                        ? recallTaskMemoryTool(args)
+                                                                                                        : name === 'agent_preflight'
+                                                                                                            ? agentPreflightTool(args)
                                                                                                             : name === 'prepare_agent_brief'
                                                                                                                 ? prepareAgentBriefTool(args)
                                                                                                                 : name === 'summarize_project_memory'

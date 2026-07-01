@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { agentPreflight } = require('./environment-health');
 const { decidePmmUsage, planTaskExecution } = require('./execution-loop');
 const { ensureDir, readJsonSafe, writeJsonAtomic } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
@@ -475,11 +476,65 @@ function summarizeProjectMemory(options = {}) {
     };
 }
 
+/**
+ * 生成 Agent 执行 brief，并在返回旧 PMM 上下文前执行 preflight 门禁。
+ *
+ * @param {object} options brief 输入参数。
+ * @returns {object} Agent brief 稳定返回结构。
+ */
 function prepareAgentBrief(options = {}) {
     const task = String(options.task || options.query || '').trim();
+    const preflight = agentPreflight(options);
     const pmmGate = decidePmmUsage(options);
-    const executionPlan = planTaskExecution(options);
     const memory = recallTaskMemory({ ...options, task });
+    if (preflight.status === 'blocked') {
+        return {
+            kind: 'agent-brief',
+            workspaceRoot: memory.workspaceRoot,
+            dataRoot: memory.dataRoot,
+            task,
+            preflight,
+            pmmGate,
+            executionPlan: {
+                contextStatus: 'preflight-blocked',
+                targetFiles: [],
+                editBoundary: {
+                    primaryFiles: [],
+                    relatedRoots: [],
+                    guidance: [
+                        'Agent Preflight 处于 blocked 状态，先执行 preflight.nextAction。',
+                        '阻断解除前不得使用旧 project-global KB 作为可用上下文。',
+                    ],
+                },
+                steps: [
+                    {
+                        step: '修复 preflight 阻断',
+                        action: '先执行 preflight.nextAction，再重新生成 agent brief。',
+                        evidence: preflight.findings.slice(0, 8),
+                    },
+                ],
+                validation: {
+                    recommendedCommands: [],
+                },
+                uncertainties: preflight.findings.map(finding => finding.message || finding.code),
+            },
+            memory,
+            recommendedFiles: [],
+            validation: {
+                recommendedCommands: [],
+            },
+            risksAndNotes: [
+                'Agent Preflight blocked，已禁止返回看似可用的旧 PMM 上下文。',
+                ...preflight.findings.map(finding => finding.message || finding.code),
+            ],
+            nextActions: [preflight.nextAction],
+            evidence: [
+                ...(memory.evidence || []).slice(0, 12),
+            ],
+        };
+    }
+
+    const executionPlan = planTaskExecution(options);
     const recommendedFiles = uniq([
         ...(executionPlan.targetFiles || []),
         ...memory.relatedFiles.map(item => item.value),
@@ -499,6 +554,7 @@ function prepareAgentBrief(options = {}) {
         workspaceRoot: memory.workspaceRoot,
         dataRoot: memory.dataRoot,
         task,
+        preflight,
         pmmGate,
         executionPlan: {
             contextStatus: executionPlan.contextStatus,
