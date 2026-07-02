@@ -211,7 +211,15 @@ function collectConfiguredSourceInputs(config = {}) {
 }
 
 function collectFilesFromTarget(root, targetPath, files, rules) {
-    if (!targetPath || hasDefaultIgnoredPathSegment(targetPath) || !fs.existsSync(targetPath)) {
+    if (!targetPath) {
+        return;
+    }
+    const relativeTarget = normalize(path.relative(root, path.resolve(targetPath)));
+    const isOutsideWorkspace = relativeTarget === '..' || relativeTarget.startsWith('../') || path.isAbsolute(relativeTarget);
+    const isDefaultIgnored = isOutsideWorkspace
+        ? hasDefaultIgnoredPathSegment(targetPath)
+        : hasDefaultIgnoredPathSegment(relativeTarget);
+    if (isDefaultIgnored || !fs.existsSync(targetPath)) {
         return;
     }
     const stat = fs.statSync(targetPath);
@@ -224,7 +232,10 @@ function collectFilesFromTarget(root, targetPath, files, rules) {
     if (!stat.isDirectory()) {
         return;
     }
-    for (const filePath of listFilesRecursive(targetPath, () => true)) {
+    for (const filePath of listFilesRecursive(targetPath, () => true, [], {
+        defaultIgnore: false,
+        ignorePath: filePath => hasDefaultIgnoredPathSegment(path.relative(root, filePath)),
+    })) {
         if (!isIgnoredSnapshotFile(root, filePath, rules)) {
             files.add(path.resolve(filePath));
         }

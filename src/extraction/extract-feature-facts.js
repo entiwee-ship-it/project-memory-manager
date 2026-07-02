@@ -3955,9 +3955,18 @@ if (TYPESCRIPT_RUNTIME) {
 function extractScriptInsights(methodRoots, context, options = {}) {
     const { bodySnippetMaxLength = 500, extractFullBody = false, enableStructuredSummary = false } = options;
     const result = [];
+    const workspaceRoot = context?.cwd || process.cwd();
 
     for (const root of methodRoots) {
-        const scriptFiles = listFilesRecursive(root, filePath => /\.(ts|tsx|js|jsx|vue)$/i.test(filePath) && !filePath.endsWith('.d.ts'));
+        const scriptFiles = listFilesRecursive(
+            root,
+            filePath => /\.(ts|tsx|js|jsx|vue)$/i.test(filePath) && !filePath.endsWith('.d.ts'),
+            [],
+            {
+                defaultIgnore: false,
+                ignorePath: filePath => hasDefaultIgnoredPathSegment(path.relative(workspaceRoot, filePath)),
+            }
+        );
         for (const scriptFile of scriptFiles) {
             const normalizedScript = normalize(scriptFile);
             let originalSource;

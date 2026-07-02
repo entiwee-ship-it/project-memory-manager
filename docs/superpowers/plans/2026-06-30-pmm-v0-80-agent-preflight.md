@@ -1,12 +1,14 @@
 # PMM v0.80 Agent Preflight Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build PMM v0.80 Agent Preflight so AI can diagnose PMM readiness, version drift, MCP capability mismatch, data-root issues, KB freshness, and repair actions before relying on PMM context.
 
 **Architecture:** Add a focused `src/agent/environment-health.js` core that gathers diagnostics and returns `agent-preflight` JSON. Expose it through CLI and MCP, then let `prepare_agent_brief` include or stop on preflight state before returning development context.
 
 **Tech Stack:** Node.js CommonJS, Node built-in `assert`, PMM external-data layout, MCP JSON-RPC handler in `src/mcp/server.js`, existing workspace registry and source freshness helpers.
+
+**Completion Status:** Completed on 2026-07-02. Final wrap-up added PMM self-bootstrap coverage for `codex-tools/project-memory-manager` paths, rebuilt PMM's own project-global KB, and verified CLI preflight as `ready` with fresh 122-file source snapshot. The current Codex MCP process may need a restart to reload source changes made during this wrap-up.
 
 ---
 
@@ -55,7 +57,7 @@
 - Read: `src/shared/source-snapshot.js`
 - Read: `src/maintenance/show-version.js`
 
-- [ ] **Step 1: Write the failing test file**
+- [x] **Step 1: Write the failing test file**
 
 Create `tests/agent-preflight.test.js` with these tests. This file intentionally imports `agentPreflight` before it exists.
 
@@ -254,7 +256,7 @@ testInstalledSkillFailureDoesNotCrash();
 console.log('agent-preflight validation passed');
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -264,7 +266,7 @@ node tests/agent-preflight.test.js
 
 Expected: FAIL with a `Cannot find module '../src/agent/environment-health'` error.
 
-- [ ] **Step 3: Commit the failing test**
+- [x] **Step 3: Commit the failing test**
 
 Run:
 
@@ -281,7 +283,7 @@ Expected: commit succeeds and contains only the new failing test.
 - Create: `src/agent/environment-health.js`
 - Modify: `tests/agent-preflight.test.js` only if an assertion exposes a mismatch with the public shape below.
 
-- [ ] **Step 1: Implement the Agent Preflight public shape**
+- [x] **Step 1: Implement the Agent Preflight public shape**
 
 Create `src/agent/environment-health.js`. Use this public shape exactly so later CLI and MCP tasks have a stable contract.
 
@@ -603,7 +605,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 2: Run the core test**
+- [x] **Step 2: Run the core test**
 
 Run:
 
@@ -613,7 +615,7 @@ node tests/agent-preflight.test.js
 
 Expected: PASS with `agent-preflight validation passed`.
 
-- [ ] **Step 3: Commit the core**
+- [x] **Step 3: Commit the core**
 
 Run:
 
@@ -632,7 +634,7 @@ Expected: commit succeeds.
 - Modify: `tests/agent-preflight.test.js`
 - Modify: `package.json`
 
-- [ ] **Step 1: Add a failing CLI fallback test**
+- [x] **Step 1: Add a failing CLI fallback test**
 
 Append this test before the final `console.log` in `tests/agent-preflight.test.js`, and call it before the log.
 
@@ -665,7 +667,7 @@ Add this call near the bottom:
 testCliPreflight();
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -675,7 +677,7 @@ node tests/agent-preflight.test.js
 
 Expected: FAIL because `src/bin/agent-preflight.js` does not exist.
 
-- [ ] **Step 3: Implement command module**
+- [x] **Step 3: Implement command module**
 
 Create `src/commands/agent/agent-preflight.js`:
 
@@ -737,7 +739,7 @@ if (require.main === module) {
 }
 ```
 
-- [ ] **Step 4: Implement thin bin wrapper**
+- [x] **Step 4: Implement thin bin wrapper**
 
 Create `src/bin/agent-preflight.js`:
 
@@ -758,7 +760,7 @@ if (require.main === module) {
 module.exports = { run };
 ```
 
-- [ ] **Step 5: Add package scripts**
+- [x] **Step 5: Add package scripts**
 
 Modify `package.json` scripts:
 
@@ -769,7 +771,7 @@ Modify `package.json` scripts:
 
 Keep the existing script names unchanged.
 
-- [ ] **Step 6: Run CLI tests**
+- [x] **Step 6: Run CLI tests**
 
 Run:
 
@@ -779,7 +781,7 @@ npm.cmd run test:preflight
 
 Expected: PASS with `agent-preflight validation passed`.
 
-- [ ] **Step 7: Commit CLI entry**
+- [x] **Step 7: Commit CLI entry**
 
 Run:
 
@@ -796,7 +798,7 @@ Expected: commit succeeds.
 - Modify: `src/mcp/server.js`
 - Modify: `tests/mcp-server.test.js`
 
-- [ ] **Step 1: Add failing MCP tests**
+- [x] **Step 1: Add failing MCP tests**
 
 In `tests/mcp-server.test.js`, add `agent_preflight` to the expected tool list in `testToolsList`.
 
@@ -825,7 +827,7 @@ Call it in the async runner near the bottom:
 await testAgentPreflightViaMcp();
 ```
 
-- [ ] **Step 2: Run MCP test to verify it fails**
+- [x] **Step 2: Run MCP test to verify it fails**
 
 Run:
 
@@ -835,7 +837,7 @@ npm.cmd run test:mcp
 
 Expected: FAIL with missing MCP tool `agent_preflight`.
 
-- [ ] **Step 3: Wire MCP imports and tool definition**
+- [x] **Step 3: Wire MCP imports and tool definition**
 
 In `src/mcp/server.js`, add:
 
@@ -862,7 +864,7 @@ Add this tool definition before `prepare_agent_brief`:
 },
 ```
 
-- [ ] **Step 4: Add MCP handler**
+- [x] **Step 4: Add MCP handler**
 
 Add a function near `prepareAgentBriefTool`:
 
@@ -895,7 +897,7 @@ In the `tools/call` chain, add `agent_preflight` before `prepare_agent_brief`:
     ? agentPreflightTool(args)
 ```
 
-- [ ] **Step 5: Run MCP test**
+- [x] **Step 5: Run MCP test**
 
 Run:
 
@@ -905,7 +907,7 @@ npm.cmd run test:mcp
 
 Expected: PASS with the existing MCP validation message.
 
-- [ ] **Step 6: Commit MCP tool**
+- [x] **Step 6: Commit MCP tool**
 
 Run:
 
@@ -922,7 +924,7 @@ Expected: commit succeeds.
 - Modify: `src/agent/memory-recall.js`
 - Modify: `tests/agent-memory-recall.test.js`
 
-- [ ] **Step 1: Add failing brief tests**
+- [x] **Step 1: Add failing brief tests**
 
 In `tests/agent-memory-recall.test.js`, update `testPrepareAgentBrief`:
 
@@ -951,7 +953,7 @@ function testPrepareAgentBriefBlockedByPreflight(fixture) {
 
 Call it after `testPrepareAgentBrief(fixture)`.
 
-- [ ] **Step 2: Run memory test to verify it fails**
+- [x] **Step 2: Run memory test to verify it fails**
 
 Run:
 
@@ -961,7 +963,7 @@ node tests/agent-memory-recall.test.js
 
 Expected: FAIL because `prepareAgentBrief` does not return `preflight`.
 
-- [ ] **Step 3: Integrate preflight into memory recall**
+- [x] **Step 3: Integrate preflight into memory recall**
 
 In `src/agent/memory-recall.js`, add:
 
@@ -1030,7 +1032,7 @@ preflight,
 
 Place it after `task`.
 
-- [ ] **Step 4: Run agent memory test**
+- [x] **Step 4: Run agent memory test**
 
 Run:
 
@@ -1040,7 +1042,7 @@ node tests/agent-memory-recall.test.js
 
 Expected: PASS with `agent-memory-recall validation passed`.
 
-- [ ] **Step 5: Run full agent suite**
+- [x] **Step 5: Run full agent suite**
 
 Run:
 
@@ -1050,7 +1052,7 @@ npm.cmd run test:agent
 
 Expected: PASS for context pack, execution loop, memory recall, and preflight tests.
 
-- [ ] **Step 6: Commit brief integration**
+- [x] **Step 6: Commit brief integration**
 
 Run:
 
@@ -1073,7 +1075,7 @@ Expected: commit succeeds.
 - Modify: `skill-version.json`
 - Modify: `tests/source-layout.test.js` only if version metadata expectations need adjustment.
 
-- [ ] **Step 1: Update version metadata**
+- [x] **Step 1: Update version metadata**
 
 In `skill-version.json`, set:
 
@@ -1091,7 +1093,7 @@ Append these capability strings to `capabilities`:
 "pmm-self-diagnosis-repair-plan"
 ```
 
-- [ ] **Step 2: Update README**
+- [x] **Step 2: Update README**
 
 In `README.md`, add `agent_preflight` before `prepare_agent_brief` in the MCP tool list:
 
@@ -1105,7 +1107,7 @@ In the Agent execution section, make the first sentence:
 PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 preflight 返回 `blocked`，先按 `nextAction` 修复 MCP、数据根或 KB freshness。
 ```
 
-- [ ] **Step 3: Update SKILL.md**
+- [x] **Step 3: Update SKILL.md**
 
 In `SKILL.md` MCP priority flow, insert `agent_preflight` before `get_current_state`:
 
@@ -1115,7 +1117,7 @@ In `SKILL.md` MCP priority flow, insert `agent_preflight` before `get_current_st
 
 Renumber the following list items.
 
-- [ ] **Step 4: Update CLI reference**
+- [x] **Step 4: Update CLI reference**
 
 In `docs/reference/cli.md`, add:
 
@@ -1129,7 +1131,7 @@ node src/bin/agent-preflight.js --workspace-root <project-root> --data-root <pmm
 返回 `agent-preflight`，包含 `status`、`health.checks`、`findings`、`repairPlan` 和 `nextAction`。AI 应在 `status=ready` 后继续调用 `prepare-agent-brief.js`。
 ```
 
-- [ ] **Step 5: Update MCP tools reference**
+- [x] **Step 5: Update MCP tools reference**
 
 In `docs/reference/mcp-tools.md`, add a section:
 
@@ -1153,7 +1155,7 @@ In `docs/reference/mcp-tools.md`, add a section:
 - `nextAction`: 下一步应继续、运行命令、重启 Codex 或询问用户
 ```
 
-- [ ] **Step 6: Update troubleshooting**
+- [x] **Step 6: Update troubleshooting**
 
 In `docs/guides/troubleshooting.md`, add:
 
@@ -1170,7 +1172,7 @@ In `docs/guides/troubleshooting.md`, add:
 4. 如果 `findings.code=skill_installation_unreadable` 或安装版本不一致，重新执行 `skill-version.json` 中的安装命令。
 ```
 
-- [ ] **Step 7: Run docs and package validation**
+- [x] **Step 7: Run docs and package validation**
 
 Run:
 
@@ -1181,7 +1183,7 @@ npm.cmd run test:source-layout
 
 Expected: both commands exit 0.
 
-- [ ] **Step 8: Commit docs and version**
+- [x] **Step 8: Commit docs and version**
 
 Run:
 
@@ -1198,7 +1200,7 @@ Expected: commit succeeds. If `tests/source-layout.test.js` was unchanged, `git 
 - No planned source edits.
 - Optional external data write: PMM task outcome in `02_runtime/project-memory-data`.
 
-- [ ] **Step 1: Run targeted test suite**
+- [x] **Step 1: Run targeted test suite**
 
 Run:
 
@@ -1213,7 +1215,7 @@ node src/bin/validate-package.js .
 
 Expected: every command exits 0.
 
-- [ ] **Step 2: Run broader regression where cheap**
+- [x] **Step 2: Run broader regression where cheap**
 
 Run:
 
@@ -1225,7 +1227,7 @@ npm.cmd run test:summary
 
 Expected: every command exits 0.
 
-- [ ] **Step 3: Exercise real PMM project preflight**
+- [x] **Step 3: Exercise real PMM project preflight**
 
 Run:
 
@@ -1235,7 +1237,7 @@ node src/bin/agent-preflight.js --workspace-root "D:/GitHubProject/personal-publ
 
 Expected: JSON parses and `kind` is `agent-preflight`. `status` may be `needs_action` if the current KB is stale before rebuilding; that is acceptable only if `repairPlan` includes `rebuild_project_kb`.
 
-- [ ] **Step 4: Rebuild PMM's own KB after v0.80 changes**
+- [x] **Step 4: Rebuild PMM's own KB after v0.80 changes**
 
 Run:
 
@@ -1245,7 +1247,7 @@ node src/bin/build-project.js --workspace-root "D:/GitHubProject/personal-public
 
 Expected: command exits 0 and writes a project-global KB built with `project-memory-manager@0.80.0`.
 
-- [ ] **Step 5: Re-run real PMM project preflight**
+- [x] **Step 5: Re-run real PMM project preflight**
 
 Run:
 
@@ -1255,7 +1257,7 @@ node src/bin/agent-preflight.js --workspace-root "D:/GitHubProject/personal-publ
 
 Expected: `status` is `ready` or `needs_action` only for CLI-only MCP runtime warnings. It must not be `blocked`.
 
-- [ ] **Step 6: Review final diff**
+- [x] **Step 6: Review final diff**
 
 Run:
 
@@ -1267,7 +1269,7 @@ git diff --check
 
 Expected: no whitespace errors. Working tree contains only intended v0.80 changes if previous tasks were not committed one-by-one; otherwise it is clean and ahead of origin by the v0.80 commits.
 
-- [ ] **Step 7: Record PMM task outcome**
+- [x] **Step 7: Record PMM task outcome**
 
 Run:
 

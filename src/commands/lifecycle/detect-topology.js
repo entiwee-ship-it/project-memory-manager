@@ -33,6 +33,8 @@ const IGNORED_PATH_SEGMENTS = new Set([
     '.nuxt',
     '.turbo',
     '.cache',
+    'out',
+    'project-memory-data',
 ]);
 
 function hasIgnoredSegment(relativePath) {
@@ -211,6 +213,7 @@ function run(argv = process.argv.slice(2)) {
         filePath => MANIFEST_BASENAMES.has(path.basename(filePath).toLowerCase()),
         [],
         {
+            defaultIgnore: false,
             ignorePath: filePath => hasIgnoredSegment(path.relative(root, filePath)),
         }
     ).filter(filePath => !hasIgnoredSegment(path.relative(root, filePath)));

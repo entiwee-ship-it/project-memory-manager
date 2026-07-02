@@ -75,10 +75,11 @@ function collectProjectScanRoots(projectProfile, root) {
 
     const shouldIgnoreScanRoot = targetPath => {
         const relativeTarget = normalize(path.relative(root, path.resolve(targetPath)));
+        const isOutsideWorkspace = relativeTarget === '..' || relativeTarget.startsWith('../') || path.isAbsolute(relativeTarget);
         return (
             projectGlobalExcludedRoots.some(excluded => relativeTarget === excluded || relativeTarget.startsWith(`${excluded}/`)) ||
             hasDefaultIgnoredPathSegment(relativeTarget) ||
-            hasDefaultIgnoredPathSegment(targetPath)
+            (isOutsideWorkspace && hasDefaultIgnoredPathSegment(targetPath))
         );
     };
 

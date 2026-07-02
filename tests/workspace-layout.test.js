@@ -414,6 +414,34 @@ function testGenericNodeToolTopologyBuildsProjectKb() {
     assert.ok(graph.nodes.some(node => node.type === 'method' && node.name.includes('runTool')));
 }
 
+function testTopologyDoesNotIgnoreToolSourceAsWorkspaceRoot() {
+    const parentRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-self-root-'));
+    const workspaceRoot = path.join(parentRoot, 'codex-tools', 'project-memory-manager');
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-self-root-data-'));
+    fs.mkdirSync(path.join(workspaceRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), JSON.stringify({
+        name: 'project-memory-manager-skill-runtime',
+        type: 'commonjs',
+        dependencies: {
+            typescript: 'latest',
+        },
+    }, null, 2));
+    fs.writeFileSync(path.join(workspaceRoot, 'src', 'index.ts'), 'export function runSelfCheck(){ return "ok"; }\n');
+
+    initProjectMemory(['--workspace-root', workspaceRoot, '--data-root', dataRoot, '--name', 'project-memory-manager']);
+    detectProjectTopology(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+    buildProjectKb(['--workspace-root', workspaceRoot, '--data-root', dataRoot]);
+
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot });
+    const profile = JSON.parse(fs.readFileSync(context.paths.projectProfile, 'utf8'));
+    const graph = JSON.parse(fs.readFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), 'utf8'));
+
+    assert.deepEqual(profile.areas.shared, ['']);
+    assert.ok(profile.stacks.shared.includes('nodejs'));
+    assert.ok(graph.nodes.some(node => node.type === 'method' && node.name.includes('runSelfCheck')));
+    assert.ok(graph.sourceSnapshot.files.some(item => item.path === 'src/index.ts'));
+}
+
 testWorkspaceId();
 testExternalDataContext();
 testLegacyContext();
@@ -427,4 +455,5 @@ testGeneratedSnapshotFilesUseContentHash();
 testImportStatsClassifyExternalDependencies();
 testTsconfigPathsResolveRootAlias();
 testGenericNodeToolTopologyBuildsProjectKb();
+testTopologyDoesNotIgnoreToolSourceAsWorkspaceRoot();
 console.log('workspace-layout validation passed');
