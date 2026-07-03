@@ -4,7 +4,13 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { handleMcpRequest } = require('../src/mcp/server');
 const { buildLookup } = require('../src/graph/build-chain-kb');
+const { loadSkillVersion } = require('../src/maintenance/show-version');
+const { buildSourceSnapshot } = require('../src/shared/source-snapshot');
 const { createWorkspaceContext } = require('../src/shared/workspace-layout');
+const { registerWorkspace } = require('../src/shared/workspace-registry');
+
+const repoRoot = path.resolve(__dirname, '..');
+const sourceVersion = loadSkillVersion(repoRoot);
 
 function makeWorkspace(prefix = 'pmm-mcp-workspace-') {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -137,6 +143,49 @@ function writeAmbiguousFeatureKb(workspaceRoot, dataRoot) {
     return featureKey;
 }
 
+function writeFreshProjectGlobalKb(workspaceRoot, dataRoot) {
+    fs.mkdirSync(path.join(workspaceRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'src', 'index.js'), 'export function main(){ return "ok"; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"name":"mcp-output-fixture"}\n');
+
+    const context = createWorkspaceContext({
+        workspaceRoot,
+        dataRoot,
+        layout: 'external-data',
+    });
+    registerWorkspace(context, { name: 'mcp-output-fixture' });
+    const config = {
+        kind: 'project-global-kb-config',
+        methodRoots: ['src'],
+    };
+    const snapshot = buildSourceSnapshot(workspaceRoot, config);
+    fs.mkdirSync(context.paths.configsDir, { recursive: true });
+    fs.mkdirSync(context.paths.projectGlobalDir, { recursive: true });
+    fs.writeFileSync(
+        path.join(context.paths.configsDir, 'project-global.json'),
+        `${JSON.stringify(config, null, 2)}\n`
+    );
+    fs.writeFileSync(
+        path.join(context.paths.projectGlobalDir, 'chain.graph.json'),
+        `${JSON.stringify({
+            kind: 'chain-graph',
+            builtWithSkill: {
+                name: sourceVersion.name,
+                version: sourceVersion.version,
+                repo: sourceVersion.repo,
+                capabilities: ['very-noisy-capability-marker'],
+            },
+            sourceSnapshot: snapshot,
+            nodes: [],
+            edges: [],
+        }, null, 2)}\n`
+    );
+    fs.writeFileSync(
+        path.join(context.paths.projectGlobalDir, 'chain.lookup.json'),
+        `${JSON.stringify({ nodesById: {}, adjacency: { incoming: {}, outgoing: {} } }, null, 2)}\n`
+    );
+}
+
 async function testToolsList() {
     const response = await handleMcpRequest({
         jsonrpc: '2.0',
@@ -196,6 +245,39 @@ async function testAgentPreflightViaMcp() {
     assert.equal(Array.isArray(result.health.checks), true);
 }
 
+async function testAgentPreflightMcpDefaultsToCompactOutput() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('agent_preflight', { workspaceRoot, dataRoot });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result.kind, 'agent-preflight');
+    assert.equal(result._mcpQuery.detail, 'compact');
+    assert.equal(serialized.includes('very-noisy-capability-marker'), false);
+    assert.equal(serialized.includes('"capabilities"'), false);
+    assert.ok(result.health.checkCounts.ok >= 1);
+}
+
+async function testAgentPreflightMcpFullDetailPreservesDiagnostics() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('agent_preflight', {
+        workspaceRoot,
+        dataRoot,
+        detail: 'full',
+    });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result.kind, 'agent-preflight');
+    assert.equal(result._mcpQuery.detail, 'full');
+    assert.equal(serialized.includes('very-noisy-capability-marker'), true);
+    assert.equal(serialized.includes('"capabilities"'), true);
+}
+
 async function testAgentPreflightRequiresWorkspaceRoot() {
     const { dataRoot } = makeWorkspace();
 
@@ -221,12 +303,54 @@ async function testPrepareAgentBriefInjectsMcpRuntime() {
         dataRoot,
         task: '赠送活动 UI 小改',
         knownFiles: ['cms-client/src/views/mall/gift-activity/components/ProductStep.vue'],
+        detail: 'full',
     });
     const result = parseTextResult(response);
 
     assert.equal(result.preflight.kind, 'agent-preflight');
     assert.equal(findHealthCheck(result, 'mcp_runtime_version_detected').status, 'ok');
     assert.equal(findHealthCheck(result, 'mcp_capability_match').status, 'ok');
+}
+
+async function testPrepareAgentBriefMcpDefaultsToCompactOutput() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('prepare_agent_brief', {
+        workspaceRoot,
+        dataRoot,
+        task: '调整 src/index.js 的导出说明',
+        knownFiles: ['src/index.js'],
+    });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result.kind, 'agent-brief');
+    assert.equal(result._mcpQuery.detail, 'compact');
+    assert.equal(result.preflight, undefined);
+    assert.equal(result.preflightSummary.kind, 'agent-preflight-summary');
+    assert.equal(serialized.includes('very-noisy-capability-marker'), false);
+    assert.equal(serialized.includes('"capabilities"'), false);
+}
+
+async function testPrepareAgentBriefMcpFullDetailKeepsPreflight() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('prepare_agent_brief', {
+        workspaceRoot,
+        dataRoot,
+        task: '调整 src/index.js 的导出说明',
+        knownFiles: ['src/index.js'],
+        detail: 'full',
+    });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result.kind, 'agent-brief');
+    assert.equal(result._mcpQuery.detail, 'full');
+    assert.equal(result.preflight.kind, 'agent-preflight');
+    assert.equal(serialized.includes('very-noisy-capability-marker'), true);
 }
 
 async function testInitialize() {
@@ -716,8 +840,12 @@ Promise.all([
     testInitialize(),
     testToolsList(),
     testAgentPreflightViaMcp(),
+    testAgentPreflightMcpDefaultsToCompactOutput(),
+    testAgentPreflightMcpFullDetailPreservesDiagnostics(),
     testAgentPreflightRequiresWorkspaceRoot(),
     testPrepareAgentBriefInjectsMcpRuntime(),
+    testPrepareAgentBriefMcpDefaultsToCompactOutput(),
+    testPrepareAgentBriefMcpFullDetailKeepsPreflight(),
     testDiagnoseUninitializedWorkspace(),
     testWorkspaceRegistryToolsViaMcp(),
     testInitAndDetectTopologyViaMcp(),

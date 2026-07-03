@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const { projectAgentOutput } = require('../../agent/output-projection');
 const { prepareAgentBrief } = require('../../agent/memory-recall');
 const { hasTaskOrChangeInput, parseExecutionArgs, printJsonIfRequested } = require('./execution-loop-cli');
 
@@ -29,7 +30,13 @@ function printText(result) {
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const result = prepareAgentBrief(args);
-    if (!printJsonIfRequested(args, result)) {
+    if (args.json && (args.compact || args.detail || args.verbosity)) {
+        const output = projectAgentOutput(result, {
+            detail: args.detail || args.verbosity || (args.compact ? 'compact' : 'full'),
+            compact: args.compact,
+        }, 'prepare_agent_brief');
+        console.log(JSON.stringify(output, null, 2));
+    } else if (!printJsonIfRequested(args, result)) {
         printText(result);
     }
     return result;

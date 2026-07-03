@@ -47,6 +47,7 @@ function writeFreshProjectKb(fixture, options = {}) {
             name: sourceVersion.name,
             version: options.version || sourceVersion.version,
             repo: sourceVersion.repo,
+            capabilities: ['preflight-noisy-capability-marker'],
         },
         sourceSnapshot: snapshot,
         nodes: [],
@@ -225,6 +226,33 @@ function testCliJson() {
     assertCheckCodes(result);
 }
 
+function testCliCompactJson() {
+    const fixture = createFixture();
+    writeFreshProjectKb(fixture);
+    writeTaskMemory(fixture);
+    const child = spawnSync(process.execPath, [
+        path.join(repoRoot, 'src/bin/agent-preflight.js'),
+        '--workspace-root', fixture.workspaceRoot,
+        '--data-root', fixture.dataRoot,
+        '--installed-skill-root', repoRoot,
+        '--json',
+        '--compact',
+    ], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        windowsHide: true,
+        maxBuffer: 20 * 1024 * 1024,
+    });
+    assert.equal(child.status, 0, child.stderr || child.stdout);
+    const result = JSON.parse(child.stdout);
+    const serialized = JSON.stringify(result);
+    assert.equal(result.kind, 'agent-preflight');
+    assert.equal(result._output.detail, 'compact');
+    assert.equal(serialized.includes('preflight-noisy-capability-marker'), false);
+    assert.equal(serialized.includes('"capabilities"'), false);
+    assert.ok(result.health.checkCounts.ok >= 1);
+}
+
 testReady();
 testRuntimeVersionObjectMatchesSourceVersion();
 testStaleKbNeedsRebuild();
@@ -233,5 +261,6 @@ testRegistryMissingNeedsRegistration();
 testMissingDataRootBlocks();
 testPartialDiagnosticFailureDoesNotThrow();
 testCliJson();
+testCliCompactJson();
 
 console.log('agent-preflight validation passed');

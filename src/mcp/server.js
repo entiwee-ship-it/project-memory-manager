@@ -32,6 +32,7 @@ const {
     updateProjectPlaybook,
 } = require('../agent/memory-recall');
 const { agentPreflight } = require('../agent/environment-health');
+const { projectAgentOutput, resolveOutputDetail } = require('../agent/output-projection');
 const {
     buildWorkspaceIdentity,
     diagnoseDataRoot,
@@ -490,6 +491,8 @@ const TOOL_DEFINITIONS = [
                 dataRoot: { type: 'string' },
                 task: { type: 'string' },
                 query: { type: 'string' },
+                detail: { type: 'string', enum: ['compact', 'full'] },
+                verbosity: { type: 'string', enum: ['compact', 'full'] },
             },
             required: ['workspaceRoot'],
         },
@@ -518,6 +521,8 @@ const TOOL_DEFINITIONS = [
                 depth: { type: 'number' },
                 limit: { type: 'number' },
                 freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
+                detail: { type: 'string', enum: ['compact', 'full'] },
+                verbosity: { type: 'string', enum: ['compact', 'full'] },
             },
             required: ['workspaceRoot', 'task'],
         },
@@ -1500,6 +1505,7 @@ function agentQueryMeta(args = {}, toolName = '') {
         limit: options.limit,
         depth: options.depth,
         freshnessPolicy: resolveFreshnessPolicy(args),
+        detail: resolveOutputDetail(args, 'compact'),
     };
 }
 
@@ -1584,7 +1590,7 @@ function hasWorkspaceRoot(args = {}) {
 }
 
 function attachGateOnlyMcpMetadata(payload, args, toolName) {
-    return textResult({
+    const enriched = {
         ...payload,
         _mcpFreshness: {
             scope: 'usage-gate',
@@ -1595,7 +1601,8 @@ function attachGateOnlyMcpMetadata(payload, args, toolName) {
             blocked: false,
         },
         _mcpQuery: agentQueryMeta(args, toolName),
-    });
+    };
+    return textResult(projectAgentOutput(enriched, args, toolName));
 }
 
 function runExecutionLoopTool(args, toolName, fn) {
@@ -1628,7 +1635,8 @@ function runExecutionLoopTool(args, toolName, fn) {
         limit: options.limit,
         depth: options.depth || args.depth,
     });
-    return textResult(attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, toolName)));
+    const enriched = attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, toolName));
+    return textResult(projectAgentOutput(enriched, args, toolName));
 }
 
 function decidePmmUsageTool(args) {
@@ -1714,10 +1722,11 @@ function agentPreflightTool(args) {
         layout: 'external-data',
         ...mcpRuntimeContext(),
     });
-    return textResult({
+    const enriched = {
         ...payload,
         _mcpQuery: agentQueryMeta(args, 'agent_preflight'),
-    });
+    };
+    return textResult(projectAgentOutput(enriched, args, 'agent_preflight'));
 }
 
 function prepareAgentBriefTool(args) {

@@ -81,10 +81,10 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 ## Agent 执行闭环
 
-PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
+PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。v0.81 起，MCP 的 `agent_preflight` 和 `prepare_agent_brief` 默认返回紧凑视图，只保留状态、关键问题、下一步动作、推荐文件、验证命令和少量证据；需要完整诊断、snapshot 或能力列表时传 `detail=full`。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
 
-- `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。
-- `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。
+- `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。MCP 默认紧凑；CLI `--json` 默认完整，`--compact` 输出紧凑。
+- `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。MCP 默认返回 `preflightSummary`，调试时传 `detail=full` 才返回完整 `preflight`。
 - `recall_task_memory` / `recall-task-memory.js`：适合只想查历史任务时使用，例如“之前 OAuth token 怎么验证过”。
 - `summarize_project_memory` / `summarize-project-memory.js`：适合跨会话接力或阶段复盘时查看 PMM 已记住什么。
 - `update_project_playbook` / `update-project-playbook.js`：适合把稳定项目规则沉淀成可召回 playbook。

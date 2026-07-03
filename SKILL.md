@@ -21,7 +21,7 @@ PMM 用来让 Codex 在动源码前先理解项目。只要任务需要项目结
 
 MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg`。按这个顺序走：
 
-1. `agent_preflight`：AI 开发任务开始前先自检 MCP tool、数据根、KB freshness 和 skill 版本。返回 `blocked` 或 `needs_action` 时，先按 `nextAction` 修复，再相信 PMM 上下文。
+1. `agent_preflight`：AI 开发任务开始前先自检 MCP tool、数据根、KB freshness 和 skill 版本。默认使用紧凑输出；只有排查 PMM 自身问题时才传 `detail=full`。返回 `blocked` 或 `needs_action` 时，先按 `nextAction` 修复，再相信 PMM 上下文。
 2. `get_current_state`：确认目标项目是否已有外置 PMM 数据根目录、project-global KB、功能注册表、`projectGlobalFreshness`、`workspaceHash` 和 `registryPath`。
 3. `list_workspaces` / `resolve_workspace`：当一个 `PMM_DATA_ROOT` 服务多个项目、路径不确定、项目移动过或需要跨会话接力时，先列出或解析目标项目对应的记忆目录。
 4. `diagnose_data_root`：共享数据根疑似混用、manifest 缺失、工作区路径失效或 `workspaceId` 碰撞时先诊断。
@@ -29,7 +29,7 @@ MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg
 6. `diagnose_workspace`：单个项目状态缺失、路径不确定或 KB 疑似过期时先诊断。
 7. `register_workspace`：新项目、新电脑首次接入、或需要刷新 workspace registry 时登记当前项目；`init_workspace` 和 `detect_topology` 也会自动刷新登记。
 8. `init_workspace` + `detect_topology`：新项目或新电脑首次接入时初始化外置记忆。
-9. `prepare_agent_brief`：接到开发任务且 preflight ready 后优先使用，聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。
+9. `prepare_agent_brief`：接到开发任务且 preflight ready 后优先使用，聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。默认读取 `preflightSummary`，不要要求完整 `preflight`；调试时才传 `detail=full`。
 10. `decide_pmm_usage`：只需要判断是否必须深度 PMM 时使用。
 11. `plan_task_execution`：需要单独生成执行计划时使用，输出 PMM gate、目标文件、编辑边界、步骤、验证命令和证据。
 12. `recall_task_memory`：需要单独召回历史任务 outcome、相关文件、验证命令和观察时使用。

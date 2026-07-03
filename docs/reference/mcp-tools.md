@@ -100,6 +100,8 @@
 
 AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
 
+v0.81 起，面向 Agent 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表和重复诊断塞进上下文。需要排查 PMM 自身问题时，在 `agent_preflight` 或 `prepare_agent_brief` 参数里传 `"detail": "full"`。
+
 ### `agent_preflight`
 
 v0.80 的开发任务自检入口。它用于在调用 `prepare_agent_brief` 前确认 MCP tool 能力、数据根、目标项目 KB freshness 和 skill 版本是否可用，避免在旧 MCP 进程、错误数据根或 stale KB 下返回看似可用的 PMM 上下文。
@@ -110,7 +112,8 @@ v0.80 的开发任务自检入口。它用于在调用 `prepare_agent_brief` 前
 {
   "workspaceRoot": "<project-root>",
   "dataRoot": "<pmm-data-root>",
-  "task": "修复登录接口"
+  "task": "修复登录接口",
+  "detail": "compact"
 }
 ```
 
@@ -118,7 +121,8 @@ v0.80 的开发任务自检入口。它用于在调用 `prepare_agent_brief` 前
 
 - `kind`：固定为 `agent-preflight`。
 - `status`：`ready`、`needs_action` 或 `blocked`。
-- `health.checks`：环境检查项和检查结果。
+- `health.checkCounts`：检查项数量摘要。
+- `health.checks`：默认只包含 warn/fail 检查项；`detail=full` 时返回完整检查项和细节。
 - `findings`：发现的问题，例如 `mcp_capability_mismatch` 或 `kb_freshness_not_ready`。
 - `repairPlan`：建议修复步骤。需要用户介入的重启 Codex、改 MCP 配置、重装 skill 等动作只给明确步骤，不自动执行。
 - `nextAction`：AI 下一步动作。`status=blocked` 时应先修复，不继续返回或信任旧 PMM 上下文。
@@ -136,6 +140,8 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 ```
 
 返回内容包括 `pmmGate`、`executionPlan`、`memory.recalledTasks`、`memory.relevantRules`、`recommendedFiles`、`validation.recommendedCommands`、`risksAndNotes` 和 `evidence`。
+
+默认 `detail=compact` 时返回 `preflightSummary`，不会嵌入完整 `preflight`。传 `detail=full` 时返回完整 `preflight`、完整 `memory` 和完整 MCP freshness 元数据，适合调试 PMM 自身问题。
 
 ### `recall_task_memory`
 

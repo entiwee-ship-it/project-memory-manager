@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { agentPreflight } = require('../../agent/environment-health');
+const { projectAgentOutput } = require('../../agent/output-projection');
 const { parseLayoutArgs } = require('../../shared/workspace-layout');
 
 /**
@@ -34,6 +35,9 @@ function parseArgs(argv = []) {
         runtimeVersion: '',
         runtimeTools: [],
         json: false,
+        compact: false,
+        detail: '',
+        verbosity: '',
     };
 
     for (let index = 0; index < argv.length; index++) {
@@ -68,6 +72,19 @@ function parseArgs(argv = []) {
         }
         if (token === '--json') {
             args.json = true;
+            continue;
+        }
+        if (token === '--compact') {
+            args.compact = true;
+            args.detail = 'compact';
+            continue;
+        }
+        if (token === '--detail') {
+            args.detail = argv[++index] || '';
+            continue;
+        }
+        if (token === '--verbosity') {
+            args.verbosity = argv[++index] || '';
         }
     }
 
@@ -110,7 +127,13 @@ function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
     const result = agentPreflight(args);
     if (args.json) {
-        console.log(JSON.stringify(result, null, 2));
+        const output = args.compact || args.detail || args.verbosity
+            ? projectAgentOutput(result, {
+                detail: args.detail || args.verbosity || (args.compact ? 'compact' : 'full'),
+                compact: args.compact,
+            }, 'agent_preflight')
+            : result;
+        console.log(JSON.stringify(output, null, 2));
         return result;
     }
     printText(result);

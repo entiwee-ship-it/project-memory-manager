@@ -43,18 +43,22 @@ node src/bin/validate-package.js
 
 ```powershell
 node src/bin/agent-preflight.js --workspace-root <project-root> --data-root <pmm-data-root> --task "修复登录接口" --json
+node src/bin/agent-preflight.js --workspace-root <project-root> --data-root <pmm-data-root> --task "修复登录接口" --json --compact
 ```
+
+CLI 的 `--json` 默认保留完整诊断，便于排查 PMM 自身问题；需要模拟 MCP 默认低噪声输出时加 `--compact`，或传 `--detail compact`。
 
 主要返回字段：
 
 - `status`：`ready`、`needs_action` 或 `blocked`。
-- `health.checks`：环境检查项和结果。
+- `health.checks`：完整 JSON 下包含所有检查项；紧凑输出下只保留 warn/fail 检查项。
 - `findings`：发现的问题，例如 MCP 能力不匹配或 KB freshness 未就绪。
 - `repairPlan`：建议修复步骤。需要用户介入的动作只给步骤，不自动执行。
 - `nextAction`：AI 下一步应该做什么。`blocked` 时不要继续使用旧 PMM 上下文。
 
 ```powershell
 node src/bin/prepare-agent-brief.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 Facebook OAuth token 保存逻辑" --json
+node src/bin/prepare-agent-brief.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 Facebook OAuth token 保存逻辑" --json --compact
 node src/bin/recall-task-memory.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --task "修复 Facebook OAuth token 保存逻辑" --json
 node src/bin/summarize-project-memory.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --json
 node src/bin/update-project-playbook.js --workspace-root E:/xile-workspace/next-app --data-root E:/xile-workspace/codex-tools/project-memory-data --rule "涉及 Facebook OAuth 时必须同时复核 authorize、callback、status route 和 token 加密边界" --category oauth --json

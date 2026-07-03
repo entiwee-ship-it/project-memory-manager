@@ -32,6 +32,9 @@ function parseExecutionArgs(argv = []) {
         source: '',
         confidence: 'medium',
         json: false,
+        compact: false,
+        detail: '',
+        verbosity: '',
     };
 
     for (let index = 0; index < argv.length; index++) {
@@ -120,6 +123,19 @@ function parseExecutionArgs(argv = []) {
         }
         if (token === '--json') {
             args.json = true;
+            continue;
+        }
+        if (token === '--compact') {
+            args.compact = true;
+            args.detail = 'compact';
+            continue;
+        }
+        if (token === '--detail') {
+            args.detail = argv[++index] || '';
+            continue;
+        }
+        if (token === '--verbosity') {
+            args.verbosity = argv[++index] || '';
         }
     }
 
