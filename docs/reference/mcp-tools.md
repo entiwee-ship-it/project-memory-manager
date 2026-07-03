@@ -100,7 +100,7 @@
 
 AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
 
-v0.81 起，面向 Agent 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表和重复诊断塞进上下文。需要排查 PMM 自身问题时，在 `agent_preflight` 或 `prepare_agent_brief` 参数里传 `"detail": "full"`。
+v0.81 起，面向 Agent 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表和重复诊断塞进上下文。v0.82 起，`get_current_state` 和 `check_kb_freshness` 同样默认返回紧凑视图，且 MCP 会自动传入当前 skill 根以减少假性预检告警；`prepare_agent_brief` 的紧凑输出会过滤 PMM 外置数据根、已安装 skill 副本等内部路径，避免把它们当作源码目标或推荐验证命令。需要排查 PMM 自身问题时，在 `agent_preflight`、`prepare_agent_brief`、`get_current_state` 或 `check_kb_freshness` 参数里传 `"detail": "full"`。
 
 ### `agent_preflight`
 

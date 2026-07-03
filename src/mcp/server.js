@@ -64,6 +64,8 @@ const TOOL_DEFINITIONS = [
             properties: {
                 workspaceRoot: { type: 'string' },
                 dataRoot: { type: 'string' },
+                detail: { type: 'string', enum: ['compact', 'full'] },
+                verbosity: { type: 'string', enum: ['compact', 'full', 'summary', 'verbose'] },
             },
             required: ['workspaceRoot'],
         },
@@ -188,6 +190,8 @@ const TOOL_DEFINITIONS = [
                 workspaceRoot: { type: 'string' },
                 dataRoot: { type: 'string' },
                 feature: { type: 'string' },
+                detail: { type: 'string', enum: ['compact', 'full'] },
+                verbosity: { type: 'string', enum: ['compact', 'full', 'summary', 'verbose'] },
             },
             required: ['workspaceRoot'],
         },
@@ -1005,7 +1009,11 @@ function inspectWorkspace(args) {
 }
 
 function getCurrentState(args) {
-    return textResult(buildWorkspaceState(args));
+    const payload = {
+        ...buildWorkspaceState(args),
+        _mcpQuery: agentQueryMeta(args, 'get_current_state'),
+    };
+    return textResult(projectAgentOutput(payload, args, 'get_current_state'));
 }
 
 function registerWorkspaceTool(args) {
@@ -1106,7 +1114,8 @@ function checkKbFreshness(args) {
             freshness: buildFeatureFreshness(context, args.feature),
         };
     }
-    return textResult(result);
+    result._mcpQuery = agentQueryMeta(args, 'check_kb_freshness');
+    return textResult(projectAgentOutput(result, args, 'check_kb_freshness'));
 }
 
 function resolveFreshnessPolicy(args = {}) {
@@ -1704,6 +1713,7 @@ function recallTaskMemoryTool(args) {
 function mcpRuntimeContext() {
     const runtimeVersion = currentSkillSummary();
     return {
+        installedSkillRoot: path.resolve(__dirname, '..', '..'),
         runtimeTools: TOOL_DEFINITIONS.map(tool => tool.name),
         runtimeVersion: runtimeVersion?.version || runtimeVersion || '',
     };

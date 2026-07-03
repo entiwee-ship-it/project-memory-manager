@@ -9,6 +9,7 @@ const {
     summarizeProjectMemory,
     updateProjectPlaybook,
 } = require('../src/agent/memory-recall');
+const { projectAgentOutput } = require('../src/agent/output-projection');
 const { requiredMcpToolsForVersion } = require('../src/agent/environment-health');
 const { recordTaskOutcome } = require('../src/agent/execution-loop');
 const { handleMcpRequest } = require('../src/mcp/server');
@@ -122,6 +123,87 @@ function testPrepareAgentBriefPreflightBlocked() {
     assert.equal(result.nextActions[0].action, result.preflight.nextAction.action);
 }
 
+function testAgentBriefCompactFiltersExternalDataRootFiles(fixture) {
+    const externalFile = path.join(
+        fixture.dataRoot,
+        'workspaces',
+        'sample',
+        'docs',
+        'project',
+        'PROJECT_Overview.md'
+    );
+    const installedSkillDir = path.join(os.homedir(), '.agents', 'skills', 'project-memory-manager');
+    const projected = projectAgentOutput({
+        kind: 'agent-brief',
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '评估 PMM 输出噪声',
+        preflight: {
+            kind: 'agent-preflight',
+            status: 'ready',
+            health: { score: 100, checks: [] },
+            findings: [],
+            repairPlan: [],
+            nextAction: null,
+        },
+        pmmGate: { decision: 'required', pmmRequired: true, deepPmmRequired: true },
+        executionPlan: {
+            contextStatus: 'context-ready',
+            targetFiles: ['src/index.js', externalFile, installedSkillDir],
+            editBoundary: {
+                primaryFiles: ['src/index.js', externalFile, installedSkillDir],
+                relatedRoots: [],
+                guidance: [],
+            },
+            steps: [
+                {
+                    step: '复核目标文件',
+                    action: 'inspect',
+                    evidence: [{ kind: 'file', file: externalFile }],
+                },
+            ],
+            validation: { recommendedCommands: ['npm test'] },
+            uncertainties: [],
+        },
+        memory: {
+            recalledTasks: [
+                {
+                    task: '升级已安装 skill 副本',
+                    outcome: '误把安装副本当作源码目标',
+                    changedFiles: [installedSkillDir, 'src/index.js'],
+                    validation: [
+                        'npm test',
+                        `node ${path.join(installedSkillDir, 'src/bin/validate-package.js')} ${installedSkillDir}`,
+                    ],
+                },
+            ],
+            relatedFiles: [{ value: installedSkillDir }, { value: 'src/index.js' }],
+            validationCommands: [
+                { value: 'npm test' },
+                { value: `node ${path.join(installedSkillDir, 'src/bin/agent-preflight.js')} --json` },
+            ],
+        },
+        recommendedFiles: ['src/index.js', externalFile, installedSkillDir],
+        validation: {
+            recommendedCommands: [
+                'npm test',
+                `node ${path.join(installedSkillDir, 'src/bin/validate-package.js')} ${installedSkillDir}`,
+            ],
+        },
+        risksAndNotes: [],
+        nextActions: [],
+        evidence: [{ kind: 'file', file: externalFile }],
+    }, {}, 'prepare_agent_brief');
+    const serialized = JSON.stringify(projected);
+
+    assert.deepEqual(projected.recommendedFiles, ['src/index.js']);
+    assert.deepEqual(projected.executionPlan.targetFiles, ['src/index.js']);
+    assert.deepEqual(projected.executionPlan.editBoundary.primaryFiles, ['src/index.js']);
+    assert.equal(serialized.includes('PROJECT_Overview.md'), false);
+    assert.equal(serialized.includes('.agents'), false);
+    assert.equal(projected.dataRoot, fixture.dataRoot);
+}
+
 function testSummarizeProjectMemory(fixture) {
     const result = summarizeProjectMemory({
         workspaceRoot: fixture.workspaceRoot,
@@ -206,6 +288,7 @@ async function testMcpTools(fixture) {
     testRecallTaskMemory(fixture);
     testPrepareAgentBrief(fixture);
     testPrepareAgentBriefPreflightBlocked();
+    testAgentBriefCompactFiltersExternalDataRootFiles(fixture);
     testSummarizeProjectMemory(fixture);
     testUpdateProjectPlaybookInference(fixture);
     testCliFallback(fixture);

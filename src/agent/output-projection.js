@@ -40,6 +40,94 @@ function resolveOutputDetail(options = {}, fallback = DETAIL_COMPACT) {
     return normalizeDetail(options.detail || options.verbosity || options.outputDetail) || fallback;
 }
 
+function hasOwn(object, key) {
+    return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function boolOrDefault(object, key, fallback) {
+    return hasOwn(object, key) ? Boolean(object[key]) : fallback;
+}
+
+function inferFreshnessStale(value = {}) {
+    if (hasOwn(value, 'stale')) {
+        return Boolean(value.stale);
+    }
+    const status = String(value.status || '').toLowerCase();
+    return ['missing', 'stale', 'unknown', 'blocked', 'error'].includes(status);
+}
+
+function comparablePath(value = '') {
+    return String(value || '').replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '').toLowerCase();
+}
+
+function isExternalDataRootFile(filePath = '', dataRoot = '') {
+    const normalizedFile = comparablePath(filePath);
+    const normalizedRoot = comparablePath(dataRoot);
+    if (!normalizedFile || !normalizedRoot) {
+        return false;
+    }
+    return normalizedFile === normalizedRoot || normalizedFile.startsWith(`${normalizedRoot}/`);
+}
+
+function isAbsoluteLikePath(filePath = '') {
+    const normalized = comparablePath(filePath);
+    return /^[a-z]:\//.test(normalized) || normalized.startsWith('/');
+}
+
+function isInsidePath(filePath = '', rootPath = '') {
+    const normalizedFile = comparablePath(filePath);
+    const normalizedRoot = comparablePath(rootPath);
+    if (!normalizedFile || !normalizedRoot) {
+        return false;
+    }
+    return normalizedFile === normalizedRoot || normalizedFile.startsWith(`${normalizedRoot}/`);
+}
+
+function isSourceCandidate(filePath = '', dataRoot = '', workspaceRoot = '') {
+    if (isExternalDataRootFile(filePath, dataRoot)) {
+        return false;
+    }
+    if (isAbsoluteLikePath(filePath) && workspaceRoot) {
+        return isInsidePath(filePath, workspaceRoot);
+    }
+    return true;
+}
+
+function filterSourceFiles(files = [], dataRoot = '', workspaceRoot = '') {
+    return asArray(files).filter(file => isSourceCandidate(file, dataRoot, workspaceRoot));
+}
+
+function itemValue(item) {
+    if (typeof item === 'string') {
+        return item;
+    }
+    if (!item || typeof item !== 'object') {
+        return '';
+    }
+    return item.value || item.command || item.file || item.path || '';
+}
+
+function containsInternalPmmPath(value = '', dataRoot = '') {
+    const normalized = comparablePath(value);
+    const normalizedRoot = comparablePath(dataRoot);
+    return Boolean(
+        (normalizedRoot && normalized.includes(normalizedRoot))
+        || normalized.includes('/.agents/skills/project-memory-manager')
+        || normalized.includes('/.codex/plugins/')
+    );
+}
+
+function filterFileItems(items = [], dataRoot = '', workspaceRoot = '') {
+    return asArray(items).filter(item => {
+        const candidate = itemValue(item);
+        return !candidate || isSourceCandidate(candidate, dataRoot, workspaceRoot);
+    });
+}
+
+function filterValidationCommands(commands = [], dataRoot = '') {
+    return asArray(commands).filter(command => !containsInternalPmmPath(itemValue(command), dataRoot));
+}
+
 function compactVersionInfo(value) {
     if (!value || typeof value !== 'object') {
         return null;
@@ -57,14 +145,15 @@ function compactFreshness(value) {
     if (!value || typeof value !== 'object') {
         return value || null;
     }
+    const stale = inferFreshnessStale(value);
     const result = {
         kind: value.kind || 'kb-freshness',
         status: value.status || '',
-        stale: Boolean(value.stale),
-        querySafe: Boolean(value.querySafe),
-        sourceFallbackAllowed: Boolean(value.sourceFallbackAllowed),
-        mustRefreshBeforeQuery: Boolean(value.mustRefreshBeforeQuery),
-        mustRefreshBeforeSourceFallback: Boolean(value.mustRefreshBeforeSourceFallback),
+        stale,
+        querySafe: boolOrDefault(value, 'querySafe', !stale),
+        sourceFallbackAllowed: boolOrDefault(value, 'sourceFallbackAllowed', !stale),
+        mustRefreshBeforeQuery: boolOrDefault(value, 'mustRefreshBeforeQuery', stale),
+        mustRefreshBeforeSourceFallback: boolOrDefault(value, 'mustRefreshBeforeSourceFallback', stale),
         reasonCodes: asArray(value.reasonCodes).slice(0, 8),
         reasons: asArray(value.reasons).slice(0, 6),
         recommendedAction: value.recommendedAction || '',
@@ -240,40 +329,43 @@ function compactAgentPreflight(preflight = {}) {
     return result;
 }
 
-function compactEvidence(evidence = [], limit = 8) {
+function compactEvidence(evidence = [], limit = 8, dataRoot = '', workspaceRoot = '') {
     return asArray(evidence).slice(0, limit).map(item => {
         const result = {};
         for (const key of ['kind', 'confidence', 'reason', 'file', 'method', 'endpoint', 'nodeId', 'edgeType', 'task', 'recordedAt', 'category']) {
             if (item && item[key] !== undefined && item[key] !== '') {
+                if (key === 'file' && !isSourceCandidate(item[key], dataRoot, workspaceRoot)) {
+                    continue;
+                }
                 result[key] = item[key];
             }
         }
         if (item?.files) {
-            result.files = asArray(item.files).slice(0, 8);
+            result.files = filterSourceFiles(item.files, dataRoot, workspaceRoot).slice(0, 8);
         }
         return result;
     });
 }
 
-function compactMemory(memory = {}) {
+function compactMemory(memory = {}, dataRoot = '', workspaceRoot = '') {
     return {
         kind: memory.kind || 'agent-memory-recall',
         task: memory.task || '',
         queryTerms: asArray(memory.queryTerms).slice(0, 12),
-        knownFiles: asArray(memory.knownFiles).slice(0, 12),
+        knownFiles: filterSourceFiles(memory.knownFiles, dataRoot, workspaceRoot).slice(0, 12),
         totalOutcomeRecords: memory.totalOutcomeRecords || 0,
         recalledTasks: asArray(memory.recalledTasks).slice(0, 4).map(record => ({
             task: record.task || '',
             outcome: record.outcome || '',
             recordedAt: record.recordedAt || '',
-            changedFiles: asArray(record.changedFiles).slice(0, 8),
-            validation: asArray(record.validation).slice(0, 5),
+            changedFiles: filterSourceFiles(record.changedFiles, dataRoot, workspaceRoot).slice(0, 8),
+            validation: filterValidationCommands(record.validation, dataRoot).slice(0, 5),
             observations: asArray(record.observations).slice(0, 5),
             confidence: record.confidence || '',
             reasons: asArray(record.reasons).slice(0, 4),
         })),
-        relatedFiles: asArray(memory.relatedFiles).slice(0, 10),
-        validationCommands: asArray(memory.validationCommands).slice(0, 8),
+        relatedFiles: filterFileItems(memory.relatedFiles, dataRoot, workspaceRoot).slice(0, 10),
+        validationCommands: filterValidationCommands(memory.validationCommands, dataRoot).slice(0, 8),
         observations: asArray(memory.observations).slice(0, 8),
         relevantRules: asArray(memory.relevantRules).slice(0, 5),
     };
@@ -293,49 +385,115 @@ function compactPmmGate(gate = {}) {
     };
 }
 
-function compactExecutionPlan(plan = {}) {
+function compactExecutionPlan(plan = {}, dataRoot = '', workspaceRoot = '') {
     return {
         contextStatus: plan.contextStatus || '',
-        targetFiles: asArray(plan.targetFiles).slice(0, 16),
+        targetFiles: filterSourceFiles(plan.targetFiles, dataRoot, workspaceRoot).slice(0, 16),
         editBoundary: {
-            primaryFiles: asArray(plan.editBoundary?.primaryFiles).slice(0, 16),
+            primaryFiles: filterSourceFiles(plan.editBoundary?.primaryFiles, dataRoot, workspaceRoot).slice(0, 16),
             relatedRoots: asArray(plan.editBoundary?.relatedRoots).slice(0, 8),
             guidance: asArray(plan.editBoundary?.guidance).slice(0, 6),
         },
         steps: asArray(plan.steps).slice(0, 5).map(step => ({
             step: step.step || '',
             action: step.action || '',
-            evidence: compactEvidence(step.evidence || [], 4),
+            evidence: compactEvidence(step.evidence || [], 4, dataRoot, workspaceRoot),
         })),
         validation: {
-            recommendedCommands: asArray(plan.validation?.recommendedCommands).slice(0, 8),
+            recommendedCommands: filterValidationCommands(plan.validation?.recommendedCommands, dataRoot).slice(0, 8),
         },
         uncertainties: asArray(plan.uncertainties).slice(0, 8),
     };
 }
 
 function compactAgentBrief(brief = {}) {
+    const dataRoot = brief.dataRoot || '';
+    const workspaceRoot = brief.workspaceRoot || '';
     return {
         kind: brief.kind || 'agent-brief',
-        workspaceRoot: brief.workspaceRoot || '',
-        dataRoot: brief.dataRoot || '',
+        workspaceRoot,
+        dataRoot,
         task: brief.task || '',
         preflightSummary: summarizePreflight(brief.preflight || {}),
         pmmGate: compactPmmGate(brief.pmmGate || {}),
-        executionPlan: compactExecutionPlan(brief.executionPlan || {}),
-        memory: compactMemory(brief.memory || {}),
-        recommendedFiles: asArray(brief.recommendedFiles).slice(0, 16),
+        executionPlan: compactExecutionPlan(brief.executionPlan || {}, dataRoot, workspaceRoot),
+        memory: compactMemory(brief.memory || {}, dataRoot, workspaceRoot),
+        recommendedFiles: filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 16),
         validation: {
-            recommendedCommands: asArray(brief.validation?.recommendedCommands).slice(0, 10),
+            recommendedCommands: filterValidationCommands(brief.validation?.recommendedCommands, dataRoot).slice(0, 10),
         },
         risksAndNotes: asArray(brief.risksAndNotes).slice(0, 12),
         nextActions: asArray(brief.nextActions).slice(0, 8),
-        evidence: compactEvidence(brief.evidence || [], 10),
+        evidence: compactEvidence(brief.evidence || [], 10, dataRoot, workspaceRoot),
         _output: {
             detail: DETAIL_COMPACT,
             fullDetail: 'Pass detail=full to include complete preflight and memory diagnostics.',
         },
     };
+}
+
+function compactWorkspaceIdentity(identity = {}) {
+    if (!identity || typeof identity !== 'object') {
+        return identity || null;
+    }
+    const result = {};
+    for (const key of ['workspaceId', 'workspaceHash', 'workspaceRoot', 'registryPath', 'matchedBy']) {
+        if (identity[key] !== undefined && identity[key] !== '') {
+            result[key] = identity[key];
+        }
+    }
+    return Object.keys(result).length ? result : null;
+}
+
+function compactWorkspaceState(state = {}) {
+    const result = {
+        workspaceRoot: state.workspaceRoot || '',
+        dataRoot: state.dataRoot || '',
+        layout: state.layout || '',
+        workspaceId: state.workspaceId || '',
+        workspaceHash: state.workspaceHash || '',
+        memoryRoot: state.memoryRoot || '',
+        manifest: state.manifest || '',
+        registryPath: state.registryPath || '',
+        projectProfile: state.projectProfile || '',
+        featureRegistry: state.featureRegistry || '',
+        projectGlobalDir: state.projectGlobalDir || '',
+        initialized: Boolean(state.initialized),
+        hasProjectProfile: Boolean(state.hasProjectProfile),
+        hasConfiguredAreaRoots: Boolean(state.hasConfiguredAreaRoots),
+        hasProjectGlobalKb: Boolean(state.hasProjectGlobalKb),
+        projectGlobalFreshness: compactFreshness(state.projectGlobalFreshness),
+        legacyProjectMemoryExists: Boolean(state.legacyProjectMemoryExists),
+        workspaceIdentity: compactWorkspaceIdentity(state.workspaceIdentity),
+        areas: state.areas || null,
+        stacks: state.stacks || null,
+        suggestedNextAction: state.suggestedNextAction || '',
+        _output: {
+            detail: DETAIL_COMPACT,
+            fullDetail: 'Pass detail=full to include complete workspace diagnostics.',
+        },
+    };
+    return result;
+}
+
+function compactKbFreshnessResult(payload = {}) {
+    const result = {
+        workspaceRoot: payload.workspaceRoot || '',
+        dataRoot: payload.dataRoot || '',
+        layout: payload.layout || '',
+        projectGlobal: compactFreshness(payload.projectGlobal),
+        _output: {
+            detail: DETAIL_COMPACT,
+            fullDetail: 'Pass detail=full to include complete freshness diagnostics and changed file lists.',
+        },
+    };
+    if (payload.feature) {
+        result.feature = {
+            featureKey: payload.feature.featureKey || '',
+            freshness: compactFreshness(payload.feature.freshness),
+        };
+    }
+    return result;
 }
 
 function attachProjectedMetadata(projected, source, detail) {
@@ -388,6 +546,10 @@ function projectAgentOutput(payload, options = {}, toolName = '') {
         projected = compactAgentPreflight(payload);
     } else if (toolName === 'prepare_agent_brief' || payload?.kind === 'agent-brief') {
         projected = compactAgentBrief(payload);
+    } else if (toolName === 'get_current_state') {
+        projected = compactWorkspaceState(payload);
+    } else if (toolName === 'check_kb_freshness') {
+        projected = compactKbFreshnessResult(payload);
     } else {
         projected = cloneJson(payload);
         if (projected && typeof projected === 'object') {

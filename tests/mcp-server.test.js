@@ -260,6 +260,18 @@ async function testAgentPreflightMcpDefaultsToCompactOutput() {
     assert.ok(result.health.checkCounts.ok >= 1);
 }
 
+async function testAgentPreflightMcpAutoChecksInstalledSkillRoot() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('agent_preflight', { workspaceRoot, dataRoot, detail: 'full' });
+    const result = parseTextResult(response);
+    const skillRootCheck = result.health.checks.find(check => check.code === 'skill_installation_match');
+
+    assert.ok(skillRootCheck, 'missing skill_installation_match check');
+    assert.equal(skillRootCheck.status, 'ok');
+}
+
 async function testAgentPreflightMcpFullDetailPreservesDiagnostics() {
     const { workspaceRoot, dataRoot } = makeWorkspace();
     writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
@@ -276,6 +288,77 @@ async function testAgentPreflightMcpFullDetailPreservesDiagnostics() {
     assert.equal(result._mcpQuery.detail, 'full');
     assert.equal(serialized.includes('very-noisy-capability-marker'), true);
     assert.equal(serialized.includes('"capabilities"'), true);
+}
+
+async function testPrepareAgentBriefCompactFreshnessKeepsFreshQuerySafety() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('prepare_agent_brief', {
+        workspaceRoot,
+        dataRoot,
+        task: '评估 src/index.js 的实现边界',
+        knownFiles: ['src/index.js'],
+    });
+    const result = parseTextResult(response);
+
+    assert.equal(result._mcpFreshness.final.status, 'fresh');
+    assert.equal(result._mcpFreshness.final.stale, false);
+    assert.equal(result._mcpFreshness.final.querySafe, true);
+    assert.equal(result._mcpFreshness.final.sourceFallbackAllowed, true);
+    assert.equal(result._mcpFreshness.final.mustRefreshBeforeQuery, false);
+    assert.equal(result._mcpFreshness.final.mustRefreshBeforeSourceFallback, false);
+}
+
+async function testGetCurrentStateMcpDefaultsToCompactOutput() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('get_current_state', { workspaceRoot, dataRoot });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result._mcpQuery.tool, 'get_current_state');
+    assert.equal(result._mcpQuery.detail, 'compact');
+    assert.equal(result._output.detail, 'compact');
+    assert.equal(result.projectGlobalFreshness.status, 'fresh');
+    assert.equal(result.projectGlobalFreshness.querySafe, true);
+    assert.equal(serialized.includes('very-noisy-capability-marker'), false);
+    assert.equal(serialized.includes('"capabilities"'), false);
+}
+
+async function testGetCurrentStateMcpFullDetailPreservesDiagnostics() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('get_current_state', {
+        workspaceRoot,
+        dataRoot,
+        detail: 'full',
+    });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result._mcpQuery.tool, 'get_current_state');
+    assert.equal(result._mcpQuery.detail, 'full');
+    assert.equal(serialized.includes('very-noisy-capability-marker'), true);
+    assert.equal(serialized.includes('"capabilities"'), true);
+}
+
+async function testCheckKbFreshnessMcpDefaultsToCompactOutput() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+
+    const response = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const result = parseTextResult(response);
+    const serialized = JSON.stringify(result);
+
+    assert.equal(result._mcpQuery.tool, 'check_kb_freshness');
+    assert.equal(result._mcpQuery.detail, 'compact');
+    assert.equal(result.projectGlobal.status, 'fresh');
+    assert.equal(result.projectGlobal.querySafe, true);
+    assert.equal(serialized.includes('very-noisy-capability-marker'), false);
+    assert.equal(serialized.includes('"capabilities"'), false);
 }
 
 async function testAgentPreflightRequiresWorkspaceRoot() {
@@ -392,7 +475,7 @@ async function testWorkspaceRegistryToolsViaMcp() {
     assert.equal(registered.workspace.projectName, 'mcp-registry-sample');
     assert.equal(fs.existsSync(registered.registryPath), true);
 
-    const stateResponse = await callTool('get_current_state', { workspaceRoot, dataRoot });
+    const stateResponse = await callTool('get_current_state', { workspaceRoot, dataRoot, detail: 'full' });
     const state = parseTextResult(stateResponse);
     assert.equal(state.workspaceHash, registered.workspace.workspaceHash);
     assert.equal(state.registryPath, registered.registryPath);
@@ -507,7 +590,7 @@ async function testProjectFreshnessDetectsSourceChanges() {
     assert.equal(built.projectGlobalFreshness.status, 'fresh');
     assert.equal(built.projectGlobalFreshness.stale, false);
 
-    const freshResponse = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const freshResponse = await callTool('check_kb_freshness', { workspaceRoot, dataRoot, detail: 'full' });
     const fresh = parseTextResult(freshResponse);
     assert.equal(fresh.projectGlobal.status, 'fresh');
     assert.equal(fresh.projectGlobal.stale, false);
@@ -518,7 +601,7 @@ async function testProjectFreshnessDetectsSourceChanges() {
 
     fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function changed(){ return "changed"; }\n');
 
-    const staleStateResponse = await callTool('get_current_state', { workspaceRoot, dataRoot });
+    const staleStateResponse = await callTool('get_current_state', { workspaceRoot, dataRoot, detail: 'full' });
     const staleState = parseTextResult(staleStateResponse);
     assert.equal(staleState.projectGlobalFreshness.status, 'stale');
     assert.equal(staleState.projectGlobalFreshness.stale, true);
@@ -530,7 +613,7 @@ async function testProjectFreshnessDetectsSourceChanges() {
     assert.ok(staleState.projectGlobalFreshness.reasonCodes.includes('source-files-changed'));
     assert.equal(staleState.suggestedNextAction, 'build_project_index');
 
-    const staleResponse = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const staleResponse = await callTool('check_kb_freshness', { workspaceRoot, dataRoot, detail: 'full' });
     const stale = parseTextResult(staleResponse);
     assert.equal(stale.projectGlobal.status, 'stale');
     assert.ok(stale.projectGlobal.changedFiles.some(item => item.path.endsWith('official-website/src/main.js')));
@@ -553,7 +636,7 @@ async function testProjectFreshnessUnknownWithoutSourceSnapshot() {
     delete graph.sourceSnapshot;
     fs.writeFileSync(graphPath, `${JSON.stringify(graph, null, 2)}\n`);
 
-    const response = await callTool('check_kb_freshness', { workspaceRoot, dataRoot });
+    const response = await callTool('check_kb_freshness', { workspaceRoot, dataRoot, detail: 'full' });
     const result = parseTextResult(response);
     assert.equal(result.projectGlobal.status, 'unknown');
     assert.equal(result.projectGlobal.stale, true);
@@ -841,11 +924,16 @@ Promise.all([
     testToolsList(),
     testAgentPreflightViaMcp(),
     testAgentPreflightMcpDefaultsToCompactOutput(),
+    testAgentPreflightMcpAutoChecksInstalledSkillRoot(),
     testAgentPreflightMcpFullDetailPreservesDiagnostics(),
     testAgentPreflightRequiresWorkspaceRoot(),
     testPrepareAgentBriefInjectsMcpRuntime(),
     testPrepareAgentBriefMcpDefaultsToCompactOutput(),
     testPrepareAgentBriefMcpFullDetailKeepsPreflight(),
+    testPrepareAgentBriefCompactFreshnessKeepsFreshQuerySafety(),
+    testGetCurrentStateMcpDefaultsToCompactOutput(),
+    testGetCurrentStateMcpFullDetailPreservesDiagnostics(),
+    testCheckKbFreshnessMcpDefaultsToCompactOutput(),
     testDiagnoseUninitializedWorkspace(),
     testWorkspaceRegistryToolsViaMcp(),
     testInitAndDetectTopologyViaMcp(),
