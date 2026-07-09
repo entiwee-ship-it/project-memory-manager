@@ -14,6 +14,9 @@ function parseArgs(argv = []) {
 function printText(result) {
     console.log(`Patch review: ${result.verdict}`);
     console.log(`- scope: ${result.scope.verdict}`);
+    if (result.scope.informationalOutOfScopeFiles?.length) {
+        console.log(`- informationalOutOfScopeFiles: ${result.scope.informationalOutOfScopeFiles.join(', ')}`);
+    }
     console.log('- findings:');
     if (!result.findings.length) {
         console.log('  - (none)');

@@ -18,6 +18,9 @@ function printText(result) {
     if (result.outOfScopeFiles.length) {
         console.log(`- outOfScopeFiles: ${result.outOfScopeFiles.join(', ')}`);
     }
+    if (result.informationalOutOfScopeFiles?.length) {
+        console.log(`- informationalOutOfScopeFiles: ${result.informationalOutOfScopeFiles.join(', ')}`);
+    }
     if (result.riskyFiles.length) {
         console.log(`- riskyFiles: ${result.riskyFiles.join(', ')}`);
     }

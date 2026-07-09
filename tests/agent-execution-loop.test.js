@@ -191,6 +191,10 @@ function testReviewPatchForAgent(fixture) {
     assert.equal(result.kind, 'agent-patch-review');
     assert.equal(result.verdict, 'changes_requested');
     assert.ok(result.findings.some(item => item.severity === 'high' || item.severity === 'medium'));
+    const highRiskFinding = result.findings.find(item => item.title === '高风险链路变更');
+    assert.ok(highRiskFinding);
+    assert.equal(highRiskFinding.detail, result.scope.impactSummary.risk.reasons.join(' '));
+    assert.equal(/auth\/token\/external-service\/Prisma/.test(highRiskFinding.detail), false);
 }
 
 function testReviewSupportFilesDoNotForceScopeReview(fixture) {
@@ -201,6 +205,7 @@ function testReviewSupportFilesDoNotForceScopeReview(fixture) {
         changedFiles: [
             'implementation-artifacts/spec-settings-qa.md',
             'tests/settings-contract.test.cjs',
+            'CHANGELOG.md',
         ],
     });
     assert.equal(result.kind, 'agent-edit-scope-validation');
@@ -208,6 +213,7 @@ function testReviewSupportFilesDoNotForceScopeReview(fixture) {
     assert.deepEqual(result.outOfScopeFiles, []);
     assertIncludes(result.informationalOutOfScopeFiles, 'implementation-artifacts/spec-settings-qa.md');
     assertIncludes(result.informationalOutOfScopeFiles, 'tests/settings-contract.test.cjs');
+    assertIncludes(result.informationalOutOfScopeFiles, 'CHANGELOG.md');
 }
 
 function testDesignTokenFilesDoNotCreateHighRiskReview(fixture) {
@@ -242,7 +248,7 @@ function testRecordTaskOutcome(fixture) {
     assertIncludes(last.changedFiles, 'app/settings/page.tsx');
 }
 
-function testCliFallback() {
+function testCliFallback(fixture) {
     const child = spawnSync(process.execPath, [
         path.join(repoRoot, 'src/bin/decide-pmm-usage.js'),
         '--task', '赠送活动 UI 小改',
@@ -260,6 +266,23 @@ function testCliFallback() {
     const result = JSON.parse(child.stdout);
     assert.equal(result.kind, 'agent-pmm-usage-decision');
     assert.equal(result.decision, 'optional_skip_allowed');
+
+    const scopeChild = spawnSync(process.execPath, [
+        path.join(repoRoot, 'src/bin/validate-edit-scope.js'),
+        '--workspace-root', fixture.workspaceRoot,
+        '--data-root', fixture.dataRoot,
+        '--task', '补充 settings QA 合同和规格',
+        '--changed-file', 'implementation-artifacts/spec-settings-qa.md',
+        '--changed-file', 'tests/settings-contract.test.cjs',
+        '--changed-file', 'CHANGELOG.md',
+    ], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        windowsHide: true,
+        maxBuffer: 20 * 1024 * 1024,
+    });
+    assert.equal(scopeChild.status, 0, scopeChild.stderr || scopeChild.stdout);
+    assert.match(scopeChild.stdout, /informationalOutOfScopeFiles: implementation-artifacts\/spec-settings-qa\.md, tests\/settings-contract\.test\.cjs, CHANGELOG\.md/);
 }
 
 async function testMcpTools(fixture) {
@@ -320,7 +343,7 @@ async function testMcpTools(fixture) {
     testReviewSupportFilesDoNotForceScopeReview(fixture);
     testDesignTokenFilesDoNotCreateHighRiskReview(fixture);
     testRecordTaskOutcome(fixture);
-    testCliFallback();
+    testCliFallback(fixture);
     await testMcpTools(fixture);
     console.log('agent-execution-loop validation passed');
 })().catch(error => {

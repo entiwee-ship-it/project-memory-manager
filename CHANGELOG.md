@@ -9,7 +9,10 @@
 
 ### 修复
 - Agent 改动范围复核会把 `implementation-artifacts`、`tests` 等合同/规格/QA 辅助文件作为非阻塞图外文件记录，避免纯验证留痕触发 `scope_review_needed` 噪声。
+- 根目录 `CHANGELOG.md` 作为发布说明支撑文件时会进入 `informationalOutOfScopeFiles`，不再单独阻塞范围复核。
 - `analyze_change_impact` 风险等级不再把前端 `design-tokens` 文件误判为 auth token 高风险，并避免通过 `contains` / `depends_on` 宽边扩散到无关 API、Prisma 或外部服务链路。
+- `review_patch_for_agent` 高风险 finding 改为使用真实 `risk.reasons`，避免泛化提示无关的 auth/token/external-service/Prisma 风险。
+- `validate-edit-scope` 和 `review-patch-for-agent` 的文本输出会展示 `informationalOutOfScopeFiles`，方便 CLI 使用者看到非阻塞图外 QA/合同/规格文件。
 
 ## [0.71.0] - 2026-06-30
 

@@ -98,7 +98,8 @@ function classifyFiles(files = []) {
 function isReviewSupportFile(file = '') {
     const normalized = normalizeText(file);
     return /(?:^|\/)(docs|tests|test|implementation-artifacts|_bmad|\.superpowers|\.impeccable|\.agents)(?:\/|$)/.test(normalized)
-        || /(?:^|\/)[^/]+\.(?:test|spec)\.(?:[cm]?js|[cm]?ts|tsx|jsx)$/.test(normalized);
+        || /(?:^|\/)[^/]+\.(?:test|spec)\.(?:[cm]?js|[cm]?ts|tsx|jsx)$/.test(normalized)
+        || /(?:^|\/)changelog\.md$/.test(normalized);
 }
 
 function hasRuntimeCompletenessSignal(gate, changedFiles = []) {
@@ -403,6 +404,20 @@ function buildScopeFollowUp({ verdict, outOfScopeFiles, riskyFiles, missingExpec
     return followUp;
 }
 
+/**
+ * 生成高风险 finding 的说明文案。
+ *
+ * @param {object} risk 影响面风险对象。
+ * @returns {string} 面向 patch review 的高风险说明。
+ */
+function formatHighRiskDetail(risk = {}) {
+    const reasons = Array.isArray(risk.reasons) ? risk.reasons.filter(Boolean) : [];
+    if (reasons.length) {
+        return reasons.join(' ');
+    }
+    return '影响面包含高风险信号，需要重点验证调用链和错误处理。';
+}
+
 function reviewPatchForAgent(options = {}) {
     const scope = validateEditScope(options);
     const findings = [];
@@ -418,7 +433,7 @@ function reviewPatchForAgent(options = {}) {
         findings.push({
             severity: 'high',
             title: '高风险链路变更',
-            detail: '影响面包含 auth/token/external-service/Prisma 写入等高风险信号，需要重点验证调用链和错误处理。',
+            detail: formatHighRiskDetail(scope.impactSummary?.risk),
         });
     }
     if (scope.impactSummary?.validation?.rebuildFeatureKb) {
