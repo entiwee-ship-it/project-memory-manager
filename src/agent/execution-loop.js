@@ -7,6 +7,7 @@ const { createWorkspaceContext } = require('../shared/workspace-layout');
 const UI_FILE_PATTERN = /\.(vue|tsx|jsx|css|scss|less|html)$/i;
 const SOURCE_FILE_PATTERN = /\.(ts|tsx|js|jsx|vue|css|scss|less|html|prisma)$/i;
 const BROAD_ROOTS = new Set(['app', 'src', 'lib', 'components', 'server', 'cms-client', 'cms-server', 'frontend', 'backend']);
+const REVIEW_SUPPORT_TASK_PATTERN = /qa|合同|规格|spec|contract|文档|docs|documentation|checklist|核查|hash|证据|evidence|artifact|报告|留痕/i;
 
 function toPosix(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -65,7 +66,7 @@ function matchSignals(text, files = []) {
     };
     add('api', '涉及 API、HTTP route 或前后端接口', /(?:^|[\s/])api(?:[\s/]|$)|endpoint|route\.ts|接口|后端|http|request/);
     add('data', '涉及数据库、Prisma model 或表读写', /prisma|schema\.prisma|database|db|sql|table|model|数据表|数据库|读写/);
-    add('auth', '涉及鉴权、会话、token 或加密', /auth|login|logout|register|oauth|session|token|secret|encrypt|decrypt|登录|鉴权|授权|密钥/);
+    add('auth', '涉及鉴权、会话、token 或加密', /auth|login|logout|register|oauth|session|\bjwt\b|\btoken\b|secret|encrypt|decrypt|登录|鉴权|授权|密钥/);
     add('external-service', '涉及外部服务依赖', /facebook|graph|anthropic|claude|stripe|openai|external-service|第三方|外部服务/);
     add('commerce', '涉及商城、交易、订单或活动链路', /mall|shop|gift|activity|campaign|order|payment|transaction|商城|交易|订单|支付|活动|赠送/);
     add('cross-module', '可能跨模块或跨端改动', /跨模块|跨端|前后端|全链路|完整链路|联动|影响面|调用链/);
@@ -92,6 +93,30 @@ function classifyFiles(files = []) {
         allUiSource: sourceFiles.length > 0 && sourceFiles.every(file => UI_FILE_PATTERN.test(file)),
         crossRoot: roots.length > 1 && broadRootCount > 1,
     };
+}
+
+function isReviewSupportFile(file = '') {
+    const normalized = normalizeText(file);
+    return /(?:^|\/)(docs|tests|test|implementation-artifacts|_bmad|\.superpowers|\.impeccable|\.agents)(?:\/|$)/.test(normalized)
+        || /(?:^|\/)[^/]+\.(?:test|spec)\.(?:[cm]?js|[cm]?ts|tsx|jsx)$/.test(normalized);
+}
+
+function hasRuntimeCompletenessSignal(gate, changedFiles = []) {
+    const hardRiskKeys = new Set(['api', 'data', 'auth', 'external-service', 'cross-module']);
+    if ((gate.riskSignals || []).some(signal => hardRiskKeys.has(signal.key))) {
+        return true;
+    }
+    return changedFiles.some(file => /(?:^|\/)app\/api\/|route\.(ts|js)$|(?:^|\/)api\/|(?:^|\/)prisma\/|schema\.prisma|(?:^|\/)db\/|lib\/api-client|settings|chat/i.test(file));
+}
+
+function shouldRequireExpectedRuntimeFiles({ gate, changedFiles }) {
+    if (!changedFiles.length) {
+        return false;
+    }
+    if (changedFiles.every(isReviewSupportFile) && REVIEW_SUPPORT_TASK_PATTERN.test(gate.task || '')) {
+        return false;
+    }
+    return hasRuntimeCompletenessSignal(gate, changedFiles);
 }
 
 function confidenceFromGate(decision, riskSignals = []) {
@@ -311,14 +336,16 @@ function validateEditScope(options = {}) {
     const boundary = context && !context.unavailable
         ? context.editBoundary
         : { primaryFiles: knownFiles.length ? knownFiles : gate.files, relatedRoots: [] };
-    const outOfScopeFiles = changedFiles.filter(file => !pathIsWithinBoundary(file, boundary));
+    const boundaryOutOfScopeFiles = changedFiles.filter(file => !pathIsWithinBoundary(file, boundary));
+    const informationalOutOfScopeFiles = boundaryOutOfScopeFiles.filter(isReviewSupportFile);
+    const outOfScopeFiles = boundaryOutOfScopeFiles.filter(file => !isReviewSupportFile(file));
     const hardRiskKeys = new Set(['api', 'data', 'auth', 'external-service', 'cross-module']);
     const riskyFiles = changedFiles.filter(file => {
         const signalKeys = matchSignals('', [file]).map(signal => signal.key);
         return signalKeys.some(key => hardRiskKeys.has(key))
             || (gate.decision !== 'optional_skip_allowed' && signalKeys.includes('commerce'));
     });
-    const missingExpectedFiles = context && !context.unavailable
+    const missingExpectedFiles = context && !context.unavailable && shouldRequireExpectedRuntimeFiles({ gate, changedFiles })
         ? (context.criticalFiles || [])
             .filter(file => /(?:api|route|prisma|lib\/api-client|settings|chat)/i.test(file))
             .filter(file => !changedFiles.some(changed => normalizeText(changed) === normalizeText(file)))
@@ -340,6 +367,7 @@ function validateEditScope(options = {}) {
         verdict,
         pmmGate: gate,
         outOfScopeFiles,
+        informationalOutOfScopeFiles,
         riskyFiles,
         missingExpectedFiles,
         impactSummary: impact?.unavailable ? { unavailable: true, error: impact.error } : (impact ? {

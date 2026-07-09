@@ -7,6 +7,7 @@ const { createWorkspaceContext } = require('../shared/workspace-layout');
 
 const DEFAULT_LIMIT = 8;
 const DEFAULT_DEPTH = 4;
+const RISK_EDGE_TYPES = new Set(['calls', 'requests', 'matches_endpoint', 'binds', 'reads', 'writes']);
 
 function toPosix(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -767,12 +768,68 @@ function featureMatchesChangedFile(feature, changedFile) {
         || (feature.evidence || []).some(item => evidenceFileMatches(item.file, changed));
 }
 
+function hasSecurityOrExternalRisk(text = '') {
+    return /auth|oauth|password|secret|encrypt|decrypt|external-service|facebook|anthropic|payment|\bsession\b|\bjwt\b|\btoken\b/.test(text);
+}
+
+function traverseRiskEdges(lookup, startIds = [], options = {}) {
+    const depthLimit = options.depth || DEFAULT_DEPTH;
+    const directions = options.directions || ['downstream'];
+    const visited = new Set(startIds);
+    const edgeSeen = new Set();
+    const result = [];
+    const queue = startIds.map(id => ({ id, depth: 0 }));
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+        for (const direction of directions) {
+            const bucket = direction === 'upstream' ? lookup.adjacency?.incoming : lookup.adjacency?.outgoing;
+            const edges = bucket?.[current.id] || [];
+            for (const edge of edges) {
+                if (!RISK_EDGE_TYPES.has(edge.type)) {
+                    continue;
+                }
+                const nextId = direction === 'upstream' ? edge.from : edge.to;
+                const edgeKey = `${direction}:${edge.from}:${edge.to}:${edge.type}:${edge.sourceKind || ''}`;
+                if (!edgeSeen.has(edgeKey)) {
+                    edgeSeen.add(edgeKey);
+                    result.push({
+                        direction,
+                        depth: current.depth + 1,
+                        edge,
+                        node: lookup.nodesById?.[nextId] || null,
+                    });
+                }
+                if (current.depth + 1 >= depthLimit || visited.has(nextId)) {
+                    continue;
+                }
+                visited.add(nextId);
+                queue.push({ id: nextId, depth: current.depth + 1 });
+            }
+        }
+    }
+    return result;
+}
+
+function riskEntryTexts(nodes = [], traversal = []) {
+    return [
+        ...nodes.map(node => normalizeText(`${node.type} ${node.name} ${node.file}`)),
+        ...traversal.map(item => normalizeText(`${item.edge?.type} ${item.node?.type} ${item.node?.name} ${item.node?.file || ''}`)),
+    ];
+}
+
+function hasDataMutationRisk(nodes = [], traversal = []) {
+    const dataDeletePattern = /api\/|endpoint|route|prisma|table|request/;
+    return traversal.some(item => item.edge?.type === 'writes')
+        || riskEntryTexts(nodes, traversal).some(text => /\bdelete\b/.test(text) && dataDeletePattern.test(text));
+}
+
 function inferRiskLevel(nodes = [], traversal = []) {
     const text = normalizeText([
         ...nodes.map(node => `${node.type} ${node.name} ${node.file}`),
         ...traversal.map(item => `${item.edge?.type} ${item.node?.type} ${item.node?.name}`),
     ].join(' '));
-    if (/auth|token|password|secret|encrypt|decrypt|external-service|facebook|anthropic|payment|delete|writes/.test(text)) {
+    if (hasSecurityOrExternalRisk(text) || hasDataMutationRisk(nodes, traversal)) {
         return 'high';
     }
     if (/api\/|endpoint|route|prisma|table|write|update|create|upsert/.test(text)) {
@@ -795,6 +852,8 @@ function analyzeChangeImpact(options = {}) {
     );
     const traversal = traverse(lookup, matchedNodes.map(node => node.id), { depth: options.depth || 3, directions: ['downstream', 'upstream'] });
     const relatedNodes = uniqBy([...matchedNodes, ...nodesFromTraversal(traversal)], node => node.id);
+    const riskTraversal = traverseRiskEdges(lookup, matchedNodes.map(node => node.id), { depth: options.depth || 3, directions: ['downstream', 'upstream'] });
+    const riskNodes = uniqBy([...matchedNodes, ...nodesFromTraversal(riskTraversal)], node => node.id);
     const featureCatalog = makeFeatureCatalog(context);
     const relatedFiles = relatedNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean);
     const affectedFeatures = featureCatalog
@@ -814,8 +873,8 @@ function analyzeChangeImpact(options = {}) {
             summary: item.feature.summary || '',
             confidence: item.direct ? 'high' : 'medium',
         }));
-    const dataAccess = collectDataAccess(traversal, lookup, context.workspaceRoot);
-    const riskLevel = inferRiskLevel(relatedNodes, traversal);
+    const dataAccess = collectDataAccess(riskTraversal, lookup, context.workspaceRoot);
+    const riskLevel = inferRiskLevel(riskNodes, riskTraversal);
     return {
         kind: 'agent-change-impact',
         workspaceRoot: context.workspaceRoot,
@@ -828,15 +887,15 @@ function analyzeChangeImpact(options = {}) {
             methods: collectByType(relatedNodes, 'method', 16).map(node => compactNode(node, context.workspaceRoot)),
         },
         affectedData: {
-            tables: dataAccess.tables.length ? dataAccess.tables : collectByType(relatedNodes, 'table', 12).map(node => compactNode(node, context.workspaceRoot)),
+            tables: dataAccess.tables.length ? dataAccess.tables : collectByType(riskNodes, 'table', 12).map(node => compactNode(node, context.workspaceRoot)),
         },
         affectedExternalServices: uniqBy(
-            collectByType(relatedNodes, 'external-service', 24).map(node => compactNode(node, context.workspaceRoot)),
+            collectByType(riskNodes, 'external-service', 24).map(node => compactNode(node, context.workspaceRoot)),
             node => node.name
         ).slice(0, 12),
         risk: {
             level: riskLevel,
-            reasons: buildImpactReasons({ changedFiles, relatedNodes, dataAccess }),
+            reasons: buildImpactReasons({ changedFiles, relatedNodes: riskNodes, dataAccess }),
         },
         reviewFocus: traversal
             .filter(item => ['calls', 'requests', 'matches_endpoint', 'binds', 'reads', 'writes', 'depends_on'].includes(item.edge?.type))

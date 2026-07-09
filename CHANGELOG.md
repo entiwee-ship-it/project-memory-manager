@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+### 修复
+- Agent 改动范围复核会把 `implementation-artifacts`、`tests` 等合同/规格/QA 辅助文件作为非阻塞图外文件记录，避免纯验证留痕触发 `scope_review_needed` 噪声。
+- `analyze_change_impact` 风险等级不再把前端 `design-tokens` 文件误判为 auth token 高风险，并避免通过 `contains` / `depends_on` 宽边扩散到无关 API、Prisma 或外部服务链路。
+
 ## [0.71.0] - 2026-06-30
 
 ### 新增

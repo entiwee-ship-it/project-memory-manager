@@ -43,6 +43,11 @@ function createExecutionFixture() {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-execution-next-'));
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-execution-data-'));
     fs.cpSync(fixtureRoot, workspaceRoot, { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'lib'), { recursive: true });
+    fs.writeFileSync(
+        path.join(workspaceRoot, 'lib', 'design-tokens.ts'),
+        "export const colorTokens = { primary: '#123456' };\n"
+    );
     const context = createWorkspaceContext({ workspaceRoot, dataRoot, layout: 'external-data' });
     const projectConfigPath = path.join(context.paths.configsDir, 'project-global.json');
     writeJsonAtomic(projectConfigPath, {
@@ -188,6 +193,37 @@ function testReviewPatchForAgent(fixture) {
     assert.ok(result.findings.some(item => item.severity === 'high' || item.severity === 'medium'));
 }
 
+function testReviewSupportFilesDoNotForceScopeReview(fixture) {
+    const result = validateEditScope({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '补充 settings QA 合同和规格',
+        changedFiles: [
+            'implementation-artifacts/spec-settings-qa.md',
+            'tests/settings-contract.test.cjs',
+        ],
+    });
+    assert.equal(result.kind, 'agent-edit-scope-validation');
+    assert.equal(result.verdict, 'within_scope');
+    assert.deepEqual(result.outOfScopeFiles, []);
+    assertIncludes(result.informationalOutOfScopeFiles, 'implementation-artifacts/spec-settings-qa.md');
+    assertIncludes(result.informationalOutOfScopeFiles, 'tests/settings-contract.test.cjs');
+}
+
+function testDesignTokenFilesDoNotCreateHighRiskReview(fixture) {
+    const result = reviewPatchForAgent({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '刷新设计 tokens 文档站样式',
+        changedFiles: ['lib/design-tokens.ts'],
+        depth: 4,
+    });
+    assert.equal(result.kind, 'agent-patch-review');
+    assert.equal(result.verdict, 'review_ready');
+    assert.notEqual(result.scope.impactSummary.risk.level, 'high');
+    assert.equal(result.findings.some(item => item.title === '高风险链路变更'), false);
+}
+
 function testRecordTaskOutcome(fixture) {
     const result = recordTaskOutcome({
         workspaceRoot: fixture.workspaceRoot,
@@ -281,6 +317,8 @@ async function testMcpTools(fixture) {
     testPlanSettingsExecution(fixture);
     testValidateSettingsScope(fixture);
     testReviewPatchForAgent(fixture);
+    testReviewSupportFilesDoNotForceScopeReview(fixture);
+    testDesignTokenFilesDoNotCreateHighRiskReview(fixture);
     testRecordTaskOutcome(fixture);
     testCliFallback();
     await testMcpTools(fixture);
