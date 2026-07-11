@@ -75,8 +75,17 @@ function collectShrinkableArrays(value, arrays = [], path = []) {
 }
 
 function shrinkPriority(path = '') {
+    if (/^(historicalExperience|projectRules|memory)(\.|$)/.test(path)) {
+        return -2;
+    }
+    if (/^(missingEvidence|sourceConfirmation)(\.|$)/.test(path)) {
+        return 4;
+    }
+    if (/^currentFacts(\.|$)/.test(path)) {
+        return /(criticalFiles|changedFiles)$/.test(path) ? 3 : 2;
+    }
     if (/(criticalFiles|recommendedFiles|targetFiles|primaryFiles|recommendedCommands)$/.test(path)) {
-        return 2;
+        return 3;
     }
     if (/(evidence|queryTerms|extractedTerms|inferredFeatures|inferredEntrypoints|nodes|edges|tables|externalServices|reasons|riskSignals|skipConditions|uncertainties|observations|nextActions)$/.test(path)) {
         return 0;
@@ -98,7 +107,7 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
     };
     let truncated = false;
     let attempts = 0;
-    while (serializedLength(result) > targetBudget && attempts < 100) {
+    while (serializedLength(result) > targetBudget && attempts < 500) {
         const arrays = collectShrinkableArrays(result)
             .filter(entry => entry.items.length > 1)
             .sort((left, right) => shrinkPriority(left.path) - shrinkPriority(right.path)
@@ -584,6 +593,233 @@ function compactEvidence(evidence = [], limit = 8, dataRoot = '', workspaceRoot 
     });
 }
 
+function compactIntent(intent = {}) {
+    const result = {
+        intent: intent.intent || '',
+        confidence: intent.confidence || 'unknown',
+    };
+    if (asArray(intent.reasons).length) {
+        result.reasons = asArray(intent.reasons).slice(0, 4);
+    }
+    if (asArray(intent.missingInputs).length) {
+        result.missingInputs = asArray(intent.missingInputs).slice(0, 4);
+    }
+    if (intent.score !== undefined && intent.score !== null) {
+        result.score = intent.score;
+    }
+    return result;
+}
+
+function compactCoverage(coverage = {}) {
+    const result = {};
+    for (const [dimension, value] of Object.entries(coverage || {})) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            result[dimension] = value;
+            continue;
+        }
+        result[dimension] = value.applicable === false ? null : Boolean(value.satisfied);
+    }
+    return result;
+}
+
+function compactMissingEvidence(items = []) {
+    return asArray(items).map(item => ({
+        dimension: item?.dimension || '',
+        reason: item?.reason || '',
+        recommendedSelector: item?.recommendedSelector ? cloneJson(item.recommendedSelector) : null,
+    }));
+}
+
+function compactSourceConfirmation(items = [], dataRoot = '', workspaceRoot = '') {
+    return asArray(items).map(item => {
+        const result = {};
+        for (const key of ['reason', 'file', 'method', 'endpoint', 'nodeId', 'confidence']) {
+            if (item?.[key] !== undefined && item[key] !== '') {
+                if (key === 'file' && !isSourceCandidate(item[key], dataRoot, workspaceRoot)) {
+                    continue;
+                }
+                result[key] = item[key];
+            }
+        }
+        if (item?.files) {
+            result.files = filterSourceFiles(item.files, dataRoot, workspaceRoot).slice(0, 8);
+        }
+        if (item?.recommendedSelector) {
+            result.recommendedSelector = cloneJson(item.recommendedSelector);
+        }
+        return result;
+    });
+}
+
+function compactFactNode(node = {}, dataRoot = '', workspaceRoot = '') {
+    if (typeof node === 'string') {
+        return node ? { id: node } : null;
+    }
+    const compact = compactNode(node, dataRoot, workspaceRoot);
+    if (!compact) {
+        return null;
+    }
+    const result = {};
+    for (const key of ['name', 'file', 'httpMethod', 'httpPath', 'route', 'protocol', 'target']) {
+        if (compact[key] !== undefined && compact[key] !== '') {
+            result[key] = compact[key];
+        }
+    }
+    if (!result.name && compact.id) {
+        result.id = compact.id;
+    }
+    return Object.keys(result).length ? result : null;
+}
+
+function compactFactEdge(edge = {}, dataRoot = '', workspaceRoot = '') {
+    const compactEndpoint = value => {
+        const node = compactFactNode(value, dataRoot, workspaceRoot);
+        if (!node) {
+            return null;
+        }
+        const result = {};
+        for (const key of ['name', 'file', 'id']) {
+            if (node[key] !== undefined && node[key] !== '') {
+                result[key] = node[key];
+            }
+        }
+        return result;
+    };
+    return {
+        type: edge.type || '',
+        from: compactEndpoint(edge.from),
+        to: compactEndpoint(edge.to),
+    };
+}
+
+function compactFactTable(table = {}, dataRoot = '', workspaceRoot = '') {
+    const result = compactFactNode(table, dataRoot, workspaceRoot) || {};
+    const reads = asArray(table.reads).slice(0, 3).map(item => ({
+        method: item.method || item.name || '',
+        file: isSourceCandidate(item.file, dataRoot, workspaceRoot) ? item.file : '',
+    }));
+    const writes = asArray(table.writes).slice(0, 3).map(item => ({
+        method: item.method || item.name || '',
+        file: isSourceCandidate(item.file, dataRoot, workspaceRoot) ? item.file : '',
+    }));
+    if (reads.length) {
+        result.reads = reads;
+    }
+    if (writes.length) {
+        result.writes = writes;
+    }
+    return result;
+}
+
+function compactCurrentFacts(facts = {}, dataRoot = '', workspaceRoot = '') {
+    const relevantFeatures = asArray(facts.relevantFeatures)
+        .slice(0, 4)
+        .map(compactFeature)
+        .filter(feature => Object.keys(feature).length > 0);
+    const typedFacts = (items, expectedTypes, limit) => asArray(items)
+        .filter(item => !item?.type || expectedTypes.includes(item.type))
+        .slice(0, limit)
+        .map(node => compactFactNode(node, dataRoot, workspaceRoot))
+        .filter(Boolean);
+    return {
+        changedFiles: filterSourceFiles(facts.changedFiles, dataRoot, workspaceRoot).slice(0, 8),
+        relevantFeatures,
+        keyEntrypoints: {
+            endpoints: typedFacts(facts.keyEntrypoints?.endpoints, ['endpoint'], 4),
+            requests: typedFacts(facts.keyEntrypoints?.requests, ['request'], 4),
+            methods: typedFacts(facts.keyEntrypoints?.methods, ['method'], 6),
+        },
+        criticalFiles: filterSourceFiles(facts.criticalFiles, dataRoot, workspaceRoot).slice(0, 10),
+        callChains: asArray(facts.callChains).slice(0, 2).map(chain => ({
+            start: compactFactNode(chain.start || {}, dataRoot, workspaceRoot),
+            edges: asArray(chain.edges || chain.traversal)
+                .slice(0, 5)
+                .map(item => compactFactEdge(item.edge || item, dataRoot, workspaceRoot))
+                .filter(edge => edge.from || edge.to),
+        })),
+        callers: asArray(facts.callers)
+            .slice(0, 6)
+            .map(node => compactFactNode(node, dataRoot, workspaceRoot))
+            .filter(Boolean),
+        dataAccess: {
+            tables: asArray(facts.dataAccess?.tables)
+                .filter(table => !table?.type || table.type === 'table')
+                .slice(0, 4)
+                .map(table => compactFactTable(table, dataRoot, workspaceRoot)),
+        },
+        externalServices: typedFacts(facts.externalServices, ['external-service'], 4),
+    };
+}
+
+function compactHistoricalExperience(experience = {}, dataRoot = '', workspaceRoot = '') {
+    const recalledTasks = asArray(experience.recalledTasks);
+    const resume = experience.resume && typeof experience.resume === 'object'
+        ? {
+            status: experience.resume.status || '',
+            completed: asArray(experience.resume.completed).slice(0, 3),
+            validation: filterValidationCommands(experience.resume.validation, dataRoot).slice(0, 4),
+            remainingRisks: asArray(experience.resume.remainingRisks).slice(0, 4),
+            nextAction: experience.resume.nextAction || '',
+            source: experience.resume.source ? {
+                task: experience.resume.source.task || '',
+                taskId: experience.resume.source.taskId || '',
+                recordedAt: experience.resume.source.recordedAt || '',
+                sourceLine: experience.resume.source.sourceLine ?? null,
+            } : null,
+        }
+        : null;
+    return {
+        recalledTasks: recalledTasks.slice(0, 2).map(record => {
+            const result = {
+                task: record.task || '',
+                outcome: record.outcome || '',
+            };
+            const changedFiles = filterSourceFiles(record.changedFiles, dataRoot, workspaceRoot).slice(0, 4);
+            const validation = filterValidationCommands(record.validation, dataRoot).slice(0, 3);
+            if (changedFiles.length) {
+                result.changedFiles = changedFiles;
+            }
+            if (validation.length) {
+                result.validation = validation;
+            }
+            for (const key of ['taskId', 'status', 'recordedAt', 'nextAction', 'outcomeConfidence', 'relevanceConfidence', 'relevanceScore']) {
+                if (record[key] !== undefined && record[key] !== '' && record[key] !== null) {
+                    result[key] = record[key];
+                }
+            }
+            if (asArray(record.remainingRisks).length) {
+                result.remainingRisks = asArray(record.remainingRisks).slice(0, 3);
+            }
+            return result;
+        }),
+        relatedFiles: filterFileItems(experience.relatedFiles, dataRoot, workspaceRoot).slice(0, 3).map(compactCountedItem),
+        validationCommands: filterValidationCommands(experience.validationCommands, dataRoot).slice(0, 3).map(compactCountedItem),
+        observations: recalledTasks.length ? [] : asArray(experience.observations).slice(0, 1),
+        resume,
+    };
+}
+
+function compactProjectRules(projectRules = {}, dataRoot = '', workspaceRoot = '') {
+    return {
+        relevantRules: asArray(projectRules.relevantRules).slice(0, 2).map(rule => {
+            if (typeof rule === 'string') {
+                return { body: rule };
+            }
+            const result = {
+                title: rule.title || '',
+                body: rule.body || '',
+                files: filterSourceFiles(rule.files, dataRoot, workspaceRoot).slice(0, 5),
+            };
+            for (const key of ['category', 'source']) {
+                if (rule[key]) {
+                    result[key] = rule[key];
+                }
+            }
+            return result;
+        }),
+    };
+}
+
 function compactMemory(memory = {}, dataRoot = '', workspaceRoot = '') {
     return {
         kind: memory.kind || 'agent-memory-recall',
@@ -651,6 +887,49 @@ function compactAgentBrief(brief = {}) {
     const preflightSummary = summarizePreflight(brief.preflight || {});
     const executionPlan = compactExecutionPlan(brief.executionPlan || {}, dataRoot, workspaceRoot);
     const memory = compactMemory(brief.memory || {}, dataRoot, workspaceRoot);
+    const readiness = brief.readiness || '';
+    const blocked = readiness === 'blocked';
+    const currentFacts = compactCurrentFacts(brief.currentFacts || {}, dataRoot, workspaceRoot);
+    const historicalExperience = compactHistoricalExperience(brief.historicalExperience || {
+        recalledTasks: memory.recalledTasks,
+        relatedFiles: memory.relatedFiles,
+        validationCommands: memory.validationCommands,
+        observations: memory.observations,
+    }, dataRoot, workspaceRoot);
+    const projectRules = compactProjectRules(brief.projectRules || {
+        relevantRules: memory.relevantRules,
+    }, dataRoot, workspaceRoot);
+    const compactPreflight = {
+        kind: preflightSummary.kind,
+        status: preflightSummary.status,
+        health: {
+            score: preflightSummary.health.score,
+            checkCounts: preflightSummary.health.checkCounts,
+        },
+    };
+    if (preflightSummary.findings.length) {
+        compactPreflight.findings = preflightSummary.findings;
+    }
+    if (preflightSummary.repairPlan.length) {
+        compactPreflight.repairPlan = preflightSummary.repairPlan;
+    }
+    if (preflightSummary.nextAction) {
+        compactPreflight.nextAction = preflightSummary.nextAction;
+    }
+    const compactGate = {
+        decision: brief.pmmGate?.decision || '',
+        pmmRequired: Boolean(brief.pmmGate?.pmmRequired),
+        deepPmmRequired: Boolean(brief.pmmGate?.deepPmmRequired),
+    };
+    if (brief.pmmGate?.recommendedTool) {
+        compactGate.recommendedTool = brief.pmmGate.recommendedTool;
+    }
+    if (asArray(brief.pmmGate?.reasons).length) {
+        compactGate.reasons = asArray(brief.pmmGate?.reasons).slice(0, 3);
+    }
+    if (asArray(brief.pmmGate?.riskSignals).length) {
+        compactGate.riskSignals = asArray(brief.pmmGate?.riskSignals).slice(0, 4);
+    }
     const compactBriefMemory = memory.recalledTasks.length || memory.relevantRules.length
         ? {
             kind: memory.kind,
@@ -672,30 +951,22 @@ function compactAgentBrief(brief = {}) {
         workspaceRoot,
         dataRoot,
         task: brief.task || '',
-        preflightSummary: {
-            kind: preflightSummary.kind,
-            status: preflightSummary.status,
-            health: {
-                score: preflightSummary.health.score,
-                checkCounts: preflightSummary.health.checkCounts,
-            },
-            findings: preflightSummary.findings,
-            repairPlan: preflightSummary.repairPlan,
-            nextAction: preflightSummary.nextAction,
-        },
-        pmmGate: {
-            decision: brief.pmmGate?.decision || '',
-            pmmRequired: Boolean(brief.pmmGate?.pmmRequired),
-            deepPmmRequired: Boolean(brief.pmmGate?.deepPmmRequired),
-            recommendedTool: brief.pmmGate?.recommendedTool || '',
-            reasons: asArray(brief.pmmGate?.reasons).slice(0, 3),
-            riskSignals: asArray(brief.pmmGate?.riskSignals).slice(0, 4),
-        },
+        intent: compactIntent(brief.intent || {}),
+        readiness,
+        confidence: brief.confidence || 'unknown',
+        coverage: compactCoverage(brief.coverage || {}),
+        missingEvidence: compactMissingEvidence(brief.missingEvidence),
+        sourceConfirmation: compactSourceConfirmation(brief.sourceConfirmation, dataRoot, workspaceRoot),
+        currentFacts,
+        historicalExperience,
+        projectRules,
+        preflightSummary: compactPreflight,
+        pmmGate: compactGate,
         executionPlan: {
             ...executionPlan,
-            targetFiles: executionPlan.targetFiles.slice(0, 8),
+            targetFiles: blocked ? [] : executionPlan.targetFiles.slice(0, 8),
             editBoundary: {
-                primaryFiles: executionPlan.editBoundary.primaryFiles.slice(0, 8),
+                primaryFiles: blocked ? [] : executionPlan.editBoundary.primaryFiles.slice(0, 8),
                 relatedRoots: executionPlan.editBoundary.relatedRoots.slice(0, 4),
                 guidance: executionPlan.editBoundary.guidance.slice(0, 3),
             },
@@ -706,16 +977,10 @@ function compactAgentBrief(brief = {}) {
             validation: {
                 recommendedCommands: executionPlan.validation.recommendedCommands.slice(0, 5),
             },
-            uncertainties: executionPlan.uncertainties.slice(0, 4),
+            uncertainties: readiness === 'ready' ? executionPlan.uncertainties.slice(0, 4) : [],
         },
-        memory: compactBriefMemory,
-        recommendedFiles: filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 10),
-        validation: {
-            recommendedCommands: filterValidationCommands(brief.validation?.recommendedCommands, dataRoot).slice(0, 6),
-        },
-        risksAndNotes: asArray(brief.risksAndNotes).slice(0, 6),
-        nextActions: asArray(brief.nextActions).slice(0, 5),
-        evidence: compactEvidence(brief.evidence || [], 6, dataRoot, workspaceRoot),
+        ...(brief.historicalExperience || brief.projectRules ? {} : { memory: compactBriefMemory }),
+        recommendedFiles: blocked ? [] : filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 10),
         _output: {
             detail: DETAIL_COMPACT,
             fullDetail: 'Pass detail=full to include complete preflight and memory diagnostics.',
@@ -756,23 +1021,20 @@ function compactTaskContext(context = {}) {
         ], dataRoot, workspaceRoot);
         return tableFiles.some(file => criticalFiles.includes(file)) || relatedToTask(table);
     });
-    return {
-        kind: context.kind || 'agent-task-context',
-        workspaceRoot,
-        dataRoot,
-        task: context.task || '',
-        taskUnderstanding: {
-            extractedTerms: asArray(context.taskUnderstanding?.extractedTerms).slice(0, 8),
-            inferredFeatures: asArray(context.taskUnderstanding?.inferredFeatures).slice(0, 4),
-            inferredEntrypoints: asArray(context.taskUnderstanding?.inferredEntrypoints).slice(0, 4),
-        },
+    const currentFacts = compactCurrentFacts(context.currentFacts || {}, dataRoot, workspaceRoot);
+    const compatibilityEntrypoints = Object.fromEntries(
+        Object.entries(currentFacts.keyEntrypoints).map(([key, items]) => [
+            key,
+            items.map(item => ({ name: item?.name || '' })).filter(item => item.name),
+        ])
+    );
+    const legacyFacts = context.currentFacts ? {} : {
         relevantFeatures: asArray(context.relevantFeatures).slice(0, 4).map(compactFeature),
         keyEntrypoints: {
             endpoints: asArray(context.keyEntrypoints?.endpoints).filter(matchesTaskText).slice(0, 4).map(node => compactNode(node, dataRoot, workspaceRoot)),
             requests: asArray(context.keyEntrypoints?.requests).filter(matchesTaskText).slice(0, 4).map(node => compactNode(node, dataRoot, workspaceRoot)),
             methods: asArray(context.keyEntrypoints?.methods).filter(relatedToTask).slice(0, 6).map(node => compactNode(node, dataRoot, workspaceRoot)),
         },
-        criticalFiles,
         callChains: asArray(context.callChains).slice(0, 2).map(chain => ({
             start: compactNode(chain.start || {}, dataRoot, workspaceRoot),
             edges: asArray(chain.edges).slice(0, 5).map(edge => compactContextEdge(edge, dataRoot, workspaceRoot)),
@@ -781,6 +1043,24 @@ function compactTaskContext(context = {}) {
             tables: relevantTables.slice(0, 4).map(table => compactTable(table, dataRoot, workspaceRoot)),
         },
         externalServices: asArray(context.externalServices).slice(0, 4).map(node => compactNode(node, dataRoot, workspaceRoot)),
+    };
+    return {
+        kind: context.kind || 'agent-task-context',
+        workspaceRoot,
+        dataRoot,
+        task: context.task || '',
+        intent: compactIntent(context.intent || {}),
+        currentFacts,
+        coverage: compactCoverage(context.coverage || {}),
+        sourceConfirmation: compactSourceConfirmation(context.sourceConfirmation, dataRoot, workspaceRoot),
+        taskUnderstanding: {
+            extractedTerms: asArray(context.taskUnderstanding?.extractedTerms).slice(0, 8),
+            inferredFeatures: asArray(context.taskUnderstanding?.inferredFeatures).slice(0, 4),
+            inferredEntrypoints: asArray(context.taskUnderstanding?.inferredEntrypoints).slice(0, 4),
+        },
+        ...legacyFacts,
+        keyEntrypoints: context.currentFacts ? compatibilityEntrypoints : legacyFacts.keyEntrypoints,
+        criticalFiles,
         editBoundary: {
             primaryFiles: filterSourceFiles(context.editBoundary?.primaryFiles, dataRoot, workspaceRoot).slice(0, 8),
             relatedRoots: asArray(context.editBoundary?.relatedRoots).slice(0, 4),

@@ -215,6 +215,11 @@ function testCompactProjectionBudgets(fixture) {
         workspaceRoot: fixture.workspaceRoot,
         dataRoot: fixture.dataRoot,
         task: '后台验证码链路',
+        intent: {
+            intent: 'debug',
+            confidence: 'high',
+            reasons: ['matched:链路'],
+        },
         taskUnderstanding: { extractedTerms: nodes.map(node => node.name) },
         relevantFeatures: nodes,
         keyEntrypoints: { endpoints: nodes, requests: nodes, methods: nodes },
@@ -226,16 +231,92 @@ function testCompactProjectionBudgets(fixture) {
         validation: { recommendedCommands: nodes.map(node => `node test-${node.id}.js`) },
         uncertainties: nodes.map(node => `${node.name}:${'u'.repeat(300)}`),
         evidence: nodes,
+        currentFacts: {
+            changedFiles: nodes.slice(0, 4).map(node => node.file),
+            relevantFeatures: nodes,
+            keyEntrypoints: { endpoints: nodes, requests: nodes, methods: nodes },
+            criticalFiles: nodes.map(node => node.file),
+            callChains: nodes.map(node => ({ start: node, traversal: nodes })),
+            callers: nodes,
+            dataAccess: { tables: nodes },
+            externalServices: nodes,
+        },
+        coverage: {
+            entrypoint: { applicable: true, satisfied: true, evidenceCount: nodes.length },
+            implementation: { applicable: true, satisfied: true, evidenceCount: nodes.length },
+            validation: { applicable: true, satisfied: true, evidenceCount: nodes.length },
+        },
+        sourceConfirmation: [{
+            reason: '需要确认验证码调用方与后端实现一致。',
+            files: nodes.slice(0, 6).map(node => node.file),
+            recommendedSelector: { type: 'endpoint' },
+        }],
     };
     const compactContext = projectAgentOutput(contextPayload, {}, 'prepare_task_context');
     assert.ok(JSON.stringify(compactContext, null, 2).length <= 6000, `task context compact output exceeded budget: ${JSON.stringify(compactContext, null, 2).length}`);
     assert.equal(compactContext._output.detail, 'compact');
+    for (const field of ['intent', 'currentFacts', 'coverage', 'sourceConfirmation']) {
+        assert.ok(Object.hasOwn(compactContext, field), `compact task context missing ${field}`);
+    }
+    assert.equal(compactContext.intent.intent, 'debug');
 
     const briefPayload = {
         kind: 'agent-brief',
         workspaceRoot: fixture.workspaceRoot,
         dataRoot: fixture.dataRoot,
         task: '后台验证码链路',
+        intent: {
+            intent: 'debug',
+            confidence: 'high',
+            reasons: ['matched:链路'],
+        },
+        readiness: 'needs_source_confirmation',
+        confidence: 'medium',
+        coverage: {
+            entrypoint: { applicable: true, satisfied: true, evidenceCount: nodes.length },
+            implementation: { applicable: true, satisfied: true, evidenceCount: nodes.length },
+            callers: { applicable: true, satisfied: false, evidenceCount: 0 },
+            validation: { applicable: true, satisfied: true, evidenceCount: nodes.length },
+        },
+        missingEvidence: [{
+            dimension: 'callers',
+            reason: '高风险调试任务缺少调用方证据。',
+            recommendedSelector: { type: 'method', direction: 'upstream' },
+        }],
+        sourceConfirmation: [{
+            reason: '需要确认验证码调用方与后端实现一致。',
+            files: nodes.slice(0, 6).map(node => node.file),
+            recommendedSelector: { type: 'endpoint' },
+        }],
+        currentFacts: {
+            changedFiles: nodes.slice(0, 4).map(node => node.file),
+            relevantFeatures: nodes,
+            keyEntrypoints: { endpoints: nodes, requests: nodes, methods: nodes },
+            criticalFiles: nodes.map(node => node.file),
+            callChains: nodes.map(node => ({ start: node, traversal: nodes })),
+            callers: nodes,
+            dataAccess: { tables: nodes },
+            externalServices: nodes,
+        },
+        historicalExperience: {
+            recalledTasks: nodes.map(node => ({
+                task: node.name,
+                outcome: node.meta.source,
+                changedFiles: [node.file],
+                observations: [node.meta.source],
+            })),
+            relatedFiles: nodes.map(node => ({ value: node.file })),
+            validationCommands: nodes.map(node => ({ value: `node test-${node.id}.js` })),
+            observations: nodes.map(node => node.meta.source),
+            resume: null,
+        },
+        projectRules: {
+            relevantRules: nodes.map(node => ({
+                title: node.name,
+                body: node.meta.source,
+                files: [node.file],
+            })),
+        },
         preflight: { kind: 'agent-preflight', status: 'ready', health: { score: 100, checks: [] }, findings: [], repairPlan: [] },
         pmmGate: { decision: 'required', pmmRequired: true, deepPmmRequired: true, reasons: nodes.map(node => node.name) },
         executionPlan: {
@@ -262,6 +343,21 @@ function testCompactProjectionBudgets(fixture) {
     };
     const compactBrief = projectAgentOutput(briefPayload, {}, 'prepare_agent_brief');
     assert.ok(JSON.stringify(compactBrief, null, 2).length <= 4000, `agent brief compact output exceeded budget: ${JSON.stringify(compactBrief, null, 2).length}`);
+    for (const field of [
+        'intent',
+        'readiness',
+        'confidence',
+        'coverage',
+        'missingEvidence',
+        'sourceConfirmation',
+        'currentFacts',
+        'historicalExperience',
+        'projectRules',
+    ]) {
+        assert.ok(Object.hasOwn(compactBrief, field), `compact agent brief missing ${field}`);
+    }
+    assert.equal(compactBrief.intent.intent, 'debug');
+    assert.equal(compactBrief.readiness, 'needs_source_confirmation');
 
     const traversal = nodes.map((node, index) => ({
         direction: 'downstream',

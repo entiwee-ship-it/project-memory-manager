@@ -416,8 +416,59 @@ async function testPrepareAgentBriefMcpDefaultsToCompactOutput() {
     assert.equal(result._mcpQuery.detail, 'compact');
     assert.equal(result.preflight, undefined);
     assert.equal(result.preflightSummary.kind, 'agent-preflight-summary');
+    for (const field of [
+        'intent',
+        'readiness',
+        'confidence',
+        'coverage',
+        'missingEvidence',
+        'sourceConfirmation',
+        'currentFacts',
+        'historicalExperience',
+        'projectRules',
+    ]) {
+        assert.ok(Object.hasOwn(result, field), `compact MCP brief missing ${field}`);
+    }
     assert.equal(serialized.includes('very-noisy-capability-marker'), false);
     assert.equal(serialized.includes('"capabilities"'), false);
+}
+
+async function testPrepareAgentBriefMcpCompactAndFullKeepQualityGate() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+    const args = {
+        workspaceRoot,
+        dataRoot,
+        task: '修复 src/index.js 导出异常',
+        knownFiles: ['src/index.js'],
+    };
+
+    const compact = parseTextResult(await callTool('prepare_agent_brief', args));
+    const full = parseTextResult(await callTool('prepare_agent_brief', { ...args, detail: 'full' }));
+
+    assert.equal(compact.intent.intent, full.intent.intent);
+    assert.equal(compact.readiness, full.readiness);
+    assert.equal(compact.confidence, full.confidence);
+}
+
+async function testPrepareAgentBriefMcpBlockedProjectionHasNoTargets() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeFreshProjectGlobalKb(workspaceRoot, dataRoot);
+    fs.appendFileSync(path.join(workspaceRoot, 'src', 'index.js'), 'export function staleChange(){ return "stale"; }\n');
+
+    const response = await callTool('prepare_agent_brief', {
+        workspaceRoot,
+        dataRoot,
+        task: '修复 src/index.js 导出异常',
+        knownFiles: ['src/index.js'],
+        freshnessPolicy: 'allow_stale',
+    });
+    const result = parseTextResult(response);
+
+    assert.equal(result.readiness, 'blocked');
+    assert.deepEqual(result.executionPlan.targetFiles, []);
+    assert.deepEqual(result.executionPlan.editBoundary.primaryFiles, []);
+    assert.deepEqual(result.recommendedFiles, []);
 }
 
 async function testPrepareAgentBriefMcpFullDetailKeepsPreflight() {
@@ -963,6 +1014,8 @@ Promise.all([
     testAgentPreflightRequiresWorkspaceRoot(),
     testPrepareAgentBriefInjectsMcpRuntime(),
     testPrepareAgentBriefMcpDefaultsToCompactOutput(),
+    testPrepareAgentBriefMcpCompactAndFullKeepQualityGate(),
+    testPrepareAgentBriefMcpBlockedProjectionHasNoTargets(),
     testPrepareAgentBriefMcpFullDetailKeepsPreflight(),
     testPrepareAgentBriefCompactFreshnessKeepsFreshQuerySafety(),
     testGetCurrentStateMcpDefaultsToCompactOutput(),
