@@ -779,7 +779,7 @@ git add README.md SKILL.md CHANGELOG.md docs/reference/mcp-tools.md docs/superpo
 git commit -m "记录 PMM 真实开发体验合同"
 ```
 
-- [ ] **Step 8: Push all local commits and wait for CI**
+- [x] **Step 8: Push all local commits and wait for CI**
 
 ```powershell
 git status --short --branch
@@ -788,7 +788,7 @@ git push origin main
 
 Wait for GitHub Actions to finish successfully. If CI fails, reproduce the failing command locally, add a RED regression when applicable, fix minimally, rerun complete verification, commit, and push again.
 
-- [ ] **Step 9: Record the PMM task outcome**
+- [x] **Step 9: Record the PMM task outcome**
 
 Use `record_task_outcome` or the CLI fallback with actual changed files, verification commands, final Experience metrics, default-use recommendation, and residual risks. Do not record the task as complete before CI is green.
 
