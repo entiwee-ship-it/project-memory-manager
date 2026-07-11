@@ -17,6 +17,14 @@ PMM 用来让 Codex 在动源码前先理解项目。只要任务需要项目结
 
 如果跳过深度 PMM，仍应在回答或任务记录里说明已经通过 `decide_pmm_usage` 门禁；提交前用 `validate_edit_scope` 或等价 changed files 复核。涉及 API、数据库、鉴权、外部服务、交易/活动链路或跨模块时，不要凭“小改”跳过深度 PMM。
 
+## Experience Value 门禁
+
+- 跨模块理解、debug、高风险实现、resume 和 review 默认深度使用 PMM，并优先读取 `prepare_agent_brief`。
+- `simple` 只允许 Usage Gate + 明确 `knownFiles` + 最终 scope validation；一旦改动扩展到 API、数据、鉴权、外部服务或跨模块，重新进入深度 PMM。
+- `readiness !== ready` 时，禁止把 brief 当成可执行计划。先处理 `missingEvidence`、`sourceConfirmation` 和 `nextAction`，必要时用精确 selector 或源码确认补齐证据。
+- `currentFacts` 是 fresh KB 提供的当前代码事实；`historicalExperience` 是可能过期的历史 outcome；`projectRules` 是稳定项目规则。三者必须分开使用，不能用历史记忆或规则替代当前源码证据。
+- token 和 latency 是成本指标，不是使用 PMM 的理由。PMM 是否值得默认使用，以文件召回、噪声、计划可采用性、历史精度、恢复完整性和工作流改善为准；发布前运行 `npm run test:experience`。
+
 ## MCP 优先流程
 
 MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg`。按这个顺序走：
@@ -95,6 +103,8 @@ CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` �
 - 只有排查 PMM 自身问题、对比旧 KB 或用户明确要求时，才允许传 `freshnessPolicy=allow_stale`。
 - PMM 返回歧义候选时，优先用推荐的 selector 再查一次，不要直接猜。
 - 使用 Agent Context Pack 或 Agent 执行闭环时，把 `evidence` 中的 `file`、`method`、`endpoint`、`nodeId` / `edgeType` 和 `confidence` 作为计划、编辑边界和 review 的依据。
+- `prepare_agent_brief.readiness` 不是 `ready` 时，先完成 `missingEvidence` / `sourceConfirmation` 指向的动作，不要直接实施返回的候选计划。
+- `currentFacts` 的权威性高于 `historicalExperience` 和 `projectRules`；后二者分别用于复用历史经验和约束执行方式，不用于证明当前代码行为。
 - `decide_pmm_usage` 返回 `optional_skip_allowed` 时，只代表可以跳过深度链路查询，不代表没有使用 PMM；仍要保留门禁结果，并在提交前复核 changed files。
 - `validate_edit_scope` 返回 `scope_review_needed`、`possibly_incomplete` 或 `pmm_context_unavailable` 时，不要直接提交；先按 `requiredFollowUp` 复核。
 - `prepare_agent_brief` 中的 `memory.recalledTasks` 是历史经验，不是当前源码事实；涉及当前行为时仍以 fresh KB 和源码精确确认为准。

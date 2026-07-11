@@ -89,7 +89,7 @@ function testReleaseQualityGate() {
     const pkg = readJson('package.json');
     assert.equal(
         pkg.scripts['test:all'],
-        'npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout'
+        'npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience'
     );
 
     assert.equal(exists('.github/workflows/ci.yml'), true, 'missing GitHub Actions CI workflow');

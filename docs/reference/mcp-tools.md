@@ -98,7 +98,7 @@
 
 ## Agent 执行闭环
 
-AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
+AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。跨模块理解、debug、高风险实现、resume 和 review 默认进入深度 PMM。只有少量明确 UI/prefab 小改可以只留下轻量门禁证据，并且提交前仍要做 scope validation。
 
 面向 Agent、Memory、workspace state 和 project/feature query 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表、节点 meta、artifact 和重复诊断塞进上下文。compact 输出保留可执行证据并通过 `_output.budgetChars` 声明字符预算：`prepare_agent_brief` 为 4,000 字符，task context、执行闭环、memory 和 project/feature query 为 6,000 字符；查询缓存仍保存完整 payload。需要排查 PMM 自身问题、完整 snapshot 或底层节点 meta 时，在参数里传 `"detail": "full"`。
 
@@ -129,7 +129,7 @@ v0.80 的开发任务自检入口。它用于在调用 `prepare_agent_brief` 前
 
 ### `prepare_agent_brief`
 
-preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划、历史任务召回、项目 playbook、推荐文件、验证命令和风险提示。preflight blocked 时，它不应继续返回看似可用的旧 PMM 上下文。
+preflight ready 后的首选任务入口。它聚合 Usage Gate、任务意图、readiness、当前事实、历史任务召回、项目 playbook、执行计划、推荐文件、验证命令和风险提示。preflight blocked 时，它不应继续返回看似可用的旧 PMM 上下文。
 
 ```json
 {
@@ -139,7 +139,13 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 }
 ```
 
-返回内容包括 `pmmGate`、`executionPlan`、`memory.recalledTasks`、`memory.relevantRules`、`recommendedFiles`、`validation.recommendedCommands`、`risksAndNotes` 和 `evidence`。
+返回内容包括 `intent`、`readiness`、`coverage`、`missingEvidence`、`sourceConfirmation`、`pmmGate`、`currentFacts`、`historicalExperience`、`projectRules`、`executionPlan`、`recommendedFiles`、`validation.recommendedCommands`、`risksAndNotes` 和 `evidence`。
+
+- `readiness="ready"`：当前证据足以采用 brief 中的执行计划。
+- `readiness!="ready"`：不得把返回的候选步骤当成可直接执行的计划；先完成 `missingEvidence`、`sourceConfirmation` 和 `nextAction` 指向的补证动作。
+- `currentFacts`：来自 fresh KB 的当前代码事实，包含入口、调用链、数据访问、外部服务和证据。
+- `historicalExperience`：来自已记录 outcome 的历史经验，可能随源码变化而过期，使用前要与当前事实核对。
+- `projectRules`：项目 playbook 中的稳定约束，用于指导执行和 review，不用于证明当前代码行为。
 
 默认 `detail=compact` 时返回 `preflightSummary`，不会嵌入完整 `preflight`。传 `detail=full` 时返回完整 `preflight`、完整 `memory` 和完整 MCP freshness 元数据，适合调试 PMM 自身问题。
 
@@ -155,7 +161,7 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 }
 ```
 
-返回相似历史 outcome、相关文件、验证命令、观察和相关 playbook 规则。它读取外置数据根目录下 `state/agent-outcomes/task-outcomes.jsonl`。只有语义词或文件达到最小相关性门槛时才召回；最近时间只作为已有命中的 tie-break。`outcomeConfidence` 表示 outcome 自身置信度，`relevanceConfidence` / `relevanceScore` 表示本次检索相关性。
+返回相似历史 outcome、相关文件、验证命令、观察和相关 playbook 规则。它读取外置数据根目录下 `state/agent-outcomes/task-outcomes.jsonl`。非 resume 任务必须有 task/outcome 核心语义命中，或调用方显式输入文件的精确命中；changedFiles 中单独出现 scope/file alias 不足以建立相关性。最近时间只作为已有命中的 tie-break。`outcomeConfidence` 表示 outcome 自身置信度，`relevanceConfidence` / `relevanceScore` 表示本次检索相关性。
 
 ### `summarize_project_memory`
 
@@ -200,6 +206,8 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 ```
 
 返回内容包括 `pmmRequired`、`deepPmmRequired`、推荐下一步工具、风险信号、允许跳过深度 PMM 的条件和证据。
+
+`optional_skip_allowed` 只适用于少量明确 UI/prefab 源文件。调用方应保留 `knownFiles`，限制改动范围，并在提交前调用 `validate_edit_scope`；它不是绕过 PMM 证据闭环的通用开关。
 
 ### `plan_task_execution`
 

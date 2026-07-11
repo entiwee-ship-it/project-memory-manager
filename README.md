@@ -83,6 +83,14 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。当前 Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回结构化 compact 视图，只保留状态、关键入口、文件、行号、风险、验证和少量证据，并通过 `_output.budgetChars` 标明字符预算。`prepare_agent_brief` 上限为 4,000 字符；task context、执行闭环、memory 与 project/feature query 上限为 6,000 字符。完整领域对象仍保留在核心函数和查询缓存中；需要完整诊断、snapshot、节点 meta 或能力列表时传 `detail=full`。CLI 领域 JSON 默认保持完整，只有明确支持 `--compact` 的命令才模拟 MCP 紧凑输出。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
 
+### Experience Value 使用合同
+
+- 跨模块理解、问题排查、高风险实现、跨会话恢复和改动 review 默认进入深度 PMM；这些任务需要调用链、当前事实、历史结果或范围证据，不能只靠少量已知文件猜测。
+- `simple` 任务只在 `decide_pmm_usage` 返回 `optional_skip_allowed` 且目标是少量明确 UI/prefab 源文件时跳过深度查询；仍要保留 `knownFiles`，并在提交前运行 `validate_edit_scope`。
+- `prepare_agent_brief.readiness !== "ready"` 时，不得把 `executionPlan` 当成可直接执行的计划。先处理 `missingEvidence`、`sourceConfirmation` 和 `nextAction`，直到当前证据足够。
+- `currentFacts` 来自 fresh KB，是当前代码证据；`historicalExperience` 来自历史 outcome，只能提供经验并可能过期；`projectRules` 是稳定约束，不能替代当前实现事实。
+- token 和耗时用于约束成本，不是首要成功标准。发布前以 `npm run test:experience` 验证真实任务的文件召回、噪声、计划可采用性、历史精度、恢复完整性和工作流改善。
+
 - `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。MCP 默认紧凑；CLI `--json` 默认完整，`--compact` 输出紧凑。
 - `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。MCP 默认返回 `preflightSummary`，调试时传 `detail=full` 才返回完整 `preflight`。
 - `recall_task_memory` / `recall-task-memory.js`：适合只想查历史任务时使用，例如“之前 OAuth token 怎么验证过”。只有存在语义词或文件命中时才召回；`outcomeConfidence` 表示历史结果自身置信度，`relevanceConfidence` 表示本次检索相关性。

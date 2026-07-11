@@ -623,7 +623,7 @@ git commit -m "保留 PMM 紧凑输出质量门禁"
 - Modify: `tests/experience/pmm-experience-harness.test.js`
 - Modify: relevant `tests/experience/fixtures/*.json` only to correct source truth, never to lower expectations
 
-- [ ] **Step 1: Produce a categorized failing report**
+- [x] **Step 1: Produce a categorized failing report**
 
 Run:
 
@@ -643,7 +643,7 @@ resume_incomplete
 workflow_not_improved
 ```
 
-- [ ] **Step 2: Fix one category at a time under TDD**
+- [x] **Step 2: Fix one category at a time under TDD**
 
 For each category, add one minimal failing assertion to the fixture/Harness or Agent test before production edits. Run the narrow test to observe the expected failure, make the smallest generic production change, rerun the narrow test, then rerun `npm run test:experience`.
 
@@ -664,7 +664,7 @@ Forbidden fixes:
 - deleting evidence to pass token budgets;
 - changing fixture truth merely because PMM failed to find it.
 
-- [ ] **Step 3: Enforce final aggregate gates**
+- [x] **Step 3: Enforce final aggregate gates**
 
 The final Harness must assert:
 
@@ -680,7 +680,7 @@ assert.equal(summary.resumeFailures, 0);
 
 It must also print the worst task for each metric, not only averages.
 
-- [ ] **Step 4: Run full Agent/MCP regression after every generic fix batch**
+- [x] **Step 4: Run full Agent/MCP regression after every generic fix batch**
 
 ```powershell
 npm run test:agent
@@ -690,7 +690,7 @@ npm run test:experience
 
 Expected: all PASS before documentation starts.
 
-- [ ] **Step 5: Commit the experience-driven fixes**
+- [x] **Step 5: Commit the experience-driven fixes**
 
 Stage only files actually changed by failing categories:
 
@@ -708,7 +708,7 @@ git commit -m "修复 PMM 真实开发体验缺口"
 - Modify: `CHANGELOG.md`
 - Modify: `docs/superpowers/plans/2026-07-11-pmm-experience-value.md`
 
-- [ ] **Step 1: Document the usage decision contract**
+- [x] **Step 1: Document the usage decision contract**
 
 Document:
 
@@ -719,7 +719,7 @@ Document:
 - token/latency remain secondary metrics;
 - `npm run test:experience` is the release gate for Experience Value.
 
-- [ ] **Step 2: Run documentation and isolation checks**
+- [x] **Step 2: Run documentation and isolation checks**
 
 ```powershell
 rg -n "T[B]D|TO[D]O|implement la[t]er|fill in detai[l]s" docs/superpowers/specs/2026-07-11-pmm-experience-value-design.md docs/superpowers/plans/2026-07-11-pmm-experience-value.md
@@ -729,7 +729,7 @@ git diff --check
 
 Expected: no placeholder matches, no production fixture references, no whitespace errors.
 
-- [ ] **Step 3: Run complete local verification**
+- [x] **Step 3: Run complete local verification**
 
 ```powershell
 npm run test:experience
@@ -742,7 +742,7 @@ git diff --check
 
 Expected: all exit 0.
 
-- [ ] **Step 4: Rebuild qyProject KB and rerun the real corpus**
+- [x] **Step 4: Rebuild qyProject KB and rerun the real corpus**
 
 ```powershell
 node src/bin/rebuild-kbs.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data
@@ -751,7 +751,7 @@ npm run test:experience
 
 Expected: qyProject project-global freshness is `fresh`; all Experience gates still pass using the rebuilt KB.
 
-- [ ] **Step 5: Rebuild PMM's own KB and run self-review**
+- [x] **Step 5: Rebuild PMM's own KB and run self-review**
 
 ```powershell
 node src/bin/rebuild-kbs.js --workspace-root E:/xile-workspace/codex-tools/project-memory-manager --data-root E:/xile-workspace/codex-tools/project-memory-data
@@ -761,7 +761,7 @@ node src/bin/review-patch-for-agent.js --workspace-root E:/xile-workspace/codex-
 
 Expected: no unresolved high/medium code finding. Scope warnings caused only by tests/docs must be manually reconciled and recorded.
 
-- [ ] **Step 6: Record the final decision in this plan**
+- [x] **Step 6: Record the final decision in this plan**
 
 Add a completion report with:
 
@@ -772,7 +772,7 @@ Add a completion report with:
 - current baseline versus final search/correction rounds;
 - any metric not met. If any hard gate is not met, leave the plan incomplete and state that PMM is not yet proven as the default entry.
 
-- [ ] **Step 7: Commit documentation and final report**
+- [x] **Step 7: Commit documentation and final report**
 
 ```powershell
 git add README.md SKILL.md CHANGELOG.md docs/reference/mcp-tools.md docs/superpowers/plans/2026-07-11-pmm-experience-value.md
@@ -791,3 +791,52 @@ Wait for GitHub Actions to finish successfully. If CI fails, reproduce the faili
 - [ ] **Step 9: Record the PMM task outcome**
 
 Use `record_task_outcome` or the CLI fallback with actual changed files, verification commands, final Experience metrics, default-use recommendation, and residual risks. Do not record the task as complete before CI is green.
+
+## 完成报告（2026-07-11）
+
+### 最终结论
+
+PMM 已证明对真实代码开发有必要使用价值，但价值来自任务理解、文件定位、历史连续性和范围复核，不来自单纯压缩 token。以下任务默认使用深度 PMM：
+
+- 跨模块或全栈链路理解，包括登录会话、验证码、商城配置和数据表影响。
+- debug，尤其是入口、调用方、prefab/script 绑定或运行态链路不明确的问题。
+- 高风险实现，包括 API、鉴权、数据、交易、配置同步和跨服务改动。
+- resume 和 review，需要历史 outcome、changed files、剩余风险和当前源码状态共同判断。
+
+以下场景只需要 Usage Gate：少量明确 UI/prefab 文件的小改，`decide_pmm_usage` 返回 `optional_skip_allowed`，调用方保留 `knownFiles`，并在提交前运行 `validate_edit_scope`。12 任务语料中的 `new-lobby-bottom-action` 属于这类边界，直接源码与 PMM 都是 1 轮，深度 PMM 没有额外效率收益。
+
+直接源码仍更可靠或不可省略的场景：
+
+- `cms-error-message-chinese` 的精确活跃调用方确认，直接搜索与 PMM 都是 1 轮；PMM 负责给出完整候选范围，源码负责确认当前调用事实。
+- `resume-completed-task` 必须核对已记录 commit 与当前工作树，因此 PMM 为 1 轮历史召回加 1 轮 source confirmation；历史记忆不能替代当前仓库状态。
+- 任意 `readiness !== ready` 的 brief，以及运行态、动态配置或 KB 无法证明的行为，必须按 `missingEvidence` / `sourceConfirmation` 精确读取源码或运行验证。
+
+### 最终指标
+
+| 指标 | 固化基线 | 最终结果 | 硬门禁 | 结论 |
+| --- | ---: | ---: | ---: | --- |
+| Top-5 recall | 0.5306 | 0.9861 | >= 0.85 | 通过 |
+| Top-10 recall | 0.6625 | 1.0000 | 观察项 | 12 个任务无 Top-10 核心漏项 |
+| Max noise ratio | 1.0000 | 0.1667 | <= 0.20 | 通过 |
+| Plan adoptable rate | 0.0000 | 1.0000 | >= 0.80 | 通过 |
+| Memory precision | 0.5000 | 1.0000 | >= 0.90 | 通过 |
+| Workflow improvement rate | 0.5000 | 0.7500 | >= 0.75 | 通过 |
+| High-risk core misses | 5 | 0 | = 0 | 通过 |
+| Resume failures | 1 | 0 | = 0 | 通过 |
+
+最差 Top-5 任务是 `game-config-rule-defaults`，结果为 5/6，缺少的第 6 个核心文件仍在 Top-10 内。最大噪声任务是 `mall-runtime-product-snapshot` 和 `review-changed-files-scope`，均为 1/6，即 0.1667，低于 0.20 门禁。
+
+### 工作流轮次
+
+- 直接源码基线总轮次保持 25。
+- PMM 总轮次从基线 21 降到 13，包括 12 次首轮 brief 和 resume 的 1 次 source confirmation。
+- 因 Top-10 核心文件缺失产生的 correction rounds 从 9 降到 0。
+- 9/12 任务严格减少搜索或纠正轮次。`new-lobby-bottom-action` 与 `cms-error-message-chinese` 持平；`resume-completed-task` 多 1 次当前源码确认，这是历史记忆的必要安全成本。
+
+### 自检与剩余风险
+
+- qyProject project-global 和 6 个 feature KB 重建成功；`agent_preflight` 返回 `status=ready`、`kbFreshness.status=fresh`，当前快照 12,253 个文件且无增删改。
+- PMM 自身 project-global KB 重建成功，包含 117 个脚本和 1,159 个方法。
+- `review_patch_for_agent` 返回 `review_ready`。声明实施计划中的生产文件和发布文档为 `knownFiles` 后，没有运行代码越界项。
+- 唯一 medium scope warning 来自 4 个测试文件或 fixture 文件名包含 login/mall 等高风险词。它们只保存测试逻辑和评测真值，生产代码没有引用 `tests/experience`，已通过 `npm run test:all`、`npm run test:experience` 和隔离检查，手工判定为非运行态风险。
+- 所有硬门禁均达到。剩余风险是 Experience Corpus 当前固定为 12 个 qyProject 任务，后续新增技术栈或新业务域时需要扩充 fixture，不能把本次结果外推为所有项目永久有效。
