@@ -30,6 +30,10 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 `prepare_agent_brief` 会聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。`decide_pmm_usage` 仍是底层门禁：少量明确 UI 源文件可以只走轻量 PMM 证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应继续使用深度 PMM 上下文。`prepare_agent_brief`、`plan_task_execution`、`validate_edit_scope` 和 `review_patch_for_agent` 在需要深度上下文时会继续遵守 freshness gate。
 
+自然语言任务可以直接传给 `prepare_agent_brief`、`prepare_task_context` 和 `recall_task_memory`。任务词模型支持中英文标识符、CJK 片段和常用业务别名；已知精确方法、endpoint、request 或协议消息时，再使用 selector 查询以缩短链路。
+
+Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回 compact 结构，并通过 `_output.budgetChars` 声明预算。compact 保留文件、行号、方向、风险、验证和下一步动作，删除完整节点 meta、snapshot、artifact 和重复 node；只有排查 PMM 自身或需要完整底层事实时才传 `detail=full`。
+
 `get_current_state` 会返回 `projectGlobalFreshness`。Codex 查询前应先看这个状态：
 
 从 v0.71 起，`get_current_state` 还会返回 `workspaceHash`、`registryPath` 和 `workspaceIdentity`。同一个 `PMM_DATA_ROOT` 可以服务多个项目；如果项目移动过、当前路径不确定、或者需要跨会话接力，应先用 `resolve_workspace` 明确目标项目对应的 `memoryRoot`，必要时用 `diagnose_data_root` 检查缺失 manifest、失效路径或 `workspaceId` 碰撞。

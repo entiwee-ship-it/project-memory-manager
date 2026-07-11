@@ -8,15 +8,24 @@
 ## [未发布]
 
 ### 改进
+- Agent Context Pack 和历史任务召回共用确定性的中英文任务词模型，支持 CJK 片段、2 到 4 字 n-gram 和验证码、麻将胡牌、特效、转转、Pinus 会话等常用业务别名。
+- `prepare_task_context`、执行闭环、历史记忆和 project/feature chain MCP 工具默认返回结构化 compact 视图，并通过 `_output.budgetChars` 暴露字符预算；`detail=full` 继续保留完整诊断结构。
+- project query 缓存继续保存完整 payload，在 MCP 返回边界按请求投影 compact/full，避免紧凑缓存破坏后续完整诊断。
 - 新增统一的 `npm run test:all` 完整回归入口，避免发布前人工逐条执行测试时漏掉 `registry`、`agent` 等测试组。
 - 新增 Windows GitHub Actions CI，在 `main` 推送和 Pull Request 上自动执行依赖安装、完整测试、包校验和 `git diff --check`。
 - CI 使用 Node.js 24 runtime 的 `actions/checkout@v7` 和 `actions/setup-node@v6`，避免 GitHub Actions 的 Node.js 20 弃用告警。
 
 ### 测试
+- 新增 `npm run test:token-roi`，覆盖中文验证码、麻将胡牌、登录会话排序，最近但无关的历史任务隔离，置信度语义和 MCP compact 字符预算。
+- 扩展 MCP 测试，覆盖 project query 默认 compact、缓存命中和 `detail=full` 完整结构兼容。
 - 扩展源码布局测试，锁定统一测试入口和 CI 必须执行的发布质量门禁命令。
 - 更新真实 qy-server 集成断言，按稳定 Pinus RPC 路由和实现方法元数据校验链路，避免远程实现类名变化造成误报。
 
 ### 修复
+- 修复中文自然语言任务被 ASCII 分词规则丢弃后，endpoint/request/method 仅靠节点类型奖励进入推荐结果的问题。
+- 修复最近任务无条件加分导致无关 outcome 污染 brief 的问题；最近时间现在只在已有语义命中时作为 tie-break。
+- 历史 outcome 的原始置信度改为 `outcomeConfidence`，检索相关性改为 `relevanceConfidence` / `relevanceScore`，不再互相覆盖。
+- query 和 Agent MCP 失败响应默认截断 stdout/stderr 并移除完整 artifact/snapshot 元数据，避免错误路径产生大段上下文。
 - `plan_task_execution` 和 `validate_edit_scope` 会把调用方明确传入的 `knownFiles` 合并进 PMM 上下文边界，避免 `package.json`、`.github` workflow、`README.md` 等已声明任务文件从计划中丢失或被误报为越界。
 - Agent 改动范围复核会把 `implementation-artifacts`、`tests` 等合同/规格/QA 辅助文件作为非阻塞图外文件记录，避免纯验证留痕触发 `scope_review_needed` 噪声。
 - 根目录 `CHANGELOG.md` 作为发布说明支撑文件时会进入 `informationalOutOfScopeFiles`，不再单独阻塞范围复核。

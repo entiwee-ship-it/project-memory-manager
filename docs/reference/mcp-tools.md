@@ -100,7 +100,7 @@
 
 AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
 
-v0.81 起，面向 Agent 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表和重复诊断塞进上下文。v0.82 起，`get_current_state` 和 `check_kb_freshness` 同样默认返回紧凑视图，且 MCP 会自动传入当前 skill 根以减少假性预检告警；`prepare_agent_brief` 的紧凑输出会过滤 PMM 外置数据根、已安装 skill 副本等内部路径，避免把它们当作源码目标或推荐验证命令。需要排查 PMM 自身问题时，在 `agent_preflight`、`prepare_agent_brief`、`get_current_state` 或 `check_kb_freshness` 参数里传 `"detail": "full"`。
+面向 Agent、Memory、workspace state 和 project/feature query 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表、节点 meta、artifact 和重复诊断塞进上下文。compact 输出保留可执行证据并通过 `_output.budgetChars` 声明字符预算；查询缓存仍保存完整 payload。需要排查 PMM 自身问题、完整 snapshot 或底层节点 meta 时，在参数里传 `"detail": "full"`。
 
 ### `agent_preflight`
 
@@ -155,7 +155,7 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 }
 ```
 
-返回相似历史 outcome、相关文件、验证命令、观察和相关 playbook 规则。它读取外置数据根目录下 `state/agent-outcomes/task-outcomes.jsonl`。
+返回相似历史 outcome、相关文件、验证命令、观察和相关 playbook 规则。它读取外置数据根目录下 `state/agent-outcomes/task-outcomes.jsonl`。只有语义词或文件达到最小相关性门槛时才召回；最近时间只作为已有命中的 tie-break。`outcomeConfidence` 表示 outcome 自身置信度，`relevanceConfidence` / `relevanceScore` 表示本次检索相关性。
 
 ### `summarize_project_memory`
 
@@ -221,7 +221,7 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 
 ### `prepare_task_context`
 
-输入自然语言任务，自动匹配相关 feature、endpoint、request、method、Prisma model 和 external-service。
+输入自然语言任务，自动匹配相关 feature、endpoint、request、method、Prisma model 和 external-service。任务词模型支持英文标识符、路径、CJK 片段、2 到 4 字 n-gram，以及验证码、麻将胡牌、特效、转转、Pinus 会话等确定性别名。
 
 ```json
 {
@@ -348,7 +348,7 @@ freshness 结果会包含门禁字段：
 
 `changeCounts.mtimeOnly` 表示文件 size 不变但 mtime 变化。对 `generatedFiles`，PMM 会优先比较内容哈希；内容不变时 KB 仍是 `fresh`，同时返回 `mtimeOnlyFiles` 作为诊断信息。
 
-查询结果会附带 `kbFreshness` 和 `_mcpFreshness`。默认情况下，`query_project_chain` 和 `query_feature_chain` 使用 `freshnessPolicy=auto_rebuild`：
+查询结果会附带 `kbFreshness` 和 `_mcpFreshness`。默认 compact 只返回紧凑起点、方向、边、目标节点、文件和行号；传 `detail=full` 才返回完整 `node`、`meta`、artifact 和 snapshot。默认情况下，`query_project_chain` 和 `query_feature_chain` 使用 `freshnessPolicy=auto_rebuild`：
 
 - 查询前发现 KB 不是 `fresh` 时，MCP 会同步重建。
 - 重建完成后再次检查新鲜度。

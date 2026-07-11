@@ -33,7 +33,7 @@ MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg
 10. `decide_pmm_usage`：只需要判断是否必须深度 PMM 时使用。
 11. `plan_task_execution`：需要单独生成执行计划时使用，输出 PMM gate、目标文件、编辑边界、步骤、验证命令和证据。
 12. `recall_task_memory`：需要单独召回历史任务 outcome、相关文件、验证命令和观察时使用。
-13. `prepare_task_context`：需要更细任务上下文时使用，输出 AI 可直接行动的上下文包。
+13. `prepare_task_context`：需要更细任务上下文时使用，输出 AI 可直接行动的上下文包。可直接传中文业务任务；任务词模型会提取 CJK 片段并扩展常用业务别名。
 14. `explain_feature_for_agent`：已经知道 feature key 时使用，输出功能记忆卡片。
 15. `analyze_change_impact`：改完或 review 前使用，按 changed files / diff 判断影响面和验证建议。
 16. `validate_edit_scope`：提交前使用，复核 changed files 是否越过 PMM 建议边界、是否含高风险文件、是否疑似漏改关键文件。
@@ -41,7 +41,7 @@ MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg
 18. `record_task_outcome`：任务结束后记录结果、改动文件、验证命令和观察，供后续会话参考。
 19. `update_project_playbook`：阶段性沉淀稳定项目规则，或从 task/outcome/changedFiles 中推断项目惯例。
 20. `summarize_project_memory`：跨会话接力或复盘时查看当前项目已沉淀的记忆。
-21. `query_project_chain` / `query_feature_chain`：需要进一步追某条 selector 链路时使用；默认 `freshnessPolicy=auto_rebuild`，工具会在 KB 过期、缺失或未知时同步重建并等待 `fresh` 后再返回结果。
+21. `query_project_chain` / `query_feature_chain`：需要进一步追某条 selector 链路时使用；默认 `freshnessPolicy=auto_rebuild`，工具会在 KB 过期、缺失或未知时同步重建并等待 `fresh` 后再返回结果。MCP 默认返回 compact 节点/边，排查完整 meta 时才传 `detail=full`。
 22. `build_project_index` / `build_feature_index`：只在需要手动维护、预热或排查构建问题时直接调用。手动预热 project-global 时优先用 `start_build_project_index` 并传 `wait:true`。
 23. `discover_features` + `build_feature_index`：需要功能级链路、入口拆分或多模块边界时生成功能 KB。
 
@@ -75,7 +75,7 @@ CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` �
 - 找入口或消歧义：用 `type`、`name`、`module`、`area`、`path`、`grouped` 收窄。
 - 追方法/接口链路：`method`、`request`、`endpoint` 搭配 `upstream` / `downstream`。
 - 查协议/事件消息：`message` 只表示项目里的协议消息名或事件消息名，不是自然语言问题入口。
-- 处理中文业务问题：先从问题里提取 `endpoint`、`request`、`method` 或关键词，再用对应 selector；不要把整句自然语言传给 `message`。
+- 处理中文业务问题：整句任务优先传给 `prepare_agent_brief` 或 `prepare_task_context`；已知精确入口时再改用 `endpoint`、`request`、`method` selector。不要把整句自然语言传给 `message`。
 - 看前后端完整链路：`mode=fullstack` 或 `focus=fullstack`。
 - 看数据库表影响：`focus=data` 或 `mode=fullstack-data`，重点读 `dataAccessSummary`。
 - 查 Next.js API route：`endpoint="GET /api/chat"` 搭配 `downstream` / `mode=fullstack-data`。
@@ -98,6 +98,8 @@ CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` �
 - `decide_pmm_usage` 返回 `optional_skip_allowed` 时，只代表可以跳过深度链路查询，不代表没有使用 PMM；仍要保留门禁结果，并在提交前复核 changed files。
 - `validate_edit_scope` 返回 `scope_review_needed`、`possibly_incomplete` 或 `pmm_context_unavailable` 时，不要直接提交；先按 `requiredFollowUp` 复核。
 - `prepare_agent_brief` 中的 `memory.recalledTasks` 是历史经验，不是当前源码事实；涉及当前行为时仍以 fresh KB 和源码精确确认为准。
+- `recalledTasks.outcomeConfidence` 是历史结果自身置信度，`relevanceConfidence` / `relevanceScore` 是本次查询相关性；不要把二者混为同一个 `confidence`。
+- Agent、Memory、workspace state 和 project/feature query MCP 工具默认 compact，并在 `_output.budgetChars` 中声明预算；只有排查 PMM 自身、完整 snapshot 或节点 meta 时才传 `detail=full`。
 - 完成任务后优先调用 `record_task_outcome`，稳定规则再调用 `update_project_playbook`，这样下一次 brief 才能召回。
 - PMM 结果不足时，必须先确认 `kbFreshness.status=fresh`，再读项目文档和源码，用 `rg` 精确确认。
 - 回答链路问题时，把 PMM 证据和源码确认结果分开说清楚。

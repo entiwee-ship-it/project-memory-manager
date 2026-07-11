@@ -18,13 +18,16 @@ npm run test:layout
 npm run test:registry
 npm run test:mcp
 npm run test:agent
+npm run test:token-roi
 npm run test:feature
 npm run test:path
 npm run test:summary
 npm run test:source-layout
 ```
 
-`test:agent` 会同时覆盖 Agent Context Pack、v0.60 Agent 执行闭环和 v0.70 Agent Memory Recall，包括 Usage Gate、执行计划、范围复核、patch review、任务结果记录、历史任务召回、Agent brief、project playbook、CLI 兜底和 MCP 工具接入。
+`test:agent` 会同时覆盖 Agent Context Pack、v0.60 Agent 执行闭环、v0.70 Agent Memory Recall 和 Token ROI 回归，包括 Usage Gate、执行计划、范围复核、patch review、任务结果记录、中文任务召回、历史记忆隔离、compact 字符预算、Agent brief、project playbook、CLI 兜底和 MCP 工具接入。
+
+`test:token-roi` 可单独快速验证中文验证码、麻将胡牌、登录会话任务排序，最近但无关的历史 outcome 隔离，置信度拆分，以及 Agent/Query MCP 默认输出预算。
 
 真实 qy-server 集成分支默认跳过；需要发布前联调时设置目标仓库后运行 `npm test`：
 

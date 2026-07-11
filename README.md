@@ -81,16 +81,16 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 ## Agent 执行闭环
 
-PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。v0.81 起，MCP 的 `agent_preflight` 和 `prepare_agent_brief` 默认返回紧凑视图，只保留状态、关键问题、下一步动作、推荐文件、验证命令和少量证据；v0.82 起，`get_current_state` 和 `check_kb_freshness` 也默认紧凑，并会自动识别 MCP 当前 skill 根、修正 fresh 状态的安全位、过滤 PMM 外置数据根和已安装 skill 副本等内部路径。需要完整诊断、snapshot 或能力列表时传 `detail=full`。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
+PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。当前 Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回结构化 compact 视图，只保留状态、关键入口、文件、行号、风险、验证和少量证据，并通过 `_output.budgetChars` 标明字符预算；完整领域对象仍保留在核心函数和查询缓存中。需要完整诊断、snapshot、节点 meta 或能力列表时传 `detail=full`。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
 
 - `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。MCP 默认紧凑；CLI `--json` 默认完整，`--compact` 输出紧凑。
 - `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。MCP 默认返回 `preflightSummary`，调试时传 `detail=full` 才返回完整 `preflight`。
-- `recall_task_memory` / `recall-task-memory.js`：适合只想查历史任务时使用，例如“之前 OAuth token 怎么验证过”。
+- `recall_task_memory` / `recall-task-memory.js`：适合只想查历史任务时使用，例如“之前 OAuth token 怎么验证过”。只有存在语义词或文件命中时才召回；`outcomeConfidence` 表示历史结果自身置信度，`relevanceConfidence` 表示本次检索相关性。
 - `summarize_project_memory` / `summarize-project-memory.js`：适合跨会话接力或阶段复盘时查看 PMM 已记住什么。
 - `update_project_playbook` / `update-project-playbook.js`：适合把稳定项目规则沉淀成可召回 playbook。
 - `decide_pmm_usage` / `decide-pmm-usage.js`：适合任务开始时使用。少量明确 UI 源文件可以得到 `optional_skip_allowed`，但必须保留门禁证据并在提交前复核；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时会要求深度 PMM。
 - `plan_task_execution` / `plan-task-execution.js`：适合动手前使用。它会把门禁、PMM 上下文、目标文件、编辑边界和验证命令组合成 AI 可执行计划；显式 `knownFiles` 会优先进入目标文件并合并进上下文边界。
-- `prepare_task_context` / `prepare-task-context.js`：适合任务开始前使用，例如“修改 settings 页 AI 配置保存逻辑”。输出会给出任务理解、相关 feature、关键入口、关键文件、调用链、数据表影响、外部服务、建议编辑边界和验证命令。
+- `prepare_task_context` / `prepare-task-context.js`：适合任务开始前使用，例如“后台验证码链路”或“转转麻将胡牌特效”。任务词模型支持中英文标识符、CJK n-gram 和常用业务别名，输出会给出任务理解、相关 feature、关键入口、关键文件、调用链、数据表影响、外部服务、建议编辑边界和验证命令。
 - `explain_feature_for_agent` / `explain-feature-for-agent.js`：适合进入某个功能前使用，例如 `featureKey=chat`、`settings`、`facebook-oauth`。输出是功能记忆卡片。
 - `analyze_change_impact` / `analyze-change-impact.js`：适合提交前或 review 前使用，输入 changed files 或 git diff，输出影响范围、风险等级、重点复核链路、推荐测试和是否需要重建 feature KB。
 - `validate_edit_scope` / `validate-edit-scope.js`：适合提交前使用。它会检查 changed files 是否落在 PMM 建议边界内，并指出越界文件、高风险文件或疑似漏改文件；显式 `knownFiles` 会合并进上下文边界，适合声明图谱外的根配置、CI workflow 和说明文档。
@@ -140,7 +140,7 @@ node src/bin/validate-package.js
 
 Next.js App Router 项目可以直接查 `app/api/**/route.ts` 生成的 endpoint，例如 `--endpoint "GET /api/chat" --downstream --mode fullstack-data`；前端 `fetchJSON` / `EventSource` 调用会尽量匹配到对应 `/api/**` route。Prisma 读写会生成 table/model 节点，可用 `--type table --name <model>` 查询。外部依赖可用 `--type external-service --name facebook`、`--type external-service --name anthropic` 等方式查询。
 
-查询时不要把整句自然语言问题传给 `message`。`message` 只表示项目里的协议消息名或事件消息名；中文业务问题要先抽取 `endpoint`、`request`、`method` 或关键词，再用对应 selector 查询。
+自然语言开发任务可以直接传给 `prepare_agent_brief`、`prepare_task_context` 或 `recall_task_memory`。`message` 仍只表示项目里的协议消息名或事件消息名；已知精确方法、接口或消息名时，优先改用 `method`、`endpoint`、`request` 或 `message` selector 收窄链路。
 
 查询结果会返回 `kbFreshness` 和 `_mcpFreshness`。MCP 查询默认 `freshnessPolicy=auto_rebuild`：状态为 `stale`、`missing`、`unknown` 时会先重建并等待 `fresh`，再返回查询结果。只有调试旧 KB 时才显式传 `freshnessPolicy=allow_stale`；想阻止自动重建时传 `freshnessPolicy=require_fresh`。
 
