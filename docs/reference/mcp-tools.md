@@ -100,7 +100,7 @@
 
 AI 接到开发任务时，先用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再获取短、准、可行动的上下文。少量明确 UI 小改可以只留下轻量门禁证据；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时，应进入深度 PMM 上下文。
 
-面向 Agent、Memory、workspace state 和 project/feature query 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表、节点 meta、artifact 和重复诊断塞进上下文。compact 输出保留可执行证据并通过 `_output.budgetChars` 声明字符预算；查询缓存仍保存完整 payload。需要排查 PMM 自身问题、完整 snapshot 或底层节点 meta 时，在参数里传 `"detail": "full"`。
+面向 Agent、Memory、workspace state 和 project/feature query 的 MCP 工具默认使用 `detail=compact`，避免把完整 snapshot、能力列表、节点 meta、artifact 和重复诊断塞进上下文。compact 输出保留可执行证据并通过 `_output.budgetChars` 声明字符预算：`prepare_agent_brief` 为 4,000 字符，task context、执行闭环、memory 和 project/feature query 为 6,000 字符；查询缓存仍保存完整 payload。需要排查 PMM 自身问题、完整 snapshot 或底层节点 meta 时，在参数里传 `"detail": "full"`。
 
 ### `agent_preflight`
 

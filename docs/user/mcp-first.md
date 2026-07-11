@@ -32,7 +32,7 @@ npx skills add https://github.com/entiwee-ship-it/project-memory-manager.git --s
 
 自然语言任务可以直接传给 `prepare_agent_brief`、`prepare_task_context` 和 `recall_task_memory`。任务词模型支持中英文标识符、CJK 片段和常用业务别名；已知精确方法、endpoint、request 或协议消息时，再使用 selector 查询以缩短链路。
 
-Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回 compact 结构，并通过 `_output.budgetChars` 声明预算。compact 保留文件、行号、方向、风险、验证和下一步动作，删除完整节点 meta、snapshot、artifact 和重复 node；只有排查 PMM 自身或需要完整底层事实时才传 `detail=full`。
+Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回 compact 结构，并通过 `_output.budgetChars` 声明预算。`prepare_agent_brief` 的默认上限为 4,000 字符；task context、执行闭环、memory 和 project/feature query 的默认上限为 6,000 字符。compact 优先保留文件、行号、方向、风险、验证和下一步动作，删除完整节点 meta、snapshot、artifact、弱相关候选和重复 node；只有排查 PMM 自身或需要完整底层事实时才传 `detail=full`。
 
 `get_current_state` 会返回 `projectGlobalFreshness`。Codex 查询前应先看这个状态：
 

@@ -8,6 +8,8 @@
 
 **Tech Stack:** Node.js, CommonJS, MCP JSON-RPC, Node built-in `assert`, PMM external-data layout
 
+**Status:** Implementation and local verification complete. Final push remains pending until the closing commit is created.
+
 ---
 
 ## File Structure
@@ -31,11 +33,11 @@
 - Read: `tests/agent-context-pack.test.js`
 - Read: `tests/agent-memory-recall.test.js`
 
-- [ ] **Step 1: Build a temporary mixed-domain fixture**
+- [x] **Step 1: Build a temporary mixed-domain fixture**
 
 Add test helpers that copy `tests/fixtures/admin-fullstack-sample` into a temporary workspace, write minimal login/Pinus and Mahjong files, add unrelated poker/activity endpoint files, initialize external PMM data, and build the project-global KB with the existing graph builder.
 
-- [ ] **Step 2: Write failing Chinese ranking tests**
+- [x] **Step 2: Write failing Chinese ranking tests**
 
 Call `prepareTaskContext()` with these exact tasks and assert the ordered `recommendedFiles` contract:
 
@@ -62,7 +64,7 @@ assertTopFiles(login.recommendedFiles, [
 ], 8);
 ```
 
-- [ ] **Step 3: Write failing memory relevance tests**
+- [x] **Step 3: Write failing memory relevance tests**
 
 Record one captcha outcome and one recent unrelated activity outcome. Assert only the captcha record is recalled, and assert the record exposes both fields:
 
@@ -74,11 +76,11 @@ assert.ok(['high', 'medium'].includes(result.recalledTasks[0].relevanceConfidenc
 assert.equal(Object.hasOwn(result.recalledTasks[0], 'confidence'), false);
 ```
 
-- [ ] **Step 4: Write failing compact budget tests**
+- [x] **Step 4: Write failing compact budget tests**
 
 Use `projectAgentOutput()` and `handleMcpRequest()` to assert every target compact response serializes below its documented budget, while `detail=full` preserves fields removed from compact output.
 
-- [ ] **Step 5: Register and run the new test**
+- [x] **Step 5: Register and run the new test**
 
 Add:
 
@@ -94,7 +96,7 @@ npm run test:token-roi
 
 Expected: FAIL because Chinese semantic ranking, recency isolation, confidence split, and target compact projections do not exist yet.
 
-- [ ] **Step 6: Commit the red test contract**
+- [x] **Step 6: Commit the red test contract**
 
 ```powershell
 git add tests/agent-token-efficiency.test.js package.json
@@ -109,7 +111,7 @@ git commit -m "测试 PMM Token ROI 回归合同"
 - Modify: `src/agent/memory-recall.js`
 - Test: `tests/agent-token-efficiency.test.js`
 
-- [ ] **Step 1: Implement the shared term model**
+- [x] **Step 1: Implement the shared term model**
 
 Export these stable functions:
 
@@ -124,11 +126,11 @@ module.exports = {
 
 `parseTaskTerms()` must return `{ raw, normalized, terms }`, where each term is `{ value, weight, source }`. Generate CJK 2-4 character n-grams, filter stop/scope words, deduplicate by normalized value using the highest weight, and apply deterministic aliases for captcha, Mahjong Hu/effects, Zhuanzhuan, Pinus/session/login, OAuth, chat, settings, and data access.
 
-- [ ] **Step 2: Replace context-pack local parsing**
+- [x] **Step 2: Replace context-pack local parsing**
 
 Delete the local `parseTaskTerms()` implementation. Pass weighted term objects into `scoreNode()` and return a score detail object containing `score`, `matchScore`, and `matchedTerms`.
 
-- [ ] **Step 3: Gate node type bonuses**
+- [x] **Step 3: Gate node type bonuses**
 
 Implement this invariant:
 
@@ -140,11 +142,11 @@ if (matchScore <= 0) {
 
 Only then add endpoint/request/method/table type bonuses. Sort by final score, then match score, then matched-term count, then stable node name.
 
-- [ ] **Step 4: Replace memory extraction and scoring**
+- [x] **Step 4: Replace memory extraction and scoring**
 
 Use the shared weighted terms in `scoreRecord()`. Keep recency as a tie-break reason only after `matchScore > 0`; require a minimum score of 3 before recall.
 
-- [ ] **Step 5: Split confidence fields**
+- [x] **Step 5: Split confidence fields**
 
 Change `compactRecord()` to emit:
 
@@ -158,7 +160,7 @@ Change `compactRecord()` to emit:
 
 Update memory evidence to use `relevanceConfidence`. For project summaries, preserve outcome confidence and set relevance fields to `null` because no query was performed.
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 ```powershell
 npm run test:token-roi
@@ -167,7 +169,7 @@ npm run test:agent
 
 Expected: Chinese ranking and memory tests PASS; compact budget tests may still FAIL until Task 3.
 
-- [ ] **Step 7: Commit semantic recall fixes**
+- [x] **Step 7: Commit semantic recall fixes**
 
 ```powershell
 git add src/agent/task-terms.js src/agent/context-pack.js src/agent/memory-recall.js tests/agent-token-efficiency.test.js
@@ -180,19 +182,19 @@ git commit -m "修复 PMM 中文任务召回与记忆相关性"
 - Modify: `src/agent/output-projection.js`
 - Test: `tests/agent-token-efficiency.test.js`
 
-- [ ] **Step 1: Add bounded projection helpers**
+- [x] **Step 1: Add bounded projection helpers**
 
 Implement `truncateText(value, maxLength)`, compact node/edge helpers, bounded array helpers, and a structural budget reducer. The reducer must shrink low-priority arrays rather than slicing serialized JSON.
 
-- [ ] **Step 2: Add Agent projections**
+- [x] **Step 2: Add Agent projections**
 
 Implement compact functions for task context, change impact, execution plan, edit scope validation, and patch review. Preserve task, status/verdict, target/changed files, concise risks, required follow-up, validation commands, and compact evidence.
 
-- [ ] **Step 3: Add memory projections**
+- [x] **Step 3: Add memory projections**
 
 Implement compact recall and project-memory summary functions. Limit recalled tasks, observations, validation commands, frequent files, and playbook rules while preserving split confidence fields.
 
-- [ ] **Step 4: Add query projection**
+- [x] **Step 4: Add query projection**
 
 Implement `compactProjectQuery()` for project and feature queries. For traversal results preserve:
 
@@ -210,11 +212,11 @@ Implement `compactProjectQuery()` for project and feature queries. For traversal
 
 Do not include full node meta, tags, bindings, full snapshots, or duplicate `node` objects in compact mode.
 
-- [ ] **Step 5: Route all target tool names**
+- [x] **Step 5: Route all target tool names**
 
 Extend `projectAgentOutput()` dispatch for all tools listed in the design. Keep the existing `detail=full` branch unchanged except for `_output.detail`.
 
-- [ ] **Step 6: Run projection tests**
+- [x] **Step 6: Run projection tests**
 
 ```powershell
 npm run test:token-roi
@@ -223,7 +225,7 @@ npm run test:agent
 
 Expected: direct projection budget tests PASS. MCP query tests remain pending until Task 4.
 
-- [ ] **Step 7: Commit compact projection core**
+- [x] **Step 7: Commit compact projection core**
 
 ```powershell
 git add src/agent/output-projection.js tests/agent-token-efficiency.test.js
@@ -237,7 +239,7 @@ git commit -m "压缩 PMM Agent 与链路查询输出"
 - Modify: `tests/mcp-server.test.js`
 - Test: `tests/agent-token-efficiency.test.js`
 
-- [ ] **Step 1: Project Agent project tools**
+- [x] **Step 1: Project Agent project tools**
 
 Change `runAgentProjectTool()` to attach metadata, then call:
 
@@ -245,23 +247,23 @@ Change `runAgentProjectTool()` to attach metadata, then call:
 return textResult(projectAgentOutput(enriched, args, toolName));
 ```
 
-- [ ] **Step 2: Project recall and summary tools**
+- [x] **Step 2: Project recall and summary tools**
 
 Route `recall_task_memory` and `summarize_project_memory` through `projectAgentOutput()` after `_mcpQuery` metadata is attached.
 
-- [ ] **Step 3: Project cached project queries**
+- [x] **Step 3: Project cached project queries**
 
 Keep `projectQueryCache` entries as full payloads. On cache hit and miss, attach MCP metadata to the full payload, then call `projectAgentOutput(..., args, 'query_project_chain')` before `textResult()`.
 
-- [ ] **Step 4: Project feature queries and errors**
+- [x] **Step 4: Project feature queries and errors**
 
 Apply the same boundary to `query_feature_chain`. Route failures through compact error projection so stdout/stderr are truncated and artifact snapshots are omitted by default.
 
-- [ ] **Step 5: Add MCP compatibility assertions**
+- [x] **Step 5: Add MCP compatibility assertions**
 
 In `tests/mcp-server.test.js`, assert default compact query output omits `resolvedStart.meta` and duplicate `node`, while `detail=full` includes the existing full structure. Assert cache hit preserves the requested detail mode.
 
-- [ ] **Step 6: Run MCP and Agent tests**
+- [x] **Step 6: Run MCP and Agent tests**
 
 ```powershell
 npm run test:mcp
@@ -270,7 +272,7 @@ npm run test:agent
 
 Expected: PASS with compact default and full compatibility.
 
-- [ ] **Step 7: Commit MCP integration**
+- [x] **Step 7: Commit MCP integration**
 
 ```powershell
 git add src/mcp/server.js tests/mcp-server.test.js tests/agent-token-efficiency.test.js
@@ -287,32 +289,32 @@ git commit -m "接入 PMM MCP 默认紧凑投影"
 - Modify: `docs/user/mcp-first.md`
 - Modify: `docs/developer/testing.md`
 
-- [ ] **Step 1: Document compact/full behavior**
+- [x] **Step 1: Document compact/full behavior**
 
 State that Agent and query MCP tools default to compact output, `detail=full` is diagnostic-only, compact output is structurally bounded, and CLI domain JSON remains complete.
 
-- [ ] **Step 2: Document Chinese task behavior**
+- [x] **Step 2: Document Chinese task behavior**
 
 Explain that natural-language Agent tools now support deterministic CJK terms and aliases, while exact chain queries should still use selectors when a method/endpoint is known.
 
-- [ ] **Step 3: Document the regression command**
+- [x] **Step 3: Document the regression command**
 
 Add `npm run test:token-roi` to testing documentation and include it in the Agent test description.
 
-- [ ] **Step 4: Update changelog**
+- [x] **Step 4: Update changelog**
 
 Under `[未发布]`, record Chinese ranking, memory relevance isolation, confidence split, compact projection coverage, and token budget tests. Do not bump the version until all release checks pass.
 
-- [ ] **Step 5: Run documentation checks**
+- [x] **Step 5: Run documentation checks**
 
 ```powershell
-rg -n "TBD|TODO|implement later|fill in details" docs/superpowers/specs/2026-07-11-pmm-token-roi-design.md docs/superpowers/plans/2026-07-11-pmm-token-roi.md
+rg -n "T[B]D|TO[D]O|implement la[t]er|fill in detai[l]s" docs/superpowers/specs/2026-07-11-pmm-token-roi-design.md docs/superpowers/plans/2026-07-11-pmm-token-roi.md
 git diff --check
 ```
 
 Expected: no placeholder matches and no whitespace errors.
 
-- [ ] **Step 6: Commit documentation**
+- [x] **Step 6: Commit documentation**
 
 ```powershell
 git add CHANGELOG.md README.md SKILL.md docs/reference/mcp-tools.md docs/user/mcp-first.md docs/developer/testing.md docs/superpowers/specs/2026-07-11-pmm-token-roi-design.md docs/superpowers/plans/2026-07-11-pmm-token-roi.md
@@ -325,7 +327,7 @@ git commit -m "记录 PMM Token ROI 使用合同"
 - Modify if measurements require factual correction: `docs/superpowers/specs/2026-07-11-pmm-token-roi-design.md`
 - Modify: `docs/superpowers/plans/2026-07-11-pmm-token-roi.md`
 
-- [ ] **Step 1: Run complete local verification**
+- [x] **Step 1: Run complete local verification**
 
 ```powershell
 npm run test:agent
@@ -337,23 +339,23 @@ git diff --check
 
 Expected: all commands exit 0.
 
-- [ ] **Step 2: Rebuild qyProject KB**
+- [x] **Step 2: Rebuild qyProject KB**
 
 Use PMM MCP `start_build_project_index` with `wait:true` for `E:/xile-workspace/qyProject` and external data root `E:/xile-workspace/codex-tools/project-memory-data`. Confirm freshness is `fresh` before measuring.
 
-- [ ] **Step 3: Rerun the three benchmark tasks**
+- [x] **Step 3: Rerun the three benchmark tasks**
 
 Measure serialized character count, estimated token count (`ceil(chars / 4)`), Top-N files, and source-correction requirement for login/Pinus, Zhuanzhuan Hu effect, and CMS captcha.
 
-- [ ] **Step 4: Compare against the baseline**
+- [x] **Step 4: Compare against the baseline**
 
 Use the design baseline of 11,122 direct-source tokens and 28,038 current PMM-plus-source tokens. Do not mark Token ROI solved if PMM plus necessary source confirmation exceeds 1.2 times the direct-source baseline.
 
-- [ ] **Step 5: Rebuild PMM's own KB and self-review**
+- [x] **Step 5: Rebuild PMM's own KB and self-review**
 
 Rebuild `E:/xile-workspace/codex-tools/project-memory-manager`, then run `validate_edit_scope` and `review_patch_for_agent` with the actual changed files.
 
-- [ ] **Step 6: Mark this plan complete with measured results**
+- [x] **Step 6: Mark this plan complete with measured results**
 
 Replace unchecked boxes with checked boxes only for commands and behavior actually verified. Add a short completion note containing measured compact character/token counts and any residual risk.
 
@@ -366,3 +368,11 @@ git push origin main
 
 Wait for GitHub Actions to complete successfully. Then record the task outcome in PMM with changed files, validation commands, benchmark results, and residual observations.
 
+## Completion Report
+
+- qyProject KB rebuilt to `fresh`: 1,624 scripts, 18,033 methods, 6,308/8,307 imports resolved.
+- Compact budgets verified: brief <= 4,000 chars; task context and exact project query <= 6,000 chars.
+- Login/Pinus, Zhuanzhuan Hu effect, and CMS captcha all retained their key implementation files; unrelated recalled tasks were reduced to zero.
+- Three-task estimate: 12,916 token for brief + exact query + fixed-window source confirmation, 1.16x the 11,122 direct-source baseline and about 54% below the previous 28,038 PMM path.
+- Residual risk: PMM is now near parity and materially improves project understanding, but it has not yet proven absolute token savings. The next phase should reduce duplicate selector/source confirmation cost.
+- Full local regression, package validation, `git diff --check`, qyProject KB rebuild, PMM self-KB rebuild, `validate_edit_scope`, and `review_patch_for_agent` were executed. Scope review only flagged planned release/support files outside the code graph; no code-level review finding remained.

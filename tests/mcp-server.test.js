@@ -731,7 +731,7 @@ async function testQueryProjectChainCompactAndFullProjection() {
     };
     const compact = parseTextResult(await callTool('query_project_chain', args));
     assert.equal(compact._output.detail, 'compact');
-    assert.ok(JSON.stringify(compact).length <= 8000);
+    assert.ok(JSON.stringify(compact, null, 2).length <= 6000);
     assert.equal(compact.resolvedStart.name, 'main.mountApp');
     assert.equal(Object.hasOwn(compact.resolvedStart, 'meta'), false);
     assert.equal(Object.hasOwn(compact, 'node'), false);

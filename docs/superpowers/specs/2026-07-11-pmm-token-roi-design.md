@@ -102,16 +102,16 @@ compact 输出遵循“保留动作证据，删除重复元数据”的原则：
 
 | 工具 | compact 最大字符数 |
 | --- | ---: |
-| `prepare_agent_brief` | 8,000 |
-| `prepare_task_context` | 8,000 |
-| `analyze_change_impact` | 8,000 |
-| `plan_task_execution` | 8,000 |
-| `validate_edit_scope` | 8,000 |
-| `review_patch_for_agent` | 8,000 |
+| `prepare_agent_brief` | 4,000 |
+| `prepare_task_context` | 6,000 |
+| `analyze_change_impact` | 6,000 |
+| `plan_task_execution` | 6,000 |
+| `validate_edit_scope` | 6,000 |
+| `review_patch_for_agent` | 6,000 |
 | `recall_task_memory` | 6,000 |
 | `summarize_project_memory` | 6,000 |
-| `query_project_chain` | 8,000 |
-| `query_feature_chain` | 8,000 |
+| `query_project_chain` | 6,000 |
+| `query_feature_chain` | 6,000 |
 
 预算通过结构化裁剪实现，不对最终 JSON 字符串做破坏性截断。若仍超预算，依次收缩低优先级数组，直到满足预算。
 
@@ -171,6 +171,20 @@ compact 输出遵循“保留动作证据，删除重复元数据”的原则：
 - PMM brief 加必要源码确认的总估算 token 不高于直接检索基线的 1.2 倍；若未达到，必须在交付中列出剩余噪声来源，不能宣称 Token ROI 已解决。
 - 任一目标工具不得再出现十万字符级默认 compact 输出。
 
+## 实测结果
+
+2026-07-11 重建 qyProject project-global KB 后，fresh 快照包含 1,624 个脚本、18,033 个方法，导入解析为 6,308/8,307（76%）。三个真实任务的 compact 结果如下：
+
+| 任务 | brief | context | 精确 query | 历史误召回 | 关键文件结果 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| HTTP 登录到 Pinus 会话 | 3,874 chars / 969 token | 5,629 chars / 1,408 token | 4,959 chars / 1,240 token | 0 | `GameSessionMgr.ts`、`LoginViewComp.ts`、`pkcon/handler.ts`、`TokenManager.ts`、`UserApi.ts` |
+| 转转麻将胡牌特效 | 3,772 chars / 943 token | 5,535 chars / 1,384 token | 5,060 chars / 1,265 token | 0 | `ZhuanZhuanMJViewComp.ts`、`PlayerHandComp.ts`、`EffectAniComp.ts`、`MaJiangBaseView.ts`、`MaJiangZz.ts` |
+| 后台验证码链路 | 3,823 chars / 956 token | 5,655 chars / 1,414 token | 4,693 chars / 1,174 token | 0 | `Login.vue`、`authController.ts`、`authRoutes.ts`、`authApi.js`、`captcha.ts` |
+
+源码确认采用每个关键实现点约 61 行的固定窗口，三项估算分别为 2,474、2,198、1,697 token。按“brief + 精确 query + 源码确认”口径，三任务总估算为 12,916 token，相对直接源码基线 11,122 token 为 1.16 倍，低于本阶段 1.2 倍验收线；相对修复前 PMM 加源码的 28,038 token 降低约 54%。
+
+因此本阶段解决了“PMM 明显放大 token 且定位错误”的问题，并让项目理解、文件排序、历史隔离和 selector 链路具备实际帮助，但尚不能宣称已经形成绝对 token 节省。下一阶段应继续减少精确 query 与源码确认的重复内容，目标是把同口径总量压到直接源码基线以下。
+
 ## 非目标
 
 - 不引入向量数据库、embedding 或外部模型调用。
@@ -179,4 +193,3 @@ compact 输出遵循“保留动作证据，删除重复元数据”的原则：
 - 不删除 `detail=full`。
 - 不借机重构 `query-chain.js` 的全部历史结构。
 - 不把 PMM 运行数据写入源码仓库。
-

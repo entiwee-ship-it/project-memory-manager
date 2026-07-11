@@ -7,6 +7,8 @@
 
 ## [未发布]
 
+## [0.83.0] - 2026-07-11
+
 ### 改进
 - Agent Context Pack 和历史任务召回共用确定性的中英文任务词模型，支持 CJK 片段、2 到 4 字 n-gram 和验证码、麻将胡牌、特效、转转、Pinus 会话等常用业务别名。
 - `prepare_task_context`、执行闭环、历史记忆和 project/feature chain MCP 工具默认返回结构化 compact 视图，并通过 `_output.budgetChars` 暴露字符预算；`detail=full` 继续保留完整诊断结构。
@@ -26,6 +28,9 @@
 - 修复最近任务无条件加分导致无关 outcome 污染 brief 的问题；最近时间现在只在已有语义命中时作为 tie-break。
 - 历史 outcome 的原始置信度改为 `outcomeConfidence`，检索相关性改为 `relevanceConfidence` / `relevanceScore`，不再互相覆盖。
 - query 和 Agent MCP 失败响应默认截断 stdout/stderr 并移除完整 artifact/snapshot 元数据，避免错误路径产生大段上下文。
+- `prepare_agent_brief` 默认预算收紧到 4,000 字符，其余 Agent 执行闭环、memory 和 project/feature query 默认预算收紧到 6,000 字符，并优先保留关键文件、验证命令和精确 selector 证据。
+- 历史召回的强相关性不再由验证日志中的 `login`、`.mjs`、`ani`、`mj` 等弱片段建立，避免无关 UI/配置任务污染登录和麻将 brief。
+- 精确节点 query 的 compact 投影现在保留 `resolvedStart`，traversal 项会继承顶层方向；task context 会过滤无任务词或关键文件证据的 endpoint、request 和数据表候选。
 - `plan_task_execution` 和 `validate_edit_scope` 会把调用方明确传入的 `knownFiles` 合并进 PMM 上下文边界，避免 `package.json`、`.github` workflow、`README.md` 等已声明任务文件从计划中丢失或被误报为越界。
 - Agent 改动范围复核会把 `implementation-artifacts`、`tests` 等合同/规格/QA 辅助文件作为非阻塞图外文件记录，避免纯验证留痕触发 `scope_review_needed` 噪声。
 - 根目录 `CHANGELOG.md` 作为发布说明支撑文件时会进入 `informationalOutOfScopeFiles`，不再单独阻塞范围复核。

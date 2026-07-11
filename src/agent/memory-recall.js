@@ -9,6 +9,10 @@ const { parseTaskTerms, termValues } = require('./task-terms');
 const DEFAULT_RECALL_LIMIT = 8;
 const DEFAULT_SCAN_LIMIT = 200;
 const MIN_RECALL_SCORE = 3;
+const GENERIC_RECALL_TERMS = new Set([
+    'ani', 'animation', 'effect', 'http', 'https', 'handler', 'login', 'mj',
+    '调用', '验证', '绑定', '登录', '后台', '前台', '前端', '后端', '链路',
+]);
 
 function toPosix(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -127,11 +131,35 @@ function recordSearchText(record = {}) {
     ].filter(Boolean).join(' '));
 }
 
+function recordStrongSearchText(record = {}) {
+    return normalizeText([
+        record.task,
+        record.outcome,
+        ...(record.changedFiles || []),
+    ].filter(Boolean).join(' '));
+}
+
+function isStrongRecallTerm(term = {}) {
+    const value = normalizeText(term.value || term);
+    if (!value || GENERIC_RECALL_TERMS.has(value)) {
+        return false;
+    }
+    if (term.source === 'cjk-ngram' || Number(term.weight || 0) <= 0.5) {
+        return false;
+    }
+    if (/^[a-z0-9]+$/.test(value) && value.length <= 2) {
+        return false;
+    }
+    return true;
+}
+
 function scoreRecord(record, queryTerms = [], queryFiles = []) {
     const text = recordSearchText(record);
+    const strongText = recordStrongSearchText(record);
     const changedFiles = splitFiles(record.changedFiles || []);
     const reasons = [];
     let matchScore = 0;
+    let strongMatchScore = 0;
 
     for (const input of queryTerms) {
         const term = typeof input === 'string' ? { value: normalizeText(input), weight: 1 } : input;
@@ -140,10 +168,18 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
             continue;
         }
         if (normalizeText(record.task || '').includes(normalized)) {
-            matchScore += 8 * (term.weight || 1);
+            const contribution = 8 * (term.weight || 1);
+            matchScore += contribution;
+            if (isStrongRecallTerm(term)) {
+                strongMatchScore += contribution;
+            }
             reasons.push(`任务命中: ${normalized}`);
         } else if (text.includes(normalized)) {
-            matchScore += (normalized.includes('/') ? 6 : 3) * (term.weight || 1);
+            const contribution = (normalized.includes('/') ? 6 : 3) * (term.weight || 1);
+            matchScore += contribution;
+            if (isStrongRecallTerm(term) && strongText.includes(normalized)) {
+                strongMatchScore += contribution;
+            }
             reasons.push(`内容命中: ${normalized}`);
         }
     }
@@ -154,9 +190,11 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
         for (const changed of changedFiles.map(normalizeText)) {
             if (changed === normalized || changed.endsWith(`/${normalized}`) || normalized.endsWith(`/${changed}`)) {
                 matchScore += 12;
+                strongMatchScore += 12;
                 reasons.push(`文件精确命中: ${file}`);
             } else if (root && changed.includes(root)) {
                 matchScore += 4;
+                strongMatchScore += 4;
                 reasons.push(`文件区域命中: ${root}`);
             }
         }
@@ -171,6 +209,7 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
     return {
         score,
         matchScore,
+        strongMatchScore,
         reasons: uniq(reasons).slice(0, 8),
     };
 }
@@ -267,7 +306,7 @@ function recallTaskMemory(options = {}) {
     const records = readOutcomeRecords(context, options);
     const recalledTasks = records
         .map(record => ({ record, scoreInfo: scoreRecord(record, queryTerms, knownFiles) }))
-        .filter(item => item.scoreInfo.matchScore >= MIN_RECALL_SCORE)
+        .filter(item => item.scoreInfo.matchScore >= MIN_RECALL_SCORE && item.scoreInfo.strongMatchScore >= MIN_RECALL_SCORE)
         .sort((left, right) => right.scoreInfo.score - left.scoreInfo.score || String(right.record.recordedAt || '').localeCompare(String(left.record.recordedAt || '')))
         .slice(0, limit)
         .map(item => compactRecord(item.record, item.scoreInfo));

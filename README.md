@@ -81,7 +81,7 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 ## Agent 执行闭环
 
-PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。当前 Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回结构化 compact 视图，只保留状态、关键入口、文件、行号、风险、验证和少量证据，并通过 `_output.budgetChars` 标明字符预算；完整领域对象仍保留在核心函数和查询缓存中。需要完整诊断、snapshot、节点 meta 或能力列表时传 `detail=full`。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
+PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM 环境是否 ready；ready 后再进入 `prepare_agent_brief`。如果 blocked，先按 `nextAction` 修复 MCP、数据根或 KB freshness。当前 Agent、Memory、workspace state 和 project/feature query MCP 工具默认返回结构化 compact 视图，只保留状态、关键入口、文件、行号、风险、验证和少量证据，并通过 `_output.budgetChars` 标明字符预算。`prepare_agent_brief` 上限为 4,000 字符；task context、执行闭环、memory 与 project/feature query 上限为 6,000 字符。完整领域对象仍保留在核心函数和查询缓存中；需要完整诊断、snapshot、节点 meta 或能力列表时传 `detail=full`。CLI 领域 JSON 默认保持完整，只有明确支持 `--compact` 的命令才模拟 MCP 紧凑输出。v0.60 的执行闭环仍然存在：先过 Usage Gate，再按风险选择上下文、实现、复核和结果记录。
 
 - `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。MCP 默认紧凑；CLI `--json` 默认完整，`--compact` 输出紧凑。
 - `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。MCP 默认返回 `preflightSummary`，调试时传 `detail=full` 才返回完整 `preflight`。

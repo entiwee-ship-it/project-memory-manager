@@ -3,8 +3,16 @@ const DETAIL_FULL = 'full';
 const OUTPUT_DETAILS = new Set([DETAIL_COMPACT, DETAIL_FULL]);
 const DEFAULT_COMPACT_BUDGET = 8000;
 const TOOL_OUTPUT_BUDGETS = {
+    prepare_agent_brief: 4000,
+    prepare_task_context: 6000,
+    analyze_change_impact: 6000,
+    plan_task_execution: 6000,
+    validate_edit_scope: 6000,
+    review_patch_for_agent: 6000,
     recall_task_memory: 6000,
     summarize_project_memory: 6000,
+    query_project_chain: 6000,
+    query_feature_chain: 6000,
 };
 
 function cloneJson(value) {
@@ -49,21 +57,31 @@ function truncateStrings(value, maxLength = 240) {
     return result;
 }
 
-function collectShrinkableArrays(value, arrays = []) {
+function collectShrinkableArrays(value, arrays = [], path = []) {
     if (Array.isArray(value)) {
-        arrays.push(value);
-        for (const item of value) {
-            collectShrinkableArrays(item, arrays);
+        arrays.push({ items: value, path: path.join('.') });
+        for (let index = 0; index < value.length; index += 1) {
+            collectShrinkableArrays(value[index], arrays, [...path, String(index)]);
         }
         return arrays;
     }
     if (!value || typeof value !== 'object') {
         return arrays;
     }
-    for (const item of Object.values(value)) {
-        collectShrinkableArrays(item, arrays);
+    for (const [key, item] of Object.entries(value)) {
+        collectShrinkableArrays(item, arrays, [...path, key]);
     }
     return arrays;
+}
+
+function shrinkPriority(path = '') {
+    if (/(criticalFiles|recommendedFiles|targetFiles|primaryFiles|recommendedCommands)$/.test(path)) {
+        return 2;
+    }
+    if (/(evidence|queryTerms|extractedTerms|inferredFeatures|inferredEntrypoints|nodes|edges|tables|externalServices|reasons|riskSignals|skipConditions|uncertainties|observations|nextActions)$/.test(path)) {
+        return 0;
+    }
+    return 1;
 }
 
 function serializedLength(value) {
@@ -71,6 +89,7 @@ function serializedLength(value) {
 }
 
 function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
+    const targetBudget = Math.max(256, budget - 128);
     let result = truncateStrings(payload, 240);
     result._output = {
         ...(result._output || {}),
@@ -79,22 +98,23 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
     };
     let truncated = false;
     let attempts = 0;
-    while (serializedLength(result) > budget && attempts < 100) {
+    while (serializedLength(result) > targetBudget && attempts < 100) {
         const arrays = collectShrinkableArrays(result)
-            .filter(items => items.length > 1)
-            .sort((left, right) => serializedLength(right) - serializedLength(left));
+            .filter(entry => entry.items.length > 1)
+            .sort((left, right) => shrinkPriority(left.path) - shrinkPriority(right.path)
+                || serializedLength(right.items) - serializedLength(left.items));
         if (!arrays.length) {
             break;
         }
-        arrays[0].splice(Math.ceil(arrays[0].length / 2));
+        arrays[0].items.splice(Math.ceil(arrays[0].items.length / 2));
         truncated = true;
         attempts += 1;
     }
-    if (serializedLength(result) > budget) {
+    if (serializedLength(result) > targetBudget) {
         result = truncateStrings(result, 120);
         truncated = true;
     }
-    if (serializedLength(result) > budget) {
+    if (serializedLength(result) > targetBudget) {
         result = truncateStrings(result, 64);
         truncated = true;
     }
@@ -262,6 +282,29 @@ function compactEdge(edge = {}, dataRoot = '', workspaceRoot = '') {
         sourceKind: edge.sourceKind || '',
         from: compactEdgeEndpoint(edge.from, dataRoot, workspaceRoot),
         to: compactEdgeEndpoint(edge.to, dataRoot, workspaceRoot),
+    };
+}
+
+function compactEdgeEndpointRef(value, dataRoot = '', workspaceRoot = '') {
+    const node = compactEdgeEndpoint(value, dataRoot, workspaceRoot);
+    if (!node) {
+        return null;
+    }
+    const result = {};
+    for (const key of ['id', 'name', 'file', 'line']) {
+        if (node[key] !== undefined && node[key] !== '') {
+            result[key] = node[key];
+        }
+    }
+    return result;
+}
+
+function compactContextEdge(edge = {}, dataRoot = '', workspaceRoot = '') {
+    return {
+        type: edge.type || '',
+        sourceKind: edge.sourceKind || '',
+        from: compactEdgeEndpointRef(edge.from, dataRoot, workspaceRoot),
+        to: compactEdgeEndpointRef(edge.to, dataRoot, workspaceRoot),
     };
 }
 
@@ -605,22 +648,74 @@ function compactExecutionPlan(plan = {}, dataRoot = '', workspaceRoot = '') {
 function compactAgentBrief(brief = {}) {
     const dataRoot = brief.dataRoot || '';
     const workspaceRoot = brief.workspaceRoot || '';
+    const preflightSummary = summarizePreflight(brief.preflight || {});
+    const executionPlan = compactExecutionPlan(brief.executionPlan || {}, dataRoot, workspaceRoot);
+    const memory = compactMemory(brief.memory || {}, dataRoot, workspaceRoot);
+    const compactBriefMemory = memory.recalledTasks.length || memory.relevantRules.length
+        ? {
+            kind: memory.kind,
+            totalOutcomeRecords: memory.totalOutcomeRecords,
+            recalledTasks: memory.recalledTasks.slice(0, 2),
+            relatedFiles: memory.relatedFiles.slice(0, 5),
+            validationCommands: memory.validationCommands.slice(0, 4),
+            observations: memory.observations.slice(0, 4),
+            relevantRules: memory.relevantRules.slice(0, 3),
+        }
+        : {
+            kind: memory.kind,
+            totalOutcomeRecords: memory.totalOutcomeRecords,
+            recalledTasks: [],
+            relevantRules: [],
+        };
     return {
         kind: brief.kind || 'agent-brief',
         workspaceRoot,
         dataRoot,
         task: brief.task || '',
-        preflightSummary: summarizePreflight(brief.preflight || {}),
-        pmmGate: compactPmmGate(brief.pmmGate || {}),
-        executionPlan: compactExecutionPlan(brief.executionPlan || {}, dataRoot, workspaceRoot),
-        memory: compactMemory(brief.memory || {}, dataRoot, workspaceRoot),
-        recommendedFiles: filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 16),
-        validation: {
-            recommendedCommands: filterValidationCommands(brief.validation?.recommendedCommands, dataRoot).slice(0, 10),
+        preflightSummary: {
+            kind: preflightSummary.kind,
+            status: preflightSummary.status,
+            health: {
+                score: preflightSummary.health.score,
+                checkCounts: preflightSummary.health.checkCounts,
+            },
+            findings: preflightSummary.findings,
+            repairPlan: preflightSummary.repairPlan,
+            nextAction: preflightSummary.nextAction,
         },
-        risksAndNotes: asArray(brief.risksAndNotes).slice(0, 12),
-        nextActions: asArray(brief.nextActions).slice(0, 8),
-        evidence: compactEvidence(brief.evidence || [], 10, dataRoot, workspaceRoot),
+        pmmGate: {
+            decision: brief.pmmGate?.decision || '',
+            pmmRequired: Boolean(brief.pmmGate?.pmmRequired),
+            deepPmmRequired: Boolean(brief.pmmGate?.deepPmmRequired),
+            recommendedTool: brief.pmmGate?.recommendedTool || '',
+            reasons: asArray(brief.pmmGate?.reasons).slice(0, 3),
+            riskSignals: asArray(brief.pmmGate?.riskSignals).slice(0, 4),
+        },
+        executionPlan: {
+            ...executionPlan,
+            targetFiles: executionPlan.targetFiles.slice(0, 8),
+            editBoundary: {
+                primaryFiles: executionPlan.editBoundary.primaryFiles.slice(0, 8),
+                relatedRoots: executionPlan.editBoundary.relatedRoots.slice(0, 4),
+                guidance: executionPlan.editBoundary.guidance.slice(0, 3),
+            },
+            steps: executionPlan.steps.slice(0, 3).map(step => ({
+                step: step.step,
+                action: step.action,
+            })),
+            validation: {
+                recommendedCommands: executionPlan.validation.recommendedCommands.slice(0, 5),
+            },
+            uncertainties: executionPlan.uncertainties.slice(0, 4),
+        },
+        memory: compactBriefMemory,
+        recommendedFiles: filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 10),
+        validation: {
+            recommendedCommands: filterValidationCommands(brief.validation?.recommendedCommands, dataRoot).slice(0, 6),
+        },
+        risksAndNotes: asArray(brief.risksAndNotes).slice(0, 6),
+        nextActions: asArray(brief.nextActions).slice(0, 5),
+        evidence: compactEvidence(brief.evidence || [], 6, dataRoot, workspaceRoot),
         _output: {
             detail: DETAIL_COMPACT,
             fullDetail: 'Pass detail=full to include complete preflight and memory diagnostics.',
@@ -631,43 +726,71 @@ function compactAgentBrief(brief = {}) {
 function compactTaskContext(context = {}) {
     const dataRoot = context.dataRoot || '';
     const workspaceRoot = context.workspaceRoot || '';
+    const criticalFiles = filterSourceFiles(context.criticalFiles, dataRoot, workspaceRoot).slice(0, 10);
+    const relevanceText = JSON.stringify({
+        task: context.task || '',
+        taskUnderstanding: context.taskUnderstanding || {},
+    }).toLowerCase();
+    const contextTerms = asArray(context.taskUnderstanding?.extractedTerms)
+        .map(term => String(term?.value || term || '').toLowerCase())
+        .filter(term => term.length >= 3);
+    const matchesTaskText = item => {
+        const itemText = JSON.stringify({
+            name: item?.name,
+            id: item?.id,
+            httpPath: item?.httpPath || item?.meta?.path,
+            route: item?.route || item?.meta?.route,
+        }).toLowerCase();
+        return contextTerms.some(term => itemText.includes(term))
+            || [item?.name, item?.id].some(value => value && relevanceText.includes(String(value).toLowerCase()));
+    };
+    const relatedToTask = item => {
+        const file = isSourceCandidate(item?.file, dataRoot, workspaceRoot) ? item.file : '';
+        return (file && criticalFiles.includes(file)) || matchesTaskText(item);
+    };
+    const relevantTables = asArray(context.dataAccess?.tables).filter(table => {
+        const tableFiles = filterSourceFiles([
+            table.file,
+            ...asArray(table.reads).map(item => item.file),
+            ...asArray(table.writes).map(item => item.file),
+        ], dataRoot, workspaceRoot);
+        return tableFiles.some(file => criticalFiles.includes(file)) || relatedToTask(table);
+    });
     return {
         kind: context.kind || 'agent-task-context',
         workspaceRoot,
         dataRoot,
         task: context.task || '',
         taskUnderstanding: {
-            rawTask: context.taskUnderstanding?.rawTask || context.task || '',
-            extractedTerms: asArray(context.taskUnderstanding?.extractedTerms).slice(0, 16),
-            inferredFeatures: asArray(context.taskUnderstanding?.inferredFeatures).slice(0, 8),
-            inferredEntrypoints: asArray(context.taskUnderstanding?.inferredEntrypoints).slice(0, 8),
+            extractedTerms: asArray(context.taskUnderstanding?.extractedTerms).slice(0, 8),
+            inferredFeatures: asArray(context.taskUnderstanding?.inferredFeatures).slice(0, 4),
+            inferredEntrypoints: asArray(context.taskUnderstanding?.inferredEntrypoints).slice(0, 4),
         },
-        relevantFeatures: asArray(context.relevantFeatures).slice(0, 6).map(compactFeature),
+        relevantFeatures: asArray(context.relevantFeatures).slice(0, 4).map(compactFeature),
         keyEntrypoints: {
-            endpoints: asArray(context.keyEntrypoints?.endpoints).slice(0, 6).map(node => compactNode(node, dataRoot, workspaceRoot)),
-            requests: asArray(context.keyEntrypoints?.requests).slice(0, 6).map(node => compactNode(node, dataRoot, workspaceRoot)),
-            methods: asArray(context.keyEntrypoints?.methods).slice(0, 8).map(node => compactNode(node, dataRoot, workspaceRoot)),
+            endpoints: asArray(context.keyEntrypoints?.endpoints).filter(matchesTaskText).slice(0, 4).map(node => compactNode(node, dataRoot, workspaceRoot)),
+            requests: asArray(context.keyEntrypoints?.requests).filter(matchesTaskText).slice(0, 4).map(node => compactNode(node, dataRoot, workspaceRoot)),
+            methods: asArray(context.keyEntrypoints?.methods).filter(relatedToTask).slice(0, 6).map(node => compactNode(node, dataRoot, workspaceRoot)),
         },
-        criticalFiles: filterSourceFiles(context.criticalFiles, dataRoot, workspaceRoot).slice(0, 12),
-        callChains: asArray(context.callChains).slice(0, 3).map(chain => ({
+        criticalFiles,
+        callChains: asArray(context.callChains).slice(0, 2).map(chain => ({
             start: compactNode(chain.start || {}, dataRoot, workspaceRoot),
-            nodes: asArray(chain.nodes).slice(0, 8).map(node => compactNode(node, dataRoot, workspaceRoot)),
-            edges: asArray(chain.edges).slice(0, 8).map(edge => compactEdge(edge, dataRoot, workspaceRoot)),
+            edges: asArray(chain.edges).slice(0, 5).map(edge => compactContextEdge(edge, dataRoot, workspaceRoot)),
         })),
         dataAccess: {
-            tables: asArray(context.dataAccess?.tables).slice(0, 8).map(table => compactTable(table, dataRoot, workspaceRoot)),
+            tables: relevantTables.slice(0, 4).map(table => compactTable(table, dataRoot, workspaceRoot)),
         },
-        externalServices: asArray(context.externalServices).slice(0, 6).map(node => compactNode(node, dataRoot, workspaceRoot)),
+        externalServices: asArray(context.externalServices).slice(0, 4).map(node => compactNode(node, dataRoot, workspaceRoot)),
         editBoundary: {
-            primaryFiles: filterSourceFiles(context.editBoundary?.primaryFiles, dataRoot, workspaceRoot).slice(0, 12),
-            relatedRoots: asArray(context.editBoundary?.relatedRoots).slice(0, 8),
-            guidance: asArray(context.editBoundary?.guidance).slice(0, 5),
+            primaryFiles: filterSourceFiles(context.editBoundary?.primaryFiles, dataRoot, workspaceRoot).slice(0, 8),
+            relatedRoots: asArray(context.editBoundary?.relatedRoots).slice(0, 4),
+            guidance: asArray(context.editBoundary?.guidance).slice(0, 3),
         },
         validation: {
-            recommendedCommands: filterValidationCommands(context.validation?.recommendedCommands, dataRoot).slice(0, 8),
+            recommendedCommands: filterValidationCommands(context.validation?.recommendedCommands, dataRoot).slice(0, 6),
         },
-        uncertainties: asArray(context.uncertainties).slice(0, 6),
-        evidence: compactEvidence(context.evidence || [], 8, dataRoot, workspaceRoot),
+        uncertainties: asArray(context.uncertainties).slice(0, 4),
+        evidence: compactEvidence(context.evidence || [], 6, dataRoot, workspaceRoot),
         _output: {
             detail: DETAIL_COMPACT,
             fullDetail: 'Pass detail=full to include complete task context, node metadata, and call chains.',
@@ -887,9 +1010,14 @@ function compactProjectQuery(payload = {}) {
     }
     if (payload.resolvedStart) {
         result.resolvedStart = compactNode(payload.resolvedStart, dataRoot, workspaceRoot);
+    } else if (payload.id || payload.type || payload.name || payload.file) {
+        result.resolvedStart = compactNode(payload, dataRoot, workspaceRoot);
     }
     if (payload.traversal) {
-        result.traversal = asArray(payload.traversal).slice(0, 24).map(item => compactTraversalItem(item, dataRoot, workspaceRoot));
+        result.traversal = asArray(payload.traversal).slice(0, 24).map(item => compactTraversalItem({
+            ...item,
+            direction: item.direction || payload.direction || '',
+        }, dataRoot, workspaceRoot));
     }
     if (payload.relatedHelpers) {
         result.relatedHelpers = asArray(payload.relatedHelpers).slice(0, 10).map(item => compactNode(item, dataRoot, workspaceRoot));

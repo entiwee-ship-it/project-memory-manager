@@ -174,10 +174,10 @@ function testMemoryRequiresSemanticMatch(fixture) {
     recordTaskOutcome({
         ...fixture,
         task: '修复赠送活动大厅动画',
-        outcome: '调整活动弹窗动画',
+        outcome: '调整活动弹窗动画并同步登录页错误提示',
         changedFiles: ['cms-client/src/views/activity/GiftAnimation.vue'],
-        validation: ['npm run test:activity'],
-        observations: ['赠送活动只影响大厅 UI'],
+        validation: ['npm run test:activity.mjs', 'Playwright: no login redirect'],
+        observations: ['验证动画调用和会话绑定行为，赠送活动只影响大厅 UI'],
         confidence: 'medium',
     });
 
@@ -228,8 +228,40 @@ function testCompactProjectionBudgets(fixture) {
         evidence: nodes,
     };
     const compactContext = projectAgentOutput(contextPayload, {}, 'prepare_task_context');
-    assert.ok(JSON.stringify(compactContext).length <= 8000, `task context compact output exceeded budget: ${JSON.stringify(compactContext).length}`);
+    assert.ok(JSON.stringify(compactContext, null, 2).length <= 6000, `task context compact output exceeded budget: ${JSON.stringify(compactContext, null, 2).length}`);
     assert.equal(compactContext._output.detail, 'compact');
+
+    const briefPayload = {
+        kind: 'agent-brief',
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '后台验证码链路',
+        preflight: { kind: 'agent-preflight', status: 'ready', health: { score: 100, checks: [] }, findings: [], repairPlan: [] },
+        pmmGate: { decision: 'required', pmmRequired: true, deepPmmRequired: true, reasons: nodes.map(node => node.name) },
+        executionPlan: {
+            contextStatus: 'context-ready',
+            targetFiles: nodes.map(node => node.file),
+            editBoundary: { primaryFiles: nodes.map(node => node.file), relatedRoots: nodes.map(node => node.file), guidance: nodes.map(node => node.name) },
+            steps: nodes.map(node => ({ step: node.name, action: node.meta.source, evidence: nodes })),
+            validation: { recommendedCommands: nodes.map(node => `node test-${node.id}.js`) },
+            uncertainties: nodes.map(node => node.meta.source),
+        },
+        memory: {
+            queryTerms: nodes.map(node => node.name),
+            recalledTasks: nodes.map(node => ({ task: node.name, outcome: node.meta.source, changedFiles: [node.file], observations: [node.meta.source] })),
+            relatedFiles: nodes.map(node => ({ value: node.file })),
+            validationCommands: nodes.map(node => ({ value: `node test-${node.id}.js` })),
+            observations: nodes.map(node => node.meta.source),
+            relevantRules: nodes,
+        },
+        recommendedFiles: nodes.map(node => node.file),
+        validation: { recommendedCommands: nodes.map(node => `node test-${node.id}.js`) },
+        risksAndNotes: nodes.map(node => node.meta.source),
+        nextActions: nodes.map(node => node.name),
+        evidence: nodes,
+    };
+    const compactBrief = projectAgentOutput(briefPayload, {}, 'prepare_agent_brief');
+    assert.ok(JSON.stringify(compactBrief, null, 2).length <= 4000, `agent brief compact output exceeded budget: ${JSON.stringify(compactBrief, null, 2).length}`);
 
     const traversal = nodes.map((node, index) => ({
         direction: 'downstream',
@@ -256,10 +288,21 @@ function testCompactProjectionBudgets(fixture) {
         kbVersionStatus: { status: 'fresh', sourceSnapshot: { files: nodes } },
     };
     const compactQuery = projectAgentOutput(queryPayload, {}, 'query_project_chain');
-    assert.ok(JSON.stringify(compactQuery).length <= 8000, `query compact output exceeded budget: ${JSON.stringify(compactQuery).length}`);
+    assert.ok(JSON.stringify(compactQuery, null, 2).length <= 6000, `query compact output exceeded budget: ${JSON.stringify(compactQuery, null, 2).length}`);
     assert.equal(Object.hasOwn(compactQuery, 'node'), false);
     assert.equal(Object.hasOwn(compactQuery.resolvedStart, 'meta'), false);
     assert.equal(compactQuery.resolvedStart.file, nodes[0].file);
+
+    const compactExactNode = projectAgentOutput(nodes[0], {}, 'query_project_chain');
+    assert.equal(compactExactNode.resolvedStart.name, nodes[0].name);
+    assert.equal(compactExactNode.resolvedStart.file, nodes[0].file);
+
+    const compactTraversal = projectAgentOutput({
+        ...queryPayload,
+        direction: 'upstream',
+        traversal: traversal.map(item => ({ ...item, direction: '' })),
+    }, {}, 'query_project_chain');
+    assert.ok(compactTraversal.traversal.every(item => item.direction === 'upstream'));
     assert.equal(compactQuery.resolvedStart.line, nodes[0].line);
 
     const fullQuery = projectAgentOutput(queryPayload, { detail: 'full' }, 'query_project_chain');
@@ -286,7 +329,7 @@ async function testMcpAgentProjection(fixture) {
         freshnessPolicy: 'allow_stale',
     });
     const context = JSON.parse(contextText);
-    assert.ok(contextText.length <= 8000, `MCP task context exceeded budget: ${contextText.length}`);
+    assert.ok(contextText.length <= 6000, `MCP task context exceeded budget: ${contextText.length}`);
     assert.equal(context._output.detail, 'compact');
     assert.ok(context.criticalFiles.includes('cms-server/src/services/captchaService.ts'));
 

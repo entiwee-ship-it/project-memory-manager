@@ -99,7 +99,7 @@ CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` �
 - `validate_edit_scope` 返回 `scope_review_needed`、`possibly_incomplete` 或 `pmm_context_unavailable` 时，不要直接提交；先按 `requiredFollowUp` 复核。
 - `prepare_agent_brief` 中的 `memory.recalledTasks` 是历史经验，不是当前源码事实；涉及当前行为时仍以 fresh KB 和源码精确确认为准。
 - `recalledTasks.outcomeConfidence` 是历史结果自身置信度，`relevanceConfidence` / `relevanceScore` 是本次查询相关性；不要把二者混为同一个 `confidence`。
-- Agent、Memory、workspace state 和 project/feature query MCP 工具默认 compact，并在 `_output.budgetChars` 中声明预算；只有排查 PMM 自身、完整 snapshot 或节点 meta 时才传 `detail=full`。
+- Agent、Memory、workspace state 和 project/feature query MCP 工具默认 compact，并在 `_output.budgetChars` 中声明预算：`prepare_agent_brief` 为 4,000 字符，其余 task context、执行闭环、memory 和 project/feature query 为 6,000 字符。只有排查 PMM 自身、完整 snapshot 或节点 meta 时才传 `detail=full`。
 - 完成任务后优先调用 `record_task_outcome`，稳定规则再调用 `update_project_playbook`，这样下一次 brief 才能召回。
 - PMM 结果不足时，必须先确认 `kbFreshness.status=fresh`，再读项目文档和源码，用 `rg` 精确确认。
 - 回答链路问题时，把 PMM 证据和源码确认结果分开说清楚。
