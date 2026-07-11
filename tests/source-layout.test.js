@@ -12,6 +12,10 @@ function readJson(relativePath) {
     return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
 }
 
+function readText(relativePath) {
+    return fs.readFileSync(path.join(root, relativePath), 'utf8');
+}
+
 function testNoLegacyRuntimeRoots() {
     assert.equal(exists('scripts'), false, 'legacy scripts directory must be removed');
     assert.equal(exists('project-memory'), false, 'root project-memory runtime data must not live in source repo');
@@ -81,8 +85,28 @@ function testPackageAndVersionUseNewEntrypoints() {
     assert.equal(version.rebuildCommand, 'node src/bin/rebuild-kbs.js --workspace-root <project-root>');
 }
 
+function testReleaseQualityGate() {
+    const pkg = readJson('package.json');
+    assert.equal(
+        pkg.scripts['test:all'],
+        'npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout'
+    );
+
+    assert.equal(exists('.github/workflows/ci.yml'), true, 'missing GitHub Actions CI workflow');
+    const workflow = readText('.github/workflows/ci.yml');
+    for (const command of [
+        'npm ci',
+        'npm run test:all',
+        'node src/bin/validate-package.js .',
+        'git diff --check',
+    ]) {
+        assert.equal(workflow.includes(command), true, `CI workflow must run: ${command}`);
+    }
+}
+
 testNoLegacyRuntimeRoots();
 testRequiredSourceDirectories();
 testRequiredBins();
 testPackageAndVersionUseNewEntrypoints();
+testReleaseQualityGate();
 console.log('source-layout validation passed');

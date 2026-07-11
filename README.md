@@ -182,20 +182,15 @@ PMM 运行文件会写到：
 
 ## 开发验证
 
-改动后运行匹配的验证命令：
+完整回归和发布前校验：
 
 ```powershell
-npm test
-npm run test:layout
-npm run test:registry
-npm run test:mcp
-npm run test:agent
-npm run test:feature
-npm run test:path
-npm run test:summary
-npm run test:source-layout
+npm run test:all
 node src/bin/validate-package.js .
+git diff --check
 ```
+
+单项测试和真实 qy-server 集成测试见 `docs/developer/testing.md`。
 
 `scripts/` 目录已经有意删除，不要再新增兼容包装入口。
 

@@ -11,13 +11,9 @@
 Required validation:
 
 ```powershell
-npm test
-npm run test:layout
-npm run test:mcp
-npm run test:feature
-npm run test:path
-npm run test:summary
-npm run test:source-layout
+npm run test:all
 node src/bin/validate-package.js .
 git diff --check
 ```
+
+推送后确认 Windows GitHub Actions `CI` workflow 通过。涉及 Pinus 抽取或 qy-server 兼容性时，还要按 `docs/developer/testing.md` 设置 `PMM_QYSERVER_ROOT` 执行真实仓库集成测试。

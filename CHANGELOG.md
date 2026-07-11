@@ -7,6 +7,14 @@
 
 ## [未发布]
 
+### 改进
+- 新增统一的 `npm run test:all` 完整回归入口，避免发布前人工逐条执行测试时漏掉 `registry`、`agent` 等测试组。
+- 新增 Windows GitHub Actions CI，在 `main` 推送和 Pull Request 上自动执行依赖安装、完整测试、包校验和 `git diff --check`。
+
+### 测试
+- 扩展源码布局测试，锁定统一测试入口和 CI 必须执行的发布质量门禁命令。
+- 更新真实 qy-server 集成断言，按稳定 Pinus RPC 路由和实现方法元数据校验链路，避免远程实现类名变化造成误报。
+
 ### 修复
 - Agent 改动范围复核会把 `implementation-artifacts`、`tests` 等合同/规格/QA 辅助文件作为非阻塞图外文件记录，避免纯验证留痕触发 `scope_review_needed` 噪声。
 - 根目录 `CHANGELOG.md` 作为发布说明支撑文件时会进入 `informationalOutOfScopeFiles`，不再单独阻塞范围复核。

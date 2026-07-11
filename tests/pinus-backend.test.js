@@ -1374,13 +1374,19 @@ function runQyserverAssertions() {
     const nestedCwd = path.join(tempRoot, 'nested', 'check');
     fs.mkdirSync(nestedCwd, { recursive: true });
 
-    const methodTraversal = namesFromTraversal(
+    const methodQuery = parseTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'backend-core', '--from', 'goldenEgg.getGoldenEggReward', '--direction', 'downstream', '--depth', '3', '--json'], nestedCwd)
     );
+    const methodTraversal = methodQuery.traversal.map(item => item.node?.name).filter(Boolean);
     assert.ok(methodTraversal.includes('tbUserAccount'));
     assert.ok(methodTraversal.includes('goldenEggLotteryRecordTable'));
     assert.ok(methodTraversal.includes('goldenEggUserInfoTable'));
-    assert.ok(methodTraversal.includes('Rpc.updateUserAsset'));
+    assert.ok(methodQuery.traversal.some(item => item.node?.type === 'route' && item.node?.meta?.route === 'pkplayer.Rpc.updateUserAsset'));
+    assert.ok(methodQuery.traversal.some(item => (
+        item.node?.type === 'method'
+        && item.node?.meta?.methodName === 'updateUserAsset'
+        && /\/servers\/pkplayer\/remote\/Rpc\.ts$/i.test(item.node?.file || '')
+    )));
 
     const roomTraversal = namesFromTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'backend-core', '--from', 'reqSyncTable', '--direction', 'downstream', '--depth', '2', '--json'], nestedCwd)
