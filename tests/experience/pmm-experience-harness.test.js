@@ -12,7 +12,7 @@ const {
     scoreResumeCompleteness,
     scoreWorkflow,
 } = require('./experience-metrics');
-const { prepareAgentBrief, recallTaskMemory } = require('../../src/agent/memory-recall');
+const { prepareAgentBrief } = require('../../src/agent/memory-recall');
 const { reviewPatchForAgent, validateEditScope } = require('../../src/agent/execution-loop');
 
 const WORKSPACE_ROOT = process.env.PMM_EXPERIENCE_WORKSPACE || 'E:/xile-workspace/qyProject';
@@ -37,7 +37,7 @@ function runFixture(fixture) {
     };
     const startedAt = Date.now();
     const brief = prepareAgentBrief(options);
-    const memory = recallTaskMemory(options);
+    const memory = brief.memory || { recalledTasks: [] };
     let review = null;
     let scope = null;
     if (fixture.intent === 'review') {

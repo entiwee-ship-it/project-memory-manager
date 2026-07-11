@@ -132,6 +132,55 @@ function testPrepareChatContext(fixture) {
     assertIncludes(result.criticalFiles, 'app/chat/page.tsx');
 }
 
+function testIntentAwareCurrentFacts(fixture) {
+    const result = prepareTaskContext({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '排查 chat 流式回复失败',
+    });
+
+    assert.equal(result.intent.intent, 'debug');
+    assert.ok(['high', 'medium'].includes(result.intent.confidence));
+    assert.deepEqual(result.currentFacts.relevantFeatures, result.relevantFeatures);
+    assert.deepEqual(result.currentFacts.keyEntrypoints, result.keyEntrypoints);
+    assert.deepEqual(result.currentFacts.criticalFiles, result.criticalFiles);
+    assert.deepEqual(result.currentFacts.callChains, result.callChains);
+    assert.deepEqual(result.currentFacts.dataAccess, result.dataAccess);
+    assert.deepEqual(result.currentFacts.externalServices, result.externalServices);
+    assert.equal(JSON.stringify(result.currentFacts).includes('outcome'), false);
+    assert.equal(JSON.stringify(result.currentFacts).includes('observations'), false);
+    assert.equal(typeof result.coverage.entrypoint, 'boolean');
+    assert.ok(Array.isArray(result.sourceConfirmation));
+}
+
+function testReviewSeedsChangedFiles(fixture) {
+    const changedFiles = ['app/settings/page.tsx', 'app/api/chat/route.ts'];
+    const result = prepareTaskContext({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '审查这些改动有没有漏改',
+        changedFiles,
+    });
+
+    assert.equal(result.intent.intent, 'review');
+    assert.deepEqual(result.currentFacts.changedFiles, changedFiles);
+    assert.deepEqual(result.criticalFiles.slice(0, 2), changedFiles);
+}
+
+function testSimpleUsesKnownFilesOnly(fixture) {
+    const result = prepareTaskContext({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '把按钮文案改成确定',
+        knownFiles: ['app/settings/page.tsx'],
+    });
+
+    assert.equal(result.intent.intent, 'simple');
+    assert.deepEqual(result.criticalFiles, ['app/settings/page.tsx']);
+    assert.deepEqual(result.currentFacts.criticalFiles, ['app/settings/page.tsx']);
+    assert.deepEqual(result.callChains, []);
+}
+
 function testExplainFacebookFeature(fixture) {
     const result = explainFeatureForAgent({
         workspaceRoot: fixture.workspaceRoot,
@@ -248,6 +297,9 @@ async function testMcpTools(fixture) {
     const fixture = createAgentFixture();
     testPrepareSettingsContext(fixture);
     testPrepareChatContext(fixture);
+    testIntentAwareCurrentFacts(fixture);
+    testReviewSeedsChangedFiles(fixture);
+    testSimpleUsesKnownFilesOnly(fixture);
     testExplainFacebookFeature(fixture);
     testAnalyzeChangeImpact(fixture);
     testDiffFileParsing();

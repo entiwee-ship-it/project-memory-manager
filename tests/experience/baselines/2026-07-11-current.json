@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-07-11T09:47:17.247Z",
+  "generatedAt": "2026-07-11T10:04:25.057Z",
   "workspaceRoot": "E:/xile-workspace/qyProject",
   "results": [
     {
       "taskId": "login-pinus-session",
       "intent": "understand",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "xy-client/assets/script/network/session/GameSessionMgr.ts",
@@ -64,16 +64,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 23663,
-        "estimatedTokens": 5916,
-        "elapsedMs": 4127
+        "chars": 17369,
+        "estimatedTokens": 4343,
+        "elapsedMs": 4489
       }
     },
     {
       "taskId": "cms-captcha-fullstack",
       "intent": "debug",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "cms-client/src/views/login/Login.vue",
@@ -126,16 +126,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 23096,
-        "estimatedTokens": 5774,
-        "elapsedMs": 4124
+        "chars": 16802,
+        "estimatedTokens": 4201,
+        "elapsedMs": 4156
       }
     },
     {
       "taskId": "zhuanzhuan-hu-effect",
       "intent": "understand",
       "risk": "medium",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "xy-client/assets/script/game/majiang/zhuanzhuan/ZhuanZhuanMJViewComp.ts",
@@ -190,16 +190,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 24555,
-        "estimatedTokens": 6139,
-        "elapsedMs": 4552
+        "chars": 18261,
+        "estimatedTokens": 4566,
+        "elapsedMs": 4606
       }
     },
     {
       "taskId": "new-lobby-enter-animation",
       "intent": "debug",
       "risk": "medium",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "xy-client/assets/script/game/common/ui/UINodeAnimation.ts",
@@ -257,16 +257,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 23914,
-        "estimatedTokens": 5979,
-        "elapsedMs": 4014
+        "chars": 17620,
+        "estimatedTokens": 4405,
+        "elapsedMs": 3995
       }
     },
     {
       "taskId": "new-lobby-head-frame",
       "intent": "implement",
       "risk": "medium",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab",
@@ -339,16 +339,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 68991,
-        "estimatedTokens": 17248,
-        "elapsedMs": 5145
+        "chars": 62697,
+        "estimatedTokens": 15675,
+        "elapsedMs": 5538
       }
     },
     {
       "taskId": "new-lobby-bottom-action",
       "intent": "implement",
       "risk": "medium",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab",
@@ -422,16 +422,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 68926,
-        "estimatedTokens": 17232,
-        "elapsedMs": 3768
+        "chars": 62632,
+        "estimatedTokens": 15658,
+        "elapsedMs": 3982
       }
     },
     {
       "taskId": "game-config-rule-defaults",
       "intent": "implement",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "qy-server/game-server/app/modules/gameConfig/gameConfigRedisMessageHandler.ts",
@@ -494,16 +494,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 24169,
-        "estimatedTokens": 6043,
-        "elapsedMs": 3981
+        "chars": 17875,
+        "estimatedTokens": 4469,
+        "elapsedMs": 4193
       }
     },
     {
       "taskId": "cms-error-message-chinese",
       "intent": "implement",
       "risk": "medium",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "cms-client/src/utils/ui/errorMessage.js",
@@ -563,16 +563,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 23801,
-        "estimatedTokens": 5951,
-        "elapsedMs": 3648
+        "chars": 17507,
+        "estimatedTokens": 4377,
+        "elapsedMs": 3728
       }
     },
     {
       "taskId": "mall-recharge-three-sides",
       "intent": "understand",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "cms-server/src/models/mallManagement/giftActivityModel.ts",
@@ -645,16 +645,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 72018,
-        "estimatedTokens": 18005,
-        "elapsedMs": 4535
+        "chars": 65724,
+        "estimatedTokens": 16431,
+        "elapsedMs": 5011
       }
     },
     {
       "taskId": "mall-runtime-product-snapshot",
       "intent": "review",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
@@ -726,16 +726,16 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 164723,
-        "estimatedTokens": 41181,
-        "elapsedMs": 62849
+        "chars": 158429,
+        "estimatedTokens": 39608,
+        "elapsedMs": 66734
       }
     },
     {
       "taskId": "resume-completed-task",
       "intent": "resume",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "qy-server/game-server/app/modules/commodity.ts",
@@ -798,16 +798,16 @@
         "nextActionCorrect": false
       },
       "cost": {
-        "chars": 22328,
-        "estimatedTokens": 5582,
-        "elapsedMs": 3651
+        "chars": 16034,
+        "estimatedTokens": 4009,
+        "elapsedMs": 3806
       }
     },
     {
       "taskId": "review-changed-files-scope",
       "intent": "review",
       "risk": "high",
-      "preflightStatus": "needs_action",
+      "preflightStatus": "ready",
       "fileMetrics": {
         "recommendedFiles": [
           "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
@@ -879,9 +879,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 162775,
-        "estimatedTokens": 40694,
-        "elapsedMs": 59943
+        "chars": 156481,
+        "estimatedTokens": 39121,
+        "elapsedMs": 62768
       }
     }
   ],
@@ -897,5 +897,483 @@
     "resumeFailures": 1,
     "worstTop5Task": "game-config-rule-defaults",
     "worstNoiseTask": "resume-completed-task"
+  },
+  "failures": {
+    "missing_required_file": [
+      {
+        "taskId": "login-pinus-session",
+        "missingFiles": [
+          "xy-client/assets/script/game/initialize/view/LoadingViewComp.ts",
+          "qy-server/game-server/app/servers/pkcon/handler/handler.ts"
+        ]
+      },
+      {
+        "taskId": "new-lobby-enter-animation",
+        "missingFiles": [
+          "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts",
+          "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"
+        ]
+      },
+      {
+        "taskId": "new-lobby-head-frame",
+        "missingFiles": [
+          "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts"
+        ]
+      },
+      {
+        "taskId": "new-lobby-bottom-action",
+        "missingFiles": [
+          "E:/xile-workspace/codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs"
+        ]
+      },
+      {
+        "taskId": "game-config-rule-defaults",
+        "missingFiles": [
+          "cms-client/src/views/gameManage/game/components/GameEdit.vue",
+          "cms-client/src/views/gameManage/game/components/GameSchemaEditor.vue",
+          "cms-client/src/views/gameManage/game/components/rule-designer/RuleCanvas.vue",
+          "cms-server/src/controllers/gameManagement/gameController.ts",
+          "cms-server/src/common/schema/game/gameSchema.ts"
+        ]
+      },
+      {
+        "taskId": "cms-error-message-chinese",
+        "missingFiles": [
+          "cms-server/src/utils/errorMessage.ts",
+          "cms-server/src/utils/requestErrorContext.ts"
+        ]
+      },
+      {
+        "taskId": "mall-recharge-three-sides",
+        "missingFiles": [
+          "cms-server/src/common/schema/mall/rechargeLadderSchema.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+          "qy-server/game-server/schema.sql"
+        ]
+      },
+      {
+        "taskId": "mall-runtime-product-snapshot",
+        "missingFiles": [
+          "qy-server/game-server/schema.sql"
+        ]
+      },
+      {
+        "taskId": "review-changed-files-scope",
+        "missingFiles": [
+          "qy-server/game-server/schema.sql"
+        ]
+      }
+    ],
+    "high_risk_evidence_gap": [
+      {
+        "taskId": "login-pinus-session",
+        "missingFiles": [
+          "xy-client/assets/script/game/initialize/view/LoadingViewComp.ts",
+          "qy-server/game-server/app/servers/pkcon/handler/handler.ts"
+        ],
+        "evidenceCoverage": {
+          "methods": true,
+          "endpoints": null,
+          "requests": null,
+          "messages": null,
+          "tables": null
+        }
+      },
+      {
+        "taskId": "game-config-rule-defaults",
+        "missingFiles": [
+          "cms-client/src/views/gameManage/game/components/GameEdit.vue",
+          "cms-client/src/views/gameManage/game/components/GameSchemaEditor.vue",
+          "cms-client/src/views/gameManage/game/components/rule-designer/RuleCanvas.vue",
+          "cms-server/src/controllers/gameManagement/gameController.ts",
+          "cms-server/src/common/schema/game/gameSchema.ts"
+        ],
+        "evidenceCoverage": {
+          "methods": false,
+          "endpoints": null,
+          "requests": null,
+          "messages": null,
+          "tables": false
+        }
+      },
+      {
+        "taskId": "mall-recharge-three-sides",
+        "missingFiles": [
+          "cms-server/src/common/schema/mall/rechargeLadderSchema.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+          "qy-server/game-server/schema.sql"
+        ],
+        "evidenceCoverage": {
+          "methods": null,
+          "endpoints": null,
+          "requests": null,
+          "messages": null,
+          "tables": false
+        }
+      },
+      {
+        "taskId": "mall-runtime-product-snapshot",
+        "missingFiles": [
+          "qy-server/game-server/schema.sql"
+        ],
+        "evidenceCoverage": {
+          "methods": null,
+          "endpoints": null,
+          "requests": null,
+          "messages": null,
+          "tables": true
+        }
+      },
+      {
+        "taskId": "review-changed-files-scope",
+        "missingFiles": [
+          "qy-server/game-server/schema.sql"
+        ],
+        "evidenceCoverage": {
+          "methods": null,
+          "endpoints": null,
+          "requests": null,
+          "messages": null,
+          "tables": true
+        }
+      }
+    ],
+    "cross_domain_noise": [
+      {
+        "taskId": "login-pinus-session",
+        "noiseRatio": 0.75,
+        "noiseFiles": [
+          "xy-client/assets/script/manager/TokenManager.ts",
+          "xy-client/assets/bundle/gui/login/login.prefab",
+          "xy-client/assets/script/manager/TrackManager.ts",
+          "xy-client/assets/script/game/common/config/GameUIConfig.ts",
+          "xy-client/assets/script/game/common/config/GameStorageConfig.ts",
+          "xy-client/assets/script/game/common/config/GameEvent.ts",
+          "xy-client/assets/script/game/common/SingletonModuleComp.ts",
+          "xy-client/assets/script/game/lobby/gameRoom/GameConfigCache.ts",
+          "xy-client/assets/script/game/lobby/gameRoom/GameRoomUtils.ts"
+        ]
+      },
+      {
+        "taskId": "cms-captcha-fullstack",
+        "noiseRatio": 0.5833333333333334,
+        "noiseFiles": [
+          "xy-client/assets/script/network/session/GameSessionMgr.ts",
+          "xy-client/assets/script/game/account/view/LoginViewComp.ts",
+          "cms-client/src/utils/ui/errorMessage.js",
+          "xy-client/assets/script/manager/TokenManager.ts",
+          "xy-client/assets/bundle/gui/login/login.prefab",
+          "xy-client/assets/script/manager/TrackManager.ts",
+          "xy-client/assets/script/game/account/UserApi.ts"
+        ]
+      },
+      {
+        "taskId": "zhuanzhuan-hu-effect",
+        "noiseRatio": 0.75,
+        "noiseFiles": [
+          "xy-client/assets/script/game/majiang/common/component/PlayerHandComp.ts",
+          "qy-server/game-server/app/servers/pkroom/games/majiang/MaJiangZz.ts",
+          "xy-client/assets/script/game/majiang/common/component/HandCard.ts",
+          "qy-server/game-server/app/servers/pkroom/games/majiang/GameCodeZhuanzhuan.ts",
+          "xy-client/assets/script/game/common/SingletonModuleComp.ts",
+          "xy-client/assets/script/game/common/config/GameSoundPlay.ts",
+          "xy-client/assets/script/utils/Tools.ts",
+          "xy-client/assets/script/game/majiang/common/CardFlipAnimation.ts",
+          "xy-client/assets/script/game/majiang/common/contants/MJRuleConfig.ts"
+        ]
+      },
+      {
+        "taskId": "new-lobby-enter-animation",
+        "noiseRatio": 0.75,
+        "noiseFiles": [
+          "xy-client/assets/script/game/common/enterAnimation/EnterAnimationPlayer.ts",
+          "xy-client/assets/script/game/common/GameBaseView.ts",
+          "xy-client/assets/script/game/common/SingletonModuleComp.ts",
+          "xy-client/assets/script/game/club/clubRule/CreateRule.ts",
+          "E:/xile-workspace/codex-tools/project-memory-data/workspaces/e-xile-workspace-qyproject/docs/project/PROJECT_Overview.md",
+          "xy-client/assets/script/game/lobby/backpack/BackpackView.ts",
+          "xy-client/assets/script/game/lobby/gameRoom/matchRoom/MatchRoomView.ts",
+          "xy-client/assets/script/game/lobby/mall/MallView.ts",
+          "xy-client/assets/script/game/lobby/payment/PaymentDialogView.ts"
+        ]
+      },
+      {
+        "taskId": "new-lobby-head-frame",
+        "noiseRatio": 0.85,
+        "noiseFiles": [
+          "xy-client/assets/script/game/poker/ZhuZhouDaMaZi/DaMaZiBaseViewComp.ts",
+          "cms-server/src/utils/redis.ts",
+          "qy-server/game-server/app/common/redis.ts",
+          "xy-client/assets/script/game/common/ui/listMode/VScrollView.ts",
+          "xy-client/assets/qyq/club/clubSetting/prefab/addMemberDialog.prefab",
+          "xy-client/assets/bundle/game/common/blessings/blessings.prefab",
+          "E:/xile-workspace/codex-tools/project-memory-data/workspaces/e-xile-workspace-qyproject/docs/project/PROJECT_Overview.md",
+          "xy-client/assets/bundle_boot/gui/loading/loading.prefab",
+          "xy-client/assets/bundle/common/prefab/BG.prefab",
+          "xy-client/assets/bundle/gui/lobby_view/LobbyView.prefab",
+          "../codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs",
+          "../codex-work/tests/xy-client/lobbyTransitionControllerContract.test.cjs",
+          "E:/xile-workspace/codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs",
+          "xy-client/assets/script/game/lobby_view/LobbyTransitionController.ts",
+          "xy-client/assets/bundle/gui/lobby_view/texture/hud_layer/img-gonggao.png",
+          "xy-client/assets/bundle/gui/lobby_view/texture/hud_layer/img-gonggao.png.meta",
+          "xy-client/assets/bundle/gui/lobby_view/texture/main_layer/img-reddot-0.2.png"
+        ]
+      },
+      {
+        "taskId": "new-lobby-bottom-action",
+        "noiseRatio": 0.9,
+        "noiseFiles": [
+          "xy-client/assets/script/game/majiang/jinzhongkoudian/manager/JinZhongKouDianSeatSelectionComp.ts",
+          "xy-client/assets/script/game/majiang/jinzhongcommon/manager/JinZhongSeatSelectionComp.ts",
+          "xy-client/assets/script/game/initialize/view/LoadingViewComp.ts",
+          "xy-client/assets/script/game/lobby/phoneBind/PhoneBindView.ts",
+          "qy-server/game-server/app/servers/pkroom/games/poker/robot/PokerDaMaZiRobotAI.ts",
+          "xy-client/assets/script/game/common/ui/UINodeAnimation.ts",
+          "xy-client/assets/script/game/poker/ZhuZhouDaMaZi/CardManager.ts",
+          "xy-client/assets/script/game/lobby/gameRoom/vipRoom/VipRoomView.ts",
+          "xy-client/assets/script/game/majiang/common/component/BaseGameComponent.ts",
+          "xy-client/assets/script/game/common/config/GameEvent.ts",
+          "xy-client/assets/script/game/common/config/GameType.ts",
+          "xy-client/assets/bundle/gui/lobby_view/LobbyView.prefab",
+          "../codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs",
+          "../codex-work/tests/xy-client/lobbyTransitionControllerContract.test.cjs",
+          "xy-client/assets/bundle/gui/lobby_view/texture/hud_layer/img-gonggao.png",
+          "xy-client/assets/bundle/gui/lobby_view/texture/hud_layer/img-gonggao.png.meta",
+          "xy-client/assets/bundle/gui/lobby_view/texture/main_layer/img-reddot-0.2.png",
+          "xy-client/assets/bundle/gui/lobby_view/texture/main_layer/img-reddot-0.2.png.meta"
+        ]
+      },
+      {
+        "taskId": "game-config-rule-defaults",
+        "noiseRatio": 0.9166666666666666,
+        "noiseFiles": [
+          "qy-server/game-server/app/modules/gameConfig/gameConfigRedisMessageHandler.ts",
+          "cms-server/src/services/gameManagement/gameConfigTokenStore.ts",
+          "qy-server/game-server/app/modules/gameConfig/runtimeGameConfig.ts",
+          "xy-client/assets/script/game/lobby/gameRoom/GameConfigCache.ts",
+          "qy-server/game-server/app/modules/gameConfig/gameConfigService.ts",
+          "cms-server/src/services/redisMessagePublisher.ts",
+          "qy-server/game-server/app/http/routes/game.ts",
+          "qy-server/game-server/app/servers/pkmatch/modules/MatchMgr.ts",
+          "qy-server/game-server/app/servers/pkmatch/remote/Rpc.ts",
+          "qy-server/game-server/app/common/constants.ts",
+          "qy-server/game-server/app/common/redisMessage.ts"
+        ]
+      },
+      {
+        "taskId": "cms-error-message-chinese",
+        "noiseRatio": 0.9166666666666666,
+        "noiseFiles": [
+          "xy-client/assets/script/game/poker/LiuYangSanShiErZhang/LiuYangSanShiErZhangViewComp.ts",
+          "xy-client/assets/script/platform/impl/native/NativeBaseService.ts",
+          "xy-client/assets/script/game/lobby/warRecord/RecordManager.ts",
+          "cms-server/src/models/gameManagement/gameModel.ts",
+          "qy-server/game-server/app/modules/christmasEvent.ts",
+          "qy-server/game-server/app/servers/pkroom/games/poker/GameCodeGuandan.ts",
+          "xy-client/assets/script/game/lobby/gameRoom/GameConfigCache.ts",
+          "cms-client/src/components/common/ChangePasswordDialog.vue",
+          "cms-client/src/components/common/UserInfoDialog.vue",
+          "cms-client/src/utils/ui/appMessage.js",
+          "cms-client/src/views/clubManage/club/ClubList.vue"
+        ]
+      },
+      {
+        "taskId": "mall-recharge-three-sides",
+        "noiseRatio": 0.75,
+        "noiseFiles": [
+          "cms-server/src/models/mallManagement/giftActivityModel.ts",
+          "cms-client/src/utils/api/modules/mallApi.js",
+          "xy-client/assets/script/network/session/GameSessionMgr.ts",
+          "cms-client/src/views/gameManage/tournament/GrantRulesEditor.vue",
+          "cms-client/src/views/mall/gift-activity/GiftActivityForm.vue",
+          "cms-client/src/views/mall/item-library/ItemLibraryFormPane.vue",
+          "cms-client/src/views/mall/item-library/ItemLibraryList.vue",
+          "cms-client/src/views/mall/purchase-record/PurchaseRecordDetailPane.vue",
+          "cms-client/src/views/mall/recharge/RechargeLadderFormPane.vue",
+          "cms-client/src/views/mall/recharge/components/CardPreview.vue",
+          "cms-client/src/views/mall/gift-activity/components/ConfigStep.vue",
+          "cms-client/src/views/mall/gift-activity/giftProductDisplay.js",
+          "cms-client/src/views/mall/shared/mallOptions.js",
+          "cms-server/src/models/mallManagement/shopItemModel.ts",
+          "cms-server/src/routes/mallManagement/mallRoutes.ts"
+        ]
+      },
+      {
+        "taskId": "mall-runtime-product-snapshot",
+        "noiseRatio": 0.8,
+        "noiseFiles": [
+          "cms-client/src/views/mall/recharge/RechargeLadderList.vue",
+          "qy-server/game-server/app/modules/mallConfig/mallConfigService.ts",
+          "qy-server/game-server/app/common/mysqlUtil.ts",
+          "qy-server/game-server/app/common/redis.ts",
+          "qy-server/game-server/app/common/utils.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallRuntimeTypes.ts",
+          "E:/xile-workspace/codex-tools/project-memory-data/workspaces/e-xile-workspace-qyproject/docs/project/PROJECT_Overview.md",
+          "qy-server/game-server/app/modules/mallGift/giftActivityService.ts",
+          "cms-client/src/views/mall/gift-activity/GiftActivityForm.vue",
+          "cms-server/src/models/mallManagement/giftActivityModel.ts",
+          "cms-client/src/views/mall/gift-activity/components/ConfigStep.vue",
+          "cms-client/src/views/mall/gift-activity/giftProductDisplay.js",
+          "cms-client/src/views/mall/recharge/components/CardPreview.vue",
+          "cms-client/src/views/mall/recharge/RechargeLadderFormPane.vue",
+          "cms-client/src/views/mall/shared/mallOptions.js",
+          "cms-server/src/common/schema/mall/rechargeLadderSchema.ts"
+        ]
+      },
+      {
+        "taskId": "resume-completed-task",
+        "noiseRatio": 1,
+        "noiseFiles": [
+          "qy-server/game-server/app/modules/commodity.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+          "qy-server/game-server/app/payment/services/orderService.ts",
+          "cms-server/src/models/mallManagement/purchaseRecordModel.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallConfigService.ts",
+          "qy-server/game-server/app/common/mysqlUtil.ts",
+          "qy-server/game-server/app/common/message.ts",
+          "qy-server/game-server/app/common/utils.ts",
+          "qy-server/game-server/app/modules/user.ts",
+          "qy-server/game-server/app/modules/mallConsumptionRecord.ts",
+          "qy-server/game-server/app/db/schema/redeem.ts"
+        ]
+      },
+      {
+        "taskId": "review-changed-files-scope",
+        "noiseRatio": 0.8,
+        "noiseFiles": [
+          "cms-client/src/views/mall/recharge/RechargeLadderList.vue",
+          "xy-client/assets/script/game/lobby/mall/MallConfigCache.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallConfigService.ts",
+          "qy-server/game-server/app/common/mysqlUtil.ts",
+          "qy-server/game-server/app/common/redis.ts",
+          "qy-server/game-server/app/common/utils.ts",
+          "qy-server/game-server/app/modules/mallConfig/mallRuntimeTypes.ts",
+          "E:/xile-workspace/codex-tools/project-memory-data/workspaces/e-xile-workspace-qyproject/docs/project/PROJECT_Overview.md",
+          "cms-client/src/views/mall/gift-activity/GiftActivityForm.vue",
+          "cms-server/src/models/mallManagement/giftActivityModel.ts",
+          "cms-client/src/views/mall/recharge/components/CardPreview.vue",
+          "cms-client/src/views/mall/recharge/RechargeLadderFormPane.vue",
+          "cms-client/src/views/mall/shared/mallOptions.js",
+          "cms-server/src/common/schema/mall/rechargeLadderSchema.ts",
+          "cms-server/src/controllers/mallManagement/rechargeLadderController.ts",
+          "cms-server/src/models/mallManagement/purchaseRecordModel.ts"
+        ]
+      }
+    ],
+    "plan_not_adoptable": [
+      {
+        "taskId": "login-pinus-session"
+      },
+      {
+        "taskId": "cms-captcha-fullstack"
+      },
+      {
+        "taskId": "zhuanzhuan-hu-effect"
+      },
+      {
+        "taskId": "new-lobby-enter-animation"
+      },
+      {
+        "taskId": "new-lobby-head-frame"
+      },
+      {
+        "taskId": "new-lobby-bottom-action"
+      },
+      {
+        "taskId": "game-config-rule-defaults"
+      },
+      {
+        "taskId": "cms-error-message-chinese"
+      },
+      {
+        "taskId": "mall-recharge-three-sides"
+      },
+      {
+        "taskId": "mall-runtime-product-snapshot"
+      },
+      {
+        "taskId": "resume-completed-task"
+      },
+      {
+        "taskId": "review-changed-files-scope"
+      }
+    ],
+    "memory_false_positive": [
+      {
+        "taskId": "new-lobby-head-frame",
+        "recalled": 8,
+        "matching": 0
+      },
+      {
+        "taskId": "new-lobby-bottom-action",
+        "recalled": 8,
+        "matching": 0
+      },
+      {
+        "taskId": "mall-recharge-three-sides",
+        "recalled": 8,
+        "matching": 0
+      },
+      {
+        "taskId": "mall-runtime-product-snapshot",
+        "recalled": 8,
+        "matching": 0
+      },
+      {
+        "taskId": "resume-completed-task",
+        "recalled": 0,
+        "matching": 0
+      },
+      {
+        "taskId": "review-changed-files-scope",
+        "recalled": 8,
+        "matching": 0
+      }
+    ],
+    "resume_incomplete": [
+      {
+        "taskId": "resume-completed-task",
+        "resumeMetrics": {
+          "statusComplete": false,
+          "validationComplete": false,
+          "riskComplete": false,
+          "nextActionCorrect": false
+        }
+      }
+    ],
+    "workflow_not_improved": [
+      {
+        "taskId": "new-lobby-head-frame",
+        "directRounds": 2,
+        "pmmRounds": 2
+      },
+      {
+        "taskId": "new-lobby-bottom-action",
+        "directRounds": 1,
+        "pmmRounds": 2
+      },
+      {
+        "taskId": "cms-error-message-chinese",
+        "directRounds": 1,
+        "pmmRounds": 2
+      },
+      {
+        "taskId": "mall-runtime-product-snapshot",
+        "directRounds": 2,
+        "pmmRounds": 2
+      },
+      {
+        "taskId": "resume-completed-task",
+        "directRounds": 1,
+        "pmmRounds": 1
+      },
+      {
+        "taskId": "review-changed-files-scope",
+        "directRounds": 2,
+        "pmmRounds": 2
+      }
+    ]
   }
 }

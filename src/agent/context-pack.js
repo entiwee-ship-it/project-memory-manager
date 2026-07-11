@@ -4,11 +4,21 @@ const { buildLookup } = require('../graph/build-chain-kb');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord, titleizeSlug } = require('../graph/feature-kb');
 const { pathExists, readJsonSafe } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
+const { buildCoverage } = require('./brief-readiness');
+const { classifyTaskIntent } = require('./task-intent');
 const { parseTaskTerms, termValues } = require('./task-terms');
 
 const DEFAULT_LIMIT = 8;
 const DEFAULT_DEPTH = 4;
 const RISK_EDGE_TYPES = new Set(['calls', 'requests', 'matches_endpoint', 'binds', 'reads', 'writes']);
+const INTENT_LIMITS = {
+    understand: 8,
+    implement: 10,
+    debug: 10,
+    resume: 4,
+    review: 12,
+    simple: 3,
+};
 
 function toPosix(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -487,21 +497,102 @@ function summarizeTaskUnderstanding(taskInfo, features, nodes) {
     };
 }
 
+function parseKnownFiles(options = {}) {
+    const values = [];
+    const add = value => {
+        if (Array.isArray(value)) {
+            value.forEach(add);
+            return;
+        }
+        String(value || '')
+            .split(/[\n,;]+/)
+            .map(item => item.trim())
+            .filter(Boolean)
+            .forEach(item => values.push(toPosix(item).replace(/^["']|["']$/g, '')));
+    };
+    add(options.knownFiles);
+    add(options.knownFile);
+    return uniq(values);
+}
+
+function prepareSimpleTaskContext(context, options, intent, taskInfo, knownFiles) {
+    const criticalFiles = knownFiles.map(file => workspaceRelative(context.workspaceRoot, file));
+    const validationCommands = inferValidationCommands(context.workspaceRoot, context, { features: [] });
+    const keyEntrypoints = { endpoints: [], requests: [], methods: [] };
+    const currentFacts = {
+        relevantFeatures: [],
+        keyEntrypoints,
+        criticalFiles,
+        callChains: [],
+        callers: [],
+        dataAccess: { tables: [] },
+        externalServices: [],
+    };
+    return {
+        kind: 'agent-task-context',
+        workspaceRoot: context.workspaceRoot,
+        dataRoot: context.dataRoot,
+        task: taskInfo.raw,
+        intent,
+        currentFacts,
+        coverage: buildCoverage({
+            intent: intent.intent,
+            files: criticalFiles,
+            validationCommands,
+        }),
+        sourceConfirmation: [],
+        taskUnderstanding: summarizeTaskUnderstanding(taskInfo, [], []),
+        relevantFeatures: [],
+        keyEntrypoints,
+        criticalFiles,
+        callChains: [],
+        callers: [],
+        dataAccess: { tables: [] },
+        externalServices: [],
+        editBoundary: buildEditBoundary(criticalFiles, []),
+        validation: { recommendedCommands: validationCommands },
+        uncertainties: [],
+        evidence: criticalFiles.map(file => ({
+            kind: 'file',
+            file,
+            confidence: 'high',
+            reason: 'Usage Gate 已确认的已知文件',
+        })),
+    };
+}
+
 function prepareTaskContext(options = {}) {
     const context = createWorkspaceContext({
         workspaceRoot: options.workspaceRoot,
         dataRoot: options.dataRoot,
         layout: options.layout,
     });
-    const { graph, lookup } = loadProjectArtifacts(context);
+    const intent = classifyTaskIntent(options);
     const taskInfo = parseTaskTerms(options.task || options.query || '');
-    const limit = options.limit || DEFAULT_LIMIT;
+    const knownFiles = parseKnownFiles(options);
+    if (intent.intent === 'simple' && knownFiles.length > 0 && knownFiles.every(file => pathExists(
+        path.isAbsolute(file) ? file : path.join(context.workspaceRoot, file)
+    ))) {
+        return prepareSimpleTaskContext(context, options, intent, taskInfo, knownFiles);
+    }
+    const { graph, lookup } = loadProjectArtifacts(context);
+    const limit = options.limit || INTENT_LIMITS[intent.intent] || DEFAULT_LIMIT;
     const scoredNodes = pickScoredNodes(graph, taskInfo.terms, { limit: Math.max(limit * 3, 20) });
-    const startNodes = scoredNodes.slice(0, limit).map(item => item.node);
+    const changedFiles = intent.intent === 'review' ? parseChangedFiles(options) : [];
+    const changedNodes = intent.intent === 'review'
+        ? (graph.nodes || []).filter(node => changedFiles.some(file => nodeMatchesChangedFile(node, file, context.workspaceRoot)))
+        : [];
+    const startNodes = uniqBy([
+        ...changedNodes,
+        ...scoredNodes.map(item => item.node),
+    ], node => node.id).slice(0, limit);
     const startIds = startNodes.map(node => node.id);
     const traversal = traverse(lookup, startIds, { depth: options.depth || DEFAULT_DEPTH, directions: ['downstream', 'upstream'] });
     const relatedNodes = uniqBy([...startNodes, ...nodesFromTraversal(traversal)], node => node.id);
-    const files = uniq(relatedNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean));
+    const files = uniq([
+        ...changedFiles.map(file => workspaceRelative(context.workspaceRoot, file)),
+        ...relatedNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean),
+    ]);
     const startFiles = uniq(startNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean));
     const featureScoringFiles = startFiles.length ? startFiles : files;
     const features = makeFeatureCatalog(context)
@@ -531,33 +622,68 @@ function prepareTaskContext(options = {}) {
     const requests = collectByType(relatedNodes, 'request', limit).map(node => compactNode(node, context.workspaceRoot));
     const methods = collectByType(relatedNodes, 'method', limit * 2).map(node => compactNode(node, context.workspaceRoot));
     const tables = collectByType(relatedNodes, 'table', limit).map(node => compactNode(node, context.workspaceRoot));
+    const callers = uniqBy(
+        traversal
+            .filter(item => item.direction === 'upstream' && item.node)
+            .map(item => compactNode(item.node, context.workspaceRoot)),
+        node => node.id
+    ).slice(0, limit);
     const callChains = startNodes.slice(0, 3).map(node => compactChain(
         node,
         traversal.filter(item => item.edge?.from === node.id || item.edge?.to === node.id || item.depth <= 2),
         lookup,
         context.workspaceRoot
     ));
+    const validationCommands = inferValidationCommands(context.workspaceRoot, context, { features });
+    const keyEntrypoints = {
+        endpoints,
+        requests,
+        methods: methods.slice(0, limit),
+    };
+    const criticalFiles = files.slice(0, 16);
+    const dataAccessResult = {
+        tables: dataAccess.tables.length ? dataAccess.tables : tables.map(table => ({ ...table, reads: [], writes: [] })),
+    };
+    const currentFacts = {
+        ...(intent.intent === 'review' ? { changedFiles } : {}),
+        relevantFeatures: compactFeatures,
+        keyEntrypoints,
+        criticalFiles,
+        callChains,
+        callers,
+        dataAccess: dataAccessResult,
+        externalServices,
+    };
+    const coverage = buildCoverage({
+        intent: intent.intent,
+        entrypoints: [...endpoints, ...requests],
+        implementations: methods,
+        files: criticalFiles,
+        callers,
+        backend: endpoints,
+        tables: dataAccessResult.tables,
+        validationCommands,
+    });
     return {
         kind: 'agent-task-context',
         workspaceRoot: context.workspaceRoot,
         dataRoot: context.dataRoot,
         task: taskInfo.raw,
+        intent,
+        currentFacts,
+        coverage,
+        sourceConfirmation: [],
         taskUnderstanding: summarizeTaskUnderstanding(taskInfo, compactFeatures, startNodes),
         relevantFeatures: compactFeatures,
-        keyEntrypoints: {
-            endpoints,
-            requests,
-            methods: methods.slice(0, limit),
-        },
-        criticalFiles: files.slice(0, 16),
+        keyEntrypoints,
+        criticalFiles,
         callChains,
-        dataAccess: {
-            tables: dataAccess.tables.length ? dataAccess.tables : tables.map(table => ({ ...table, reads: [], writes: [] })),
-        },
+        callers,
+        dataAccess: dataAccessResult,
         externalServices,
         editBoundary: buildEditBoundary(files, features),
         validation: {
-            recommendedCommands: inferValidationCommands(context.workspaceRoot, context, { features }),
+            recommendedCommands: validationCommands,
         },
         uncertainties: buildUncertainties({ taskInfo, features, startNodes, dataAccess, externalServices }),
         evidence: uniqBy(
