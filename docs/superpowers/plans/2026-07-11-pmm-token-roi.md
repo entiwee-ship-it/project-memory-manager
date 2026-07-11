@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node.js, CommonJS, MCP JSON-RPC, Node built-in `assert`, PMM external-data layout
 
-**Status:** Implementation and local verification complete. Final push remains pending until the closing commit is created.
+**Status:** Complete. Implementation, verification, benchmark, commits, and pushes finished on 2026-07-11.
 
 ---
 
@@ -359,7 +359,7 @@ Rebuild `E:/xile-workspace/codex-tools/project-memory-manager`, then run `valida
 
 Replace unchecked boxes with checked boxes only for commands and behavior actually verified. Add a short completion note containing measured compact character/token counts and any residual risk.
 
-- [ ] **Step 7: Final commit and push**
+- [x] **Step 7: Final commit and push**
 
 ```powershell
 git status --short --branch
