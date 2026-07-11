@@ -2,11 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const { agentPreflight } = require('./environment-health');
 const { decidePmmUsage, planTaskExecution } = require('./execution-loop');
+const { evaluateBriefReadiness } = require('./brief-readiness');
+const { classifyTaskIntent } = require('./task-intent');
 const { ensureDir, readJsonSafe, writeJsonAtomic } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 const { parseTaskTerms, termValues } = require('./task-terms');
 
-const DEFAULT_RECALL_LIMIT = 8;
+const DEFAULT_RECALL_LIMIT = 3;
 const DEFAULT_SCAN_LIMIT = 200;
 const MIN_RECALL_SCORE = 3;
 const GENERIC_RECALL_TERMS = new Set([
@@ -160,6 +162,8 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
     const reasons = [];
     let matchScore = 0;
     let strongMatchScore = 0;
+    let fileExactMatches = 0;
+    let fileAreaMatches = 0;
 
     for (const input of queryTerms) {
         const term = typeof input === 'string' ? { value: normalizeText(input), weight: 1 } : input;
@@ -191,10 +195,12 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
             if (changed === normalized || changed.endsWith(`/${normalized}`) || normalized.endsWith(`/${changed}`)) {
                 matchScore += 12;
                 strongMatchScore += 12;
+                fileExactMatches += 1;
                 reasons.push(`文件精确命中: ${file}`);
             } else if (root && changed.includes(root)) {
                 matchScore += 4;
                 strongMatchScore += 4;
+                fileAreaMatches += 1;
                 reasons.push(`文件区域命中: ${root}`);
             }
         }
@@ -210,6 +216,8 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
         score,
         matchScore,
         strongMatchScore,
+        fileExactMatches,
+        fileAreaMatches,
         reasons: uniq(reasons).slice(0, 8),
     };
 }
@@ -241,12 +249,35 @@ function compactRecord(record, scoreInfo) {
         changedFiles: splitFiles(record.changedFiles || []).slice(0, 12),
         validation: asArray(record.validation || []).slice(0, 8),
         observations: asArray(record.observations || []).slice(0, 8),
+        status: record.status || '',
+        remainingRisks: asArray(record.remainingRisks || []).slice(0, 8),
+        nextAction: record.nextAction || '',
+        taskId: record.taskId || '',
         outcomeConfidence: record.confidence || 'unknown',
         relevanceConfidence: hasRelevance ? confidenceFromScore(scoreInfo.score) : null,
         relevanceScore: hasRelevance ? scoreInfo.score : null,
         reasons: scoreInfo?.reasons || [],
         sourceLine: record._line || null,
     };
+}
+
+function normalizeResumeTask(value = '') {
+    return normalizeText(value)
+        .replace(/继续|接着|恢复|上次|上一轮|历史任务|交接|resume|continue/gi, '')
+        .replace(/[\s,，。；;:：_-]+/g, '')
+        .trim();
+}
+
+function resumeRecordMatches(record, scoreInfo, task, taskId) {
+    if (taskId && record.taskId && normalizeText(taskId) === normalizeText(record.taskId)) {
+        return true;
+    }
+    const query = normalizeResumeTask(task);
+    const recorded = normalizeResumeTask(record.task);
+    if (query && recorded && (query === recorded || query.includes(recorded) || recorded.includes(query))) {
+        return true;
+    }
+    return scoreInfo.fileExactMatches > 0 && scoreInfo.strongMatchScore >= 12;
 }
 
 function countValues(values = []) {
@@ -300,27 +331,44 @@ function recallTaskMemory(options = {}) {
         layout: options.layout,
     });
     const task = String(options.task || options.query || '').trim();
+    const intent = classifyTaskIntent(options);
     const knownFiles = splitFiles([options.knownFiles, options.files, options.file, options.changedFiles, options.changedFile]);
-    const limit = clampInteger(options.limit, DEFAULT_RECALL_LIMIT, 50);
+    const limit = intent.intent === 'resume' ? 1 : clampInteger(options.limit, DEFAULT_RECALL_LIMIT, 10);
     const queryTerms = parseTaskTerms(task, knownFiles).terms;
     const records = readOutcomeRecords(context, options);
-    const recalledTasks = records
+    const candidates = intent.intent === 'simple' && options.includeHistory !== true
+        ? []
+        : records
         .map(record => ({ record, scoreInfo: scoreRecord(record, queryTerms, knownFiles) }))
-        .filter(item => item.scoreInfo.matchScore >= MIN_RECALL_SCORE && item.scoreInfo.strongMatchScore >= MIN_RECALL_SCORE)
-        .sort((left, right) => right.scoreInfo.score - left.scoreInfo.score || String(right.record.recordedAt || '').localeCompare(String(left.record.recordedAt || '')))
+        .filter(item => intent.intent === 'resume'
+            ? resumeRecordMatches(item.record, item.scoreInfo, task, options.taskId || options.id)
+            : item.scoreInfo.matchScore >= MIN_RECALL_SCORE && item.scoreInfo.strongMatchScore >= MIN_RECALL_SCORE);
+    const recalledTasks = candidates
+        .sort((left, right) => {
+            if (intent.intent === 'review') {
+                return right.scoreInfo.fileExactMatches - left.scoreInfo.fileExactMatches
+                    || right.scoreInfo.fileAreaMatches - left.scoreInfo.fileAreaMatches
+                    || right.scoreInfo.score - left.scoreInfo.score;
+            }
+            return right.scoreInfo.score - left.scoreInfo.score
+                || String(right.record.recordedAt || '').localeCompare(String(left.record.recordedAt || ''));
+        })
         .slice(0, limit)
         .map(item => compactRecord(item.record, item.scoreInfo));
     const relatedFiles = countValues(recalledTasks.flatMap(record => record.changedFiles)).slice(0, 16);
     const validationCommands = countValues(recalledTasks.flatMap(record => record.validation)).slice(0, 12);
     const observations = uniq(recalledTasks.flatMap(record => record.observations)).slice(0, 16);
     const playbook = loadPlaybook(context);
-    const relevantRules = selectRelevantRules(playbook, queryTerms, knownFiles, 8);
+    const relevantRules = intent.intent === 'simple' && options.includeHistory !== true
+        ? []
+        : selectRelevantRules(playbook, queryTerms, knownFiles, 8);
 
     return {
         kind: 'agent-memory-recall',
         workspaceRoot: context.workspaceRoot,
         dataRoot: context.dataRoot,
         task,
+        intent,
         queryTerms: termValues(queryTerms),
         knownFiles,
         totalOutcomeRecords: records.filter(record => !record._invalid).length,
@@ -488,6 +536,133 @@ function summarizeProjectMemory(options = {}) {
     };
 }
 
+function preflightFreshness(preflight = {}) {
+    const check = (preflight.health?.checks || []).find(item => item.code === 'kb_freshness_ready');
+    return check?.details?.kbFreshness?.status || (preflight.status === 'blocked' ? 'missing' : 'unknown');
+}
+
+function emptyCurrentFacts(changedFiles = []) {
+    return {
+        changedFiles: splitFiles(changedFiles),
+        relevantFeatures: [],
+        keyEntrypoints: { endpoints: [], requests: [], methods: [] },
+        criticalFiles: [],
+        callChains: [],
+        callers: [],
+        dataAccess: { tables: [] },
+        externalServices: [],
+    };
+}
+
+function historicalExperienceFromMemory(memory, intent) {
+    const recalledTasks = memory.recalledTasks || [];
+    const first = recalledTasks[0] || null;
+    const remainingRisks = first
+        ? uniq([...(first.remainingRisks || []), ...(first.observations || [])])
+        : [];
+    let nextAction = first?.nextAction || '';
+    if (!nextAction && remainingRisks.length > 0) {
+        nextAction = `先确认当前源码和已记录状态，再处理剩余风险：${remainingRisks[0]}`;
+    }
+    if (!nextAction && first) {
+        nextAction = '先确认当前源码与已记录 outcome 一致，再继续任务。';
+    }
+    return {
+        recalledTasks,
+        relatedFiles: memory.relatedFiles || [],
+        validationCommands: memory.validationCommands || [],
+        observations: memory.observations || [],
+        resume: intent.intent === 'resume' && first ? {
+            status: first.status || 'completed',
+            completed: [first.outcome].filter(Boolean),
+            validation: first.validation || [],
+            remainingRisks,
+            nextAction,
+            source: {
+                task: first.task,
+                taskId: first.taskId || '',
+                recordedAt: first.recordedAt,
+                sourceLine: first.sourceLine,
+            },
+        } : null,
+    };
+}
+
+function readinessInput({ intent, preflight, pmmGate, currentFacts, validationCommands, sourceConfirmation }) {
+    const riskSignalKeys = (pmmGate.riskSignals || []).map(item => item.key).filter(Boolean);
+    const endpoints = currentFacts.keyEntrypoints?.endpoints || [];
+    const requests = currentFacts.keyEntrypoints?.requests || [];
+    const methods = currentFacts.keyEntrypoints?.methods || [];
+    const tables = currentFacts.dataAccess?.tables || [];
+    return {
+        intent: intent.intent,
+        risk: riskSignalKeys.length > 0 ? 'high' : 'low',
+        freshness: preflightFreshness(preflight),
+        files: currentFacts.criticalFiles || [],
+        entrypoints: [...endpoints, ...requests],
+        implementations: methods,
+        callers: currentFacts.callers || [],
+        backend: endpoints,
+        tables,
+        validationCommands,
+        sourceConfirmation,
+        applicability: {
+            backend: endpoints.length > 0 || riskSignalKeys.some(key => ['api', 'auth', 'external-service', 'cross-module', 'commerce'].includes(key)),
+            data: tables.length > 0 || riskSignalKeys.some(key => ['data', 'commerce'].includes(key)),
+        },
+    };
+}
+
+function blockedExecutionPlan(preflight) {
+    return {
+        contextStatus: 'preflight-blocked',
+        targetFiles: [],
+        editBoundary: {
+            primaryFiles: [],
+            relatedRoots: [],
+            guidance: [
+                'Agent Preflight 或 KB freshness 未通过，先执行 preflight.nextAction。',
+                '阻断解除前不得使用旧 project-global KB 作为可用上下文。',
+            ],
+        },
+        steps: [{
+            step: '修复 preflight 阻断',
+            action: '先执行 preflight.nextAction，再重新生成 agent brief。',
+            evidence: (preflight.findings || []).slice(0, 8),
+        }],
+        validation: { recommendedCommands: [] },
+        uncertainties: (preflight.findings || []).map(finding => finding.message || finding.code),
+    };
+}
+
+function resumeExecutionPlan(historicalExperience) {
+    const resume = historicalExperience.resume;
+    const targetFiles = (historicalExperience.relatedFiles || []).map(item => item.value).filter(Boolean);
+    return {
+        contextStatus: resume ? 'resume-memory-ready' : 'resume-memory-missing',
+        targetFiles,
+        editBoundary: {
+            primaryFiles: targetFiles,
+            relatedRoots: [],
+            guidance: ['历史 outcome 仅用于恢复任务；进入修改前先确认当前源码。'],
+        },
+        steps: [{
+            step: '确认恢复点',
+            action: resume?.nextAction || '没有精确历史任务，先提供任务 id、提交或 changed files。',
+        }],
+        validation: {
+            recommendedCommands: (historicalExperience.validationCommands || []).map(item => item.value).filter(Boolean),
+        },
+        uncertainties: resume ? ['历史状态尚未与当前源码进行精确确认。'] : ['没有召回可证明的历史任务状态。'],
+        currentFacts: emptyCurrentFacts(),
+        sourceConfirmation: resume ? [{
+            reason: '历史 outcome 需要与当前源码和提交状态确认。',
+            files: targetFiles,
+        }] : [],
+        evidence: [],
+    };
+}
+
 /**
  * 生成 Agent 执行 brief，并在返回旧 PMM 上下文前执行 preflight 门禁。
  *
@@ -496,76 +671,94 @@ function summarizeProjectMemory(options = {}) {
  */
 function prepareAgentBrief(options = {}) {
     const task = String(options.task || options.query || '').trim();
+    const intent = classifyTaskIntent(options);
     const preflight = agentPreflight(options);
     const pmmGate = decidePmmUsage(options);
-    const memory = recallTaskMemory({ ...options, task });
-    if (preflight.status === 'blocked') {
+    const memory = recallTaskMemory({ ...options, task, intent: intent.intent });
+    const historicalExperience = historicalExperienceFromMemory(memory, intent);
+    const projectRules = { relevantRules: memory.relevantRules || [] };
+    const freshness = preflightFreshness(preflight);
+    if (preflight.status === 'blocked' || freshness !== 'fresh') {
+        const quality = evaluateBriefReadiness({ intent: intent.intent, freshness });
         return {
             kind: 'agent-brief',
             workspaceRoot: memory.workspaceRoot,
             dataRoot: memory.dataRoot,
             task,
+            intent,
+            readiness: quality.readiness,
+            confidence: 'low',
+            coverage: quality.coverage,
+            missingEvidence: quality.missingEvidence,
+            sourceConfirmation: quality.sourceConfirmation,
+            currentFacts: emptyCurrentFacts(options.changedFiles || options.changedFile),
+            historicalExperience,
+            projectRules,
             preflight,
             pmmGate,
-            executionPlan: {
-                contextStatus: 'preflight-blocked',
-                targetFiles: [],
-                editBoundary: {
-                    primaryFiles: [],
-                    relatedRoots: [],
-                    guidance: [
-                        'Agent Preflight 处于 blocked 状态，先执行 preflight.nextAction。',
-                        '阻断解除前不得使用旧 project-global KB 作为可用上下文。',
-                    ],
-                },
-                steps: [
-                    {
-                        step: '修复 preflight 阻断',
-                        action: '先执行 preflight.nextAction，再重新生成 agent brief。',
-                        evidence: preflight.findings.slice(0, 8),
-                    },
-                ],
-                validation: {
-                    recommendedCommands: [],
-                },
-                uncertainties: preflight.findings.map(finding => finding.message || finding.code),
-            },
+            executionPlan: blockedExecutionPlan(preflight),
             memory,
             recommendedFiles: [],
-            validation: {
-                recommendedCommands: [],
-            },
+            validation: { recommendedCommands: [] },
             risksAndNotes: [
-                'Agent Preflight blocked，已禁止返回看似可用的旧 PMM 上下文。',
-                ...preflight.findings.map(finding => finding.message || finding.code),
+                'Agent Preflight 或 KB freshness 未通过，已禁止返回看似可用的旧 PMM 上下文。',
+                ...(preflight.findings || []).map(finding => finding.message || finding.code),
             ],
             nextActions: [preflight.nextAction],
-            evidence: [
-                ...(memory.evidence || []).slice(0, 12),
-            ],
+            evidence: (memory.evidence || []).slice(0, 12),
         };
     }
 
-    const executionPlan = planTaskExecution(options);
-    const recommendedFiles = uniq([
-        ...(executionPlan.targetFiles || []),
-        ...memory.relatedFiles.map(item => item.value),
-    ]).slice(0, 20);
+    const executionPlan = intent.intent === 'resume'
+        ? resumeExecutionPlan(historicalExperience)
+        : planTaskExecution({ ...options, intent: intent.intent });
+    const currentFacts = executionPlan.currentFacts || {
+        ...emptyCurrentFacts(options.changedFiles || options.changedFile),
+        criticalFiles: executionPlan.targetFiles || [],
+    };
     const validationCommands = uniq([
         ...((executionPlan.validation && executionPlan.validation.recommendedCommands) || []),
         ...memory.validationCommands.map(item => item.value),
     ]).slice(0, 16);
+    const sourceConfirmation = uniqBy(executionPlan.sourceConfirmation || [], item => JSON.stringify(item));
+    const quality = evaluateBriefReadiness(readinessInput({
+        intent,
+        preflight,
+        pmmGate,
+        currentFacts,
+        validationCommands,
+        sourceConfirmation,
+    }));
+    const recommendedFiles = (executionPlan.targetFiles || []).slice(0, 20);
     const risksAndNotes = uniq([
         ...((executionPlan.uncertainties || [])),
         ...memory.observations,
         ...memory.relevantRules.map(rule => rule.body || rule.title).filter(Boolean),
+        ...quality.missingEvidence.map(item => item.reason),
     ]).slice(0, 20);
+    const modeNextActions = {
+        understand: '依据 currentFacts.callChains 精读关键入口和实现。',
+        implement: '依据 editBoundary 确认目标文件、调用方和验证后再修改。',
+        debug: '先复现症状，并用 currentFacts 中的状态流、配置和日志入口证伪假设。',
+        resume: historicalExperience.resume?.nextAction || '提供精确任务 id、提交或 changed files 后再继续。',
+        review: '依据 changed files、调用方、数据边界和测试缺口完成 patch review。',
+        simple: '按 Usage Gate 只修改明确文件，并在提交前复核 scope。',
+    };
 
     return {
         kind: 'agent-brief',
         workspaceRoot: memory.workspaceRoot,
         dataRoot: memory.dataRoot,
         task,
+        intent,
+        readiness: quality.readiness,
+        confidence: quality.readiness === 'ready' ? intent.confidence : (quality.readiness === 'blocked' ? 'low' : 'medium'),
+        coverage: quality.coverage,
+        missingEvidence: quality.missingEvidence,
+        sourceConfirmation: quality.sourceConfirmation,
+        currentFacts,
+        historicalExperience,
+        projectRules,
         preflight,
         pmmGate,
         executionPlan: {
@@ -583,7 +776,7 @@ function prepareAgentBrief(options = {}) {
         },
         risksAndNotes,
         nextActions: [
-            pmmGate.deepPmmRequired ? '先依据 executionPlan.targetFiles 和 PMM evidence 精读源码。' : '按 Usage Gate 限定在明确文件范围内修改。',
+            modeNextActions[intent.intent],
             memory.recalledTasks.length ? '复用 recalledTasks 中的历史验证命令和风险观察。' : '当前没有命中的历史任务，完成后调用 record_task_outcome 沉淀记忆。',
             '提交前运行 validate_edit_scope 或 review_patch_for_agent。',
         ],

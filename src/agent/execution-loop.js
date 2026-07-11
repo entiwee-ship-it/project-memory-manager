@@ -290,6 +290,10 @@ function planTaskExecution(options = {}) {
         kind: 'agent-task-execution-plan',
         task: gate.task,
         pmmGate: gate,
+        intent: context?.intent || null,
+        currentFacts: context?.currentFacts || null,
+        coverage: context?.coverage || null,
+        sourceConfirmation: context?.sourceConfirmation || [],
         contextStatus: context?.unavailable ? 'context-unavailable' : (context ? 'context-ready' : 'gate-only'),
         targetFiles,
         editBoundary,
@@ -486,6 +490,10 @@ function recordTaskOutcome(options = {}) {
         changedFiles: changedFiles.length ? changedFiles : collectInputFiles(options),
         validation: asArray(options.validation || options.validationCommands),
         observations: asArray(options.observations || options.notes),
+        status: String(options.status || '').trim() || 'completed',
+        remainingRisks: asArray(options.remainingRisks || options.risks),
+        nextAction: String(options.nextAction || '').trim(),
+        taskId: String(options.taskId || options.id || '').trim(),
         confidence: options.confidence || 'medium',
     };
     if (!record.task) {

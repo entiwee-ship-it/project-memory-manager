@@ -12,6 +12,9 @@ const {
 const { projectAgentOutput } = require('../src/agent/output-projection');
 const { requiredMcpToolsForVersion } = require('../src/agent/environment-health');
 const { recordTaskOutcome } = require('../src/agent/execution-loop');
+const { run: buildChainKb } = require('../src/graph/build-chain-kb');
+const { createWorkspaceContext } = require('../src/shared/workspace-layout');
+const { writeJsonAtomic } = require('../src/shared/common');
 const { handleMcpRequest } = require('../src/mcp/server');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -20,8 +23,41 @@ function createMemoryFixture() {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-memory-workspace-'));
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-memory-data-'));
     fs.mkdirSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'callback'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'status'), { recursive: true });
     fs.mkdirSync(path.join(workspaceRoot, 'app', 'api', 'chat'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'app', 'chat'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'lib'), { recursive: true });
     fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"scripts":{"test":"node --test"}}\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'callback', 'route.ts'), [
+        "import { saveFacebookToken } from '../../../../../../lib/facebook-client';",
+        'export async function GET() { return saveFacebookToken(); }',
+    ].join('\n'));
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'status', 'route.ts'), 'export async function GET() { return { connected: true }; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'chat', 'route.ts'), 'export async function POST() { return { ok: true }; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'chat', 'page.tsx'), 'export default function ChatPage() { return null; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'lib', 'facebook-client.ts'), 'export function saveFacebookToken() { return { ok: true }; }\n');
+
+    const context = createWorkspaceContext({ workspaceRoot, dataRoot, layout: 'external-data' });
+    const projectConfigPath = path.join(context.paths.configsDir, 'project-global.json');
+    writeJsonAtomic(projectConfigPath, {
+        featureKey: 'project-global',
+        featureName: 'Project Global KB',
+        type: 'project-global',
+        registerFeature: false,
+        methodRoots: ['app', 'lib'],
+        outputs: {
+            scan: path.join(context.paths.projectGlobalDir, 'scan.raw.json'),
+            graph: path.join(context.paths.projectGlobalDir, 'chain.graph.json'),
+            lookup: path.join(context.paths.projectGlobalDir, 'chain.lookup.json'),
+            report: path.join(context.paths.projectGlobalDir, 'build.report.json'),
+        },
+    });
+    buildChainKb([
+        '--workspace-root', workspaceRoot,
+        '--data-root', dataRoot,
+        '--layout', 'external-data',
+        '--config', projectConfigPath,
+    ]);
 
     recordTaskOutcome({
         workspaceRoot,
@@ -44,6 +80,22 @@ function createMemoryFixture() {
         changedFiles: ['app/api/chat/route.ts', 'app/chat/page.tsx'],
         validation: ['npm run test:chat'],
         observations: ['chat route 变更要复核 EventSource 客户端显示'],
+    });
+    recordTaskOutcome({
+        workspaceRoot,
+        dataRoot,
+        task: '统一钻石充值交易商品快照来源',
+        outcome: '完成商品快照统一并提交 e61e81d6',
+        changedFiles: [
+            'app/modules/commodity.ts',
+            'app/modules/mallConfig/mallRechargeProductSnapshot.ts',
+            'app/payment/services/orderService.ts',
+        ],
+        validation: ['mall-recharge-product-snapshot-contract.test.cjs 通过', 'npm run build:dev 通过'],
+        observations: ['月卡 productId=17 仍使用数据库 fallback'],
+        status: 'completed',
+        remainingRisks: ['ProductInfo.typeOfExpenditure 与 schema.sql 历史类型不一致'],
+        nextAction: '确认 e61e81d6 后决定是否清理 typeOfExpenditure 类型债',
     });
     updateProjectPlaybook({
         workspaceRoot,
@@ -83,7 +135,7 @@ function testRecallTaskMemory(fixture) {
         task: '继续修复 Facebook OAuth token 保存',
     });
     assert.equal(result.kind, 'agent-memory-recall');
-    assert.equal(result.totalOutcomeRecords, 2);
+    assert.equal(result.totalOutcomeRecords, 3);
     assert.ok(result.recalledTasks.length >= 1);
     assert.equal(result.recalledTasks[0].task, '修复 Facebook OAuth token 保存逻辑');
     assertIncludes(result.relatedFiles.map(item => item.value), 'app/api/facebook/oauth/callback/route.ts');
@@ -98,11 +150,58 @@ function testPrepareAgentBrief(fixture) {
         task: '继续修复 Facebook OAuth token 保存',
     });
     assert.equal(result.kind, 'agent-brief');
+    assert.equal(result.intent.intent, 'resume');
+    assert.ok(['ready', 'needs_source_confirmation'].includes(result.readiness));
+    assert.ok(Object.hasOwn(result, 'coverage'));
+    assert.ok(Array.isArray(result.missingEvidence));
+    assert.ok(Array.isArray(result.sourceConfirmation));
+    assert.ok(Object.hasOwn(result, 'currentFacts'));
+    assert.ok(Object.hasOwn(result, 'historicalExperience'));
+    assert.ok(Object.hasOwn(result, 'projectRules'));
+    assert.equal(JSON.stringify(result.currentFacts).includes('Facebook OAuth 修改必须'), false);
+    assert.equal(JSON.stringify(result.historicalExperience).includes('kbFreshness'), false);
     assert.equal(result.pmmGate.decision, 'required');
     assert.ok(result.memory.recalledTasks.length >= 1);
     assertIncludes(result.recommendedFiles, 'app/api/facebook/oauth/callback/route.ts');
     assertIncludes(result.validation.recommendedCommands, 'npm run test:oauth');
     assert.ok(result.risksAndNotes.some(note => note.includes('Facebook OAuth')));
+}
+
+function testSimpleBriefSkipsHistory(fixture) {
+    const result = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '把按钮文案改成确定',
+        knownFiles: ['app/chat/page.tsx'],
+    });
+    assert.equal(result.intent.intent, 'simple');
+    assert.deepEqual(result.historicalExperience.recalledTasks, []);
+}
+
+function testResumeBriefCompleteness(fixture) {
+    const result = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一钻石充值交易商品快照来源',
+    });
+    const serialized = JSON.stringify(result.historicalExperience);
+    assert.equal(result.intent.intent, 'resume');
+    assert.ok(serialized.includes('e61e81d6'));
+    assert.ok(serialized.includes('mall-recharge-product-snapshot-contract.test.cjs'));
+    assert.ok(serialized.includes('typeOfExpenditure'));
+    assert.ok(serialized.includes('确认 e61e81d6'));
+    assert.equal(result.historicalExperience.recalledTasks.length, 1);
+}
+
+function testReviewRecallPrioritizesChangedFiles(fixture) {
+    const result = recallTaskMemory({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '审查这些改动有没有漏改',
+        changedFiles: ['app/payment/services/orderService.ts'],
+        intent: 'review',
+    });
+    assert.equal(result.recalledTasks[0].task, '统一钻石充值交易商品快照来源');
 }
 
 function testPrepareAgentBriefPreflightBlocked() {
@@ -210,7 +309,7 @@ function testSummarizeProjectMemory(fixture) {
         dataRoot: fixture.dataRoot,
     });
     assert.equal(result.kind, 'agent-project-memory-summary');
-    assert.equal(result.outcomeCount, 2);
+    assert.equal(result.outcomeCount, 3);
     assert.equal(result.playbook.ruleCount, 1);
     assertIncludes(result.frequentFiles.map(item => item.value), 'app/api/chat/route.ts');
 }
@@ -287,6 +386,9 @@ async function testMcpTools(fixture) {
     const fixture = createMemoryFixture();
     testRecallTaskMemory(fixture);
     testPrepareAgentBrief(fixture);
+    testSimpleBriefSkipsHistory(fixture);
+    testResumeBriefCompleteness(fixture);
+    testReviewRecallPrioritizesChangedFiles(fixture);
     testPrepareAgentBriefPreflightBlocked();
     testAgentBriefCompactFiltersExternalDataRootFiles(fixture);
     testSummarizeProjectMemory(fixture);
