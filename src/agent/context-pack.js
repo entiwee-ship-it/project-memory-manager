@@ -4,6 +4,7 @@ const { buildLookup } = require('../graph/build-chain-kb');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord, titleizeSlug } = require('../graph/feature-kb');
 const { pathExists, readJsonSafe } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
+const { parseTaskTerms, termValues } = require('./task-terms');
 
 const DEFAULT_LIMIT = 8;
 const DEFAULT_DEPTH = 4;
@@ -132,46 +133,6 @@ function confidenceFromScore(score) {
     return 'low';
 }
 
-function parseTaskTerms(task = '') {
-    const raw = String(task || '').trim();
-    const text = normalizeText(raw);
-    const terms = new Set();
-    for (const part of text.split(/[^a-z0-9_./:-]+/i)) {
-        const token = part.trim();
-        if (token.length >= 2) {
-            terms.add(token);
-        }
-    }
-    const add = (...items) => items.forEach(item => terms.add(normalizeText(item)));
-
-    if (/settings|setting|设置/.test(text)) {
-        add('settings', 'Setting', 'SettingsPage', 'loadSettings', 'loadStatus', 'loadAiConfig', 'saveSettings');
-    }
-    if (/ai|模型|配置|config/.test(text)) {
-        add('ai', 'aiConfig', 'getAiConfig', 'saveAiConfig', '/api/ai/config', '/api/ai/models');
-    }
-    if (/保存|save|更新|修改/.test(text)) {
-        add('save', 'post', 'update', 'create', 'upsert');
-    }
-    if (/chat|聊天|流式|回复|对话|stream/.test(text)) {
-        add('chat', '/api/chat', 'handleChat', 'streamChatCompletion', 'conversation', 'message', 'Anthropic', 'Claude');
-    }
-    if (/facebook|graph|oauth|授权|脸书/.test(text)) {
-        add('facebook', 'facebook-oauth', 'Facebook Graph API', 'facebookConnection', '/api/facebook/oauth');
-    }
-    if (/auth|login|logout|register|登录|注册|登出/.test(text)) {
-        add('auth', 'login', 'logout', 'register', '/api/auth');
-    }
-    if (/operation|operations|发布|同步|评论|campaign/.test(text)) {
-        add('operations', '/api/operations', 'executePostToFacebook', 'syncPosts', 'syncComments', 'campaign');
-    }
-    return {
-        raw,
-        normalized: text,
-        terms: Array.from(terms).filter(Boolean),
-    };
-}
-
 function nodeSearchText(node) {
     const meta = node?.meta || {};
     return normalizeText([
@@ -187,18 +148,30 @@ function nodeSearchText(node) {
 
 function scoreNode(node, terms = []) {
     const text = nodeSearchText(node);
-    let score = 0;
-    for (const term of terms) {
-        const normalized = normalizeText(term);
+    const normalizedName = normalizeText(node.name || '');
+    let matchScore = 0;
+    const matchedTerms = [];
+    for (const input of terms) {
+        const term = typeof input === 'string' ? { value: normalizeText(input), weight: 1 } : input;
+        const normalized = normalizeText(term?.value || '');
         if (!normalized) {
             continue;
         }
-        if (node.name && normalizeText(node.name) === normalized) {
-            score += 12;
+        let contribution = 0;
+        if (normalizedName === normalized) {
+            contribution = 12 * (term.weight || 1);
         } else if (text.includes(normalized)) {
-            score += normalized.includes('/') ? 8 : 5;
+            contribution = (normalized.includes('/') ? 8 : 5) * (term.weight || 1);
+        }
+        if (contribution > 0) {
+            matchScore += contribution;
+            matchedTerms.push(normalized);
         }
     }
+    if (matchScore <= 0) {
+        return { score: 0, matchScore: 0, matchedTerms: [] };
+    }
+    let score = matchScore;
     if (['endpoint', 'request'].includes(node.type)) {
         score += 3;
     }
@@ -208,7 +181,11 @@ function scoreNode(node, terms = []) {
     if (['table', 'external-service'].includes(node.type)) {
         score += 1;
     }
-    return score;
+    return {
+        score,
+        matchScore,
+        matchedTerms: Array.from(new Set(matchedTerms)),
+    };
 }
 
 function loadJsonIfExists(filePath, fallback) {
@@ -301,15 +278,16 @@ function featureSearchText(feature = {}) {
 function scoreFeature(feature, terms = [], files = []) {
     const text = featureSearchText(feature);
     let score = 0;
-    for (const term of terms) {
-        const normalized = normalizeText(term);
+    for (const input of terms) {
+        const term = typeof input === 'string' ? { value: normalizeText(input), weight: 1 } : input;
+        const normalized = normalizeText(term?.value || '');
         if (!normalized) {
             continue;
         }
         if (normalizeText(feature.featureKey) === normalized) {
-            score += 20;
+            score += 20 * (term.weight || 1);
         } else if (text.includes(normalized)) {
-            score += normalized.includes('/') ? 8 : 6;
+            score += (normalized.includes('/') ? 8 : 6) * (term.weight || 1);
         }
     }
     for (const file of files) {
@@ -355,9 +333,12 @@ function evidenceFileMatches(evidenceFile = '', file = '') {
 function pickScoredNodes(graph, terms, options = {}) {
     const limit = options.limit || DEFAULT_LIMIT;
     return [...(graph.nodes || [])]
-        .map(node => ({ node, score: scoreNode(node, terms) }))
+        .map(node => ({ node, ...scoreNode(node, terms) }))
         .filter(item => item.score > 0)
-        .sort((left, right) => right.score - left.score || String(left.node.name).localeCompare(String(right.node.name)))
+        .sort((left, right) => right.score - left.score
+            || right.matchScore - left.matchScore
+            || right.matchedTerms.length - left.matchedTerms.length
+            || String(left.node.name).localeCompare(String(right.node.name)))
         .slice(0, limit);
 }
 
@@ -497,7 +478,7 @@ function buildEditBoundary(files = [], features = []) {
 function summarizeTaskUnderstanding(taskInfo, features, nodes) {
     return {
         rawTask: taskInfo.raw,
-        extractedTerms: taskInfo.terms.slice(0, 24),
+        extractedTerms: termValues(taskInfo.terms).slice(0, 24),
         inferredFeatures: features.map(feature => feature.featureKey),
         inferredEntrypoints: nodes
             .filter(node => ['endpoint', 'request', 'method'].includes(node.type))
@@ -581,7 +562,12 @@ function prepareTaskContext(options = {}) {
         uncertainties: buildUncertainties({ taskInfo, features, startNodes, dataAccess, externalServices }),
         evidence: uniqBy(
             [
-                ...scoredNodes.slice(0, 16).map(item => evidenceFromNode(item.node, context.workspaceRoot, `任务词命中，score=${item.score}`, confidenceFromScore(item.score))),
+                ...scoredNodes.slice(0, 16).map(item => evidenceFromNode(
+                    item.node,
+                    context.workspaceRoot,
+                    `任务词命中 ${item.matchedTerms.slice(0, 6).join(', ')}，score=${item.score}`,
+                    confidenceFromScore(item.score)
+                )),
                 ...dataAccess.evidence.slice(0, 8),
             ],
             item => `${item.kind}:${item.nodeId || item.edgeType}:${item.name || ''}:${item.file || ''}:${item.line || ''}`

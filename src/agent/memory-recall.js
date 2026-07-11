@@ -4,13 +4,11 @@ const { agentPreflight } = require('./environment-health');
 const { decidePmmUsage, planTaskExecution } = require('./execution-loop');
 const { ensureDir, readJsonSafe, writeJsonAtomic } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
+const { parseTaskTerms, termValues } = require('./task-terms');
 
 const DEFAULT_RECALL_LIMIT = 8;
 const DEFAULT_SCAN_LIMIT = 200;
-const STOP_WORDS = new Set([
-    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'task', 'fix', 'add',
-    '修改', '修复', '新增', '调整', '一个', '这个', '那个', '功能', '逻辑', '问题',
-]);
+const MIN_RECALL_SCORE = 3;
 
 function toPosix(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -69,37 +67,6 @@ function splitFiles(values = []) {
         .flatMap(value => String(value || '').split(/[\n,;]+/))
         .map(file => toPosix(file).trim().replace(/^["']|["']$/g, ''))
         .filter(Boolean));
-}
-
-function extractTerms(...values) {
-    const text = normalizeText(values.flat().filter(Boolean).join(' '));
-    const terms = new Set();
-    for (const token of text.split(/[^a-z0-9_./:-]+/i)) {
-        const clean = token.trim();
-        if (clean.length >= 2 && !STOP_WORDS.has(clean)) {
-            terms.add(clean);
-        }
-    }
-    const add = (...items) => items.forEach(item => terms.add(normalizeText(item)));
-    if (/facebook|graph|oauth|脸书|授权/.test(text)) {
-        add('facebook', 'graph', 'oauth', 'facebookconnection', '/api/facebook/oauth');
-    }
-    if (/auth|login|logout|register|token|session|jwt|登录|注册|鉴权|会话|令牌/.test(text)) {
-        add('auth', 'login', 'logout', 'register', 'token', 'session', 'jwt', '/api/auth');
-    }
-    if (/chat|聊天|流式|回复|对话|stream|claude|anthropic/.test(text)) {
-        add('chat', 'stream', 'claude', 'anthropic', '/api/chat');
-    }
-    if (/settings|setting|设置|config|配置/.test(text)) {
-        add('settings', 'config', 'aiconfig', '/api/ai/config');
-    }
-    if (/prisma|schema|database|数据|表|db/.test(text)) {
-        add('prisma', 'schema.prisma', 'database', 'db');
-    }
-    if (/campaign|activity|order|payment|mall|shop|活动|订单|支付|商城|赠送/.test(text)) {
-        add('campaign', 'activity', 'order', 'payment', 'mall', 'gift');
-    }
-    return Array.from(terms).filter(Boolean);
 }
 
 function readOutcomeRecords(context, options = {}) {
@@ -164,18 +131,19 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
     const text = recordSearchText(record);
     const changedFiles = splitFiles(record.changedFiles || []);
     const reasons = [];
-    let score = 0;
+    let matchScore = 0;
 
-    for (const term of queryTerms) {
-        const normalized = normalizeText(term);
+    for (const input of queryTerms) {
+        const term = typeof input === 'string' ? { value: normalizeText(input), weight: 1 } : input;
+        const normalized = normalizeText(term?.value || '');
         if (!normalized) {
             continue;
         }
         if (normalizeText(record.task || '').includes(normalized)) {
-            score += 8;
+            matchScore += 8 * (term.weight || 1);
             reasons.push(`任务命中: ${normalized}`);
         } else if (text.includes(normalized)) {
-            score += normalized.includes('/') ? 6 : 3;
+            matchScore += (normalized.includes('/') ? 6 : 3) * (term.weight || 1);
             reasons.push(`内容命中: ${normalized}`);
         }
     }
@@ -185,21 +153,24 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
         const root = normalized.split('/').slice(0, 3).join('/');
         for (const changed of changedFiles.map(normalizeText)) {
             if (changed === normalized || changed.endsWith(`/${normalized}`) || normalized.endsWith(`/${changed}`)) {
-                score += 12;
+                matchScore += 12;
                 reasons.push(`文件精确命中: ${file}`);
             } else if (root && changed.includes(root)) {
-                score += 4;
+                matchScore += 4;
                 reasons.push(`文件区域命中: ${root}`);
             }
         }
     }
 
-    if (recordedRecently(record.recordedAt)) {
-        score += 1;
+    let score = matchScore;
+    if (matchScore > 0 && recordedRecently(record.recordedAt)) {
+        score += 0.25;
+        reasons.push('最近任务 tie-break');
     }
 
     return {
         score,
+        matchScore,
         reasons: uniq(reasons).slice(0, 8),
     };
 }
@@ -223,6 +194,7 @@ function confidenceFromScore(score) {
 }
 
 function compactRecord(record, scoreInfo) {
+    const hasRelevance = Number.isFinite(scoreInfo?.score);
     return {
         task: record.task || '',
         outcome: record.outcome || '',
@@ -230,9 +202,10 @@ function compactRecord(record, scoreInfo) {
         changedFiles: splitFiles(record.changedFiles || []).slice(0, 12),
         validation: asArray(record.validation || []).slice(0, 8),
         observations: asArray(record.observations || []).slice(0, 8),
-        confidence: confidenceFromScore(scoreInfo.score),
-        score: scoreInfo.score,
-        reasons: scoreInfo.reasons,
+        outcomeConfidence: record.confidence || 'unknown',
+        relevanceConfidence: hasRelevance ? confidenceFromScore(scoreInfo.score) : null,
+        relevanceScore: hasRelevance ? scoreInfo.score : null,
+        reasons: scoreInfo?.reasons || [],
         sourceLine: record._line || null,
     };
 }
@@ -248,7 +221,7 @@ function countValues(values = []) {
 }
 
 function selectRelevantRules(playbook, terms = [], files = [], limit = 8) {
-    const normalizedTerms = terms.map(normalizeText);
+    const normalizedTerms = termValues(terms).map(normalizeText);
     const normalizedFiles = files.map(normalizeText);
     return (playbook.rules || [])
         .map(rule => {
@@ -290,11 +263,11 @@ function recallTaskMemory(options = {}) {
     const task = String(options.task || options.query || '').trim();
     const knownFiles = splitFiles([options.knownFiles, options.files, options.file, options.changedFiles, options.changedFile]);
     const limit = clampInteger(options.limit, DEFAULT_RECALL_LIMIT, 50);
-    const queryTerms = extractTerms(task, knownFiles);
+    const queryTerms = parseTaskTerms(task, knownFiles).terms;
     const records = readOutcomeRecords(context, options);
     const recalledTasks = records
         .map(record => ({ record, scoreInfo: scoreRecord(record, queryTerms, knownFiles) }))
-        .filter(item => item.scoreInfo.score > 0)
+        .filter(item => item.scoreInfo.matchScore >= MIN_RECALL_SCORE)
         .sort((left, right) => right.scoreInfo.score - left.scoreInfo.score || String(right.record.recordedAt || '').localeCompare(String(left.record.recordedAt || '')))
         .slice(0, limit)
         .map(item => compactRecord(item.record, item.scoreInfo));
@@ -309,7 +282,7 @@ function recallTaskMemory(options = {}) {
         workspaceRoot: context.workspaceRoot,
         dataRoot: context.dataRoot,
         task,
-        queryTerms,
+        queryTerms: termValues(queryTerms),
         knownFiles,
         totalOutcomeRecords: records.filter(record => !record._invalid).length,
         recalledTasks,
@@ -320,7 +293,7 @@ function recallTaskMemory(options = {}) {
         evidence: [
             ...recalledTasks.slice(0, 8).map(record => ({
                 kind: 'task-outcome',
-                confidence: record.confidence,
+                confidence: record.relevanceConfidence,
                 reason: record.reasons.join('; '),
                 task: record.task,
                 recordedAt: record.recordedAt,
@@ -346,7 +319,7 @@ function ruleInputList(options = {}) {
             title: rule.length > 48 ? `${rule.slice(0, 48)}...` : rule,
             body: rule,
             category: options.category || 'manual',
-            tags: extractTerms(rule).slice(0, 8),
+            tags: termValues(parseTaskTerms(rule).terms).slice(0, 8),
             files: splitFiles(options.changedFiles || options.knownFiles || options.files || options.file),
             source: options.source || 'manual',
         }));
@@ -465,7 +438,7 @@ function summarizeProjectMemory(options = {}) {
         outcomePath: outcomePath(context),
         playbookPath: playbookPath(context),
         outcomeCount: validRecords.length,
-        latestOutcomes: validRecords.slice(0, limit).map(record => compactRecord(record, { score: 1, reasons: ['最近任务记录'] })),
+        latestOutcomes: validRecords.slice(0, limit).map(record => compactRecord(record, { score: null, reasons: ['最近任务记录'] })),
         frequentFiles: countValues(validRecords.flatMap(record => splitFiles(record.changedFiles || []))).slice(0, 20),
         frequentValidationCommands: countValues(validRecords.flatMap(record => asArray(record.validation || []))).slice(0, 12),
         playbook: {
