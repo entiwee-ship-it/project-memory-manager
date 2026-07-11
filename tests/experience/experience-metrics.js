@@ -54,10 +54,13 @@ function scoreEvidenceCoverage(fixture, payload = {}) {
 }
 
 function scoreMemoryRecall(fixture, recalledTasks = []) {
-    const expected = fixture.intent === 'resume' ? 1 : 0;
+    const expectedFragments = (fixture.expectedMemory?.taskFragments || [])
+        .map(value => String(value || '').trim().toLowerCase())
+        .filter(Boolean);
+    const expected = expectedFragments.length > 0 ? 1 : 0;
     const matching = recalledTasks.filter(item => {
         const text = JSON.stringify(item).toLowerCase();
-        return fixture.intent === 'resume' && (text.includes('商品快照') || text.includes('e61e81d6'));
+        return expectedFragments.some(fragment => text.includes(fragment));
     }).length;
     return {
         expected,

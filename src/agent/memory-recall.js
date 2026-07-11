@@ -141,6 +141,13 @@ function recordStrongSearchText(record = {}) {
     ].filter(Boolean).join(' '));
 }
 
+function recordSemanticSearchText(record = {}) {
+    return normalizeText([
+        record.task,
+        record.outcome,
+    ].filter(Boolean).join(' '));
+}
+
 function isStrongRecallTerm(term = {}) {
     const value = normalizeText(term.value || term);
     if (!value || GENERIC_RECALL_TERMS.has(value)) {
@@ -155,13 +162,36 @@ function isStrongRecallTerm(term = {}) {
     return true;
 }
 
+function isTaskSemanticRecallTerm(term = {}) {
+    const value = normalizeText(term.value || term);
+    if (!value || GENERIC_RECALL_TERMS.has(value) || Number(term.weight || 0) <= 0.5) {
+        return false;
+    }
+    if (term.source === 'semantic-alias') {
+        return true;
+    }
+    if (term.source === 'alias') {
+        return false;
+    }
+    if (term.source === 'cjk-ngram') {
+        return value.length >= 4;
+    }
+    if (/^[a-z0-9]+$/.test(value) && value.length <= 2) {
+        return false;
+    }
+    return true;
+}
+
 function scoreRecord(record, queryTerms = [], queryFiles = []) {
     const text = recordSearchText(record);
     const strongText = recordStrongSearchText(record);
+    const semanticText = recordSemanticSearchText(record);
     const changedFiles = splitFiles(record.changedFiles || []);
     const reasons = [];
     let matchScore = 0;
     let strongMatchScore = 0;
+    let semanticMatchScore = 0;
+    let semanticMatchCount = 0;
     let fileExactMatches = 0;
     let fileAreaMatches = 0;
 
@@ -177,12 +207,20 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
             if (isStrongRecallTerm(term)) {
                 strongMatchScore += contribution;
             }
+            if (isTaskSemanticRecallTerm(term)) {
+                semanticMatchScore += contribution;
+                semanticMatchCount += 1;
+            }
             reasons.push(`任务命中: ${normalized}`);
         } else if (text.includes(normalized)) {
             const contribution = (normalized.includes('/') ? 6 : 3) * (term.weight || 1);
             matchScore += contribution;
             if (isStrongRecallTerm(term) && strongText.includes(normalized)) {
                 strongMatchScore += contribution;
+            }
+            if (isTaskSemanticRecallTerm(term) && semanticText.includes(normalized)) {
+                semanticMatchScore += contribution;
+                semanticMatchCount += 1;
             }
             reasons.push(`内容命中: ${normalized}`);
         }
@@ -216,6 +254,8 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
         score,
         matchScore,
         strongMatchScore,
+        semanticMatchScore,
+        semanticMatchCount,
         fileExactMatches,
         fileAreaMatches,
         reasons: uniq(reasons).slice(0, 8),
@@ -265,6 +305,7 @@ function normalizeResumeTask(value = '') {
     return normalizeText(value)
         .replace(/继续|接着|恢复|上次|上一轮|历史任务|交接|resume|continue/gi, '')
         .replace(/[\s,，。；;:：_-]+/g, '')
+        .replace(/(?:相关)?(?:任务|工作|事项)$/g, '')
         .trim();
 }
 
@@ -342,7 +383,8 @@ function recallTaskMemory(options = {}) {
         .map(record => ({ record, scoreInfo: scoreRecord(record, queryTerms, knownFiles) }))
         .filter(item => intent.intent === 'resume'
             ? resumeRecordMatches(item.record, item.scoreInfo, task, options.taskId || options.id)
-            : item.scoreInfo.matchScore >= MIN_RECALL_SCORE && item.scoreInfo.strongMatchScore >= MIN_RECALL_SCORE);
+            : item.scoreInfo.matchScore >= MIN_RECALL_SCORE
+                && (item.scoreInfo.semanticMatchScore >= MIN_RECALL_SCORE || item.scoreInfo.fileExactMatches > 0));
     const recalledTasks = candidates
         .sort((left, right) => {
             if (intent.intent === 'review') {
@@ -554,6 +596,12 @@ function emptyCurrentFacts(changedFiles = []) {
     };
 }
 
+function extractCommitReference(...values) {
+    const text = values.flatMap(asArray).filter(Boolean).join(' ');
+    const match = text.match(/\b(?:commit\s+)?([0-9a-f]{7,40})\b/i);
+    return match ? match[1] : '';
+}
+
 function historicalExperienceFromMemory(memory, intent) {
     const recalledTasks = memory.recalledTasks || [];
     const first = recalledTasks[0] || null;
@@ -562,7 +610,11 @@ function historicalExperienceFromMemory(memory, intent) {
         : [];
     let nextAction = first?.nextAction || '';
     if (!nextAction && remainingRisks.length > 0) {
-        nextAction = `先确认当前源码和已记录状态，再处理剩余风险：${remainingRisks[0]}`;
+        const commitReference = extractCommitReference(first?.outcome, first?.task, first?.observations);
+        const confirmationTarget = commitReference
+            ? `${commitReference} 和当前源码状态`
+            : '当前源码和已记录状态';
+        nextAction = `先确认 ${confirmationTarget}，再处理剩余风险：${remainingRisks[0]}`;
     }
     if (!nextAction && first) {
         nextAction = '先确认当前源码与已记录 outcome 一致，再继续任务。';

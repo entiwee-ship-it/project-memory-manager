@@ -21,6 +21,7 @@
   "forbiddenDomains": ["xy-client/assets/script/game/common/gameApis/DressUpApi.ts", "mahjong", "captcha"],
   "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": ["tb_recharge_ladder"]},
   "expectedValidation": ["validate_edit_scope", "review_patch_for_agent", "mall-recharge-product-snapshot-contract.test.cjs", "npm run build:dev"],
+  "expectedMemory": {"taskFragments": ["商品快照", "商城相关"]},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
   "directSourceBaseline": {"searchRounds": ["changed files callers", "tb_recharge_ladder"], "readFiles": ["qy-server/game-server/app/modules/commodity.ts", "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts", "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts", "qy-server/game-server/app/payment/services/orderService.ts", "qy-server/game-server/schema.sql"], "correctionRounds": 0}
 }

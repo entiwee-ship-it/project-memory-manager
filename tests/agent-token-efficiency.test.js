@@ -10,6 +10,7 @@ const { buildLookup } = require('../src/graph/build-chain-kb');
 const { handleMcpRequest } = require('../src/mcp/server');
 const { ensureDir, writeJsonAtomic } = require('../src/shared/common');
 const { createWorkspaceContext } = require('../src/shared/workspace-layout');
+const { parseTaskTerms } = require('../src/agent/task-terms');
 
 function makeNode(id, type, name, file, line = 1, meta = {}) {
     return {
@@ -56,6 +57,14 @@ function createMixedDomainFixture() {
     const loginNodes = [
         makeNode('login-view', 'method', 'LoginViewComp.loginGameServer', 'xy-client/assets/script/login/LoginViewComp.ts', 88),
         makeNode('login-session', 'method', 'GameSessionMgr.ensureLoggedIn', 'xy-client/assets/script/session/GameSessionMgr.ts', 42, { tags: ['session'] }),
+        ...Array.from({ length: 10 }, (_, index) => makeNode(
+            `login-session-noise-${index}`,
+            'method',
+            `GameSessionMgr.loginSession${index}`,
+            'xy-client/assets/script/session/GameSessionMgr.ts',
+            50 + index,
+            { tags: ['login', 'session', 'pinus'] }
+        )),
         makeNode('login-pkcon', 'method', 'pkcon.handler.doLogin', 'qy-server/game-server/app/servers/connector/handler/pkconHandler.ts', 31, { tags: ['pinus', 'session'] }),
     ];
     const mahjongNodes = [
@@ -81,9 +90,36 @@ function createMixedDomainFixture() {
         18,
         { tags: ['animation', 'effect'] }
     ));
+    const crowdedNodes = Array.from({ length: 30 }, (_, index) => makeNode(
+        `shared-component-${index}`,
+        'method',
+        `SharedComponent.method${String(index).padStart(2, '0')}`,
+        'src/shared/SharedComponent.ts',
+        index + 1,
+        { tags: ['shared', 'component'] }
+    ));
+    const secondaryNode = makeNode(
+        'shared-component-secondary',
+        'method',
+        'SharedComponentSecondary.run',
+        'src/shared/SharedComponentSecondary.ts',
+        1,
+        { tags: ['shared', 'component'] }
+    );
 
-    const nodes = [...noiseNodes, ...captchaNodes, ...loginNodes, ...mahjongNodes];
+    const projectModule = {
+        id: 'module:project-global',
+        type: 'module',
+        name: 'project-global',
+        file: '',
+        line: 1,
+        area: 'project',
+        stack: [],
+        meta: {},
+    };
+    const nodes = [projectModule, ...noiseNodes, ...captchaNodes, ...loginNodes, ...mahjongNodes, ...crowdedNodes, secondaryNode];
     const edges = [
+        ...nodes.filter(node => node.file).map(node => makeEdge(projectModule.id, node.id, 'contains')),
         makeEdge('captcha-view', 'captcha-request', 'requests'),
         makeEdge('captcha-request', 'captcha-endpoint', 'matches_endpoint'),
         makeEdge('captcha-endpoint', 'captcha-controller'),
@@ -102,7 +138,7 @@ function createMixedDomainFixture() {
         edges,
     };
 
-    for (const node of nodes) {
+    for (const node of nodes.filter(item => item.file)) {
         writeSourceFile(workspaceRoot, node.file);
     }
     ensureDir(context.paths.projectGlobalDir);
@@ -123,6 +159,50 @@ function assertIncludesTop(files, expectedFiles, limit = 8) {
     }
 }
 
+function testTaskTermPrecision() {
+    const values = task => new Set(parseTaskTerms(task).terms.map(term => term.value));
+
+    const captcha = values('排查后台登录验证码刷新链路');
+    for (const term of ['authapi', 'authcontroller', 'captcha']) {
+        assert.ok(captcha.has(term), `captcha terms missing ${term}`);
+    }
+    assert.equal(captcha.has('gamesession'), false);
+    assert.equal(captcha.has('loginview'), false);
+
+    const lobby = values('排查新版大厅入场动画首帧闪现');
+    for (const term of ['newlobby', 'newlobbyview', 'lobbyview', 'gameuiconfig', 'uinodeanimation']) {
+        assert.ok(lobby.has(term), `new lobby terms missing ${term}`);
+    }
+
+    const gameConfig = values('同步后台游戏配置规则默认值并检查前后端存储契约');
+    for (const term of ['gameedit', 'gameschemaeditor', 'rulecanvas', 'gameschema']) {
+        assert.ok(gameConfig.has(term), `game config terms missing ${term}`);
+    }
+    assert.equal(gameConfig.has('ai'), false);
+
+    const errorMessage = values('统一后台前后端错误提示中文化并检查调用方');
+    for (const term of ['errormessage', 'requesterrorcontext']) {
+        assert.ok(errorMessage.has(term), `error message terms missing ${term}`);
+    }
+
+    const recharge = values('解释商城充值配置在后台前端、后台后端和游戏服之间的一致性链路');
+    for (const term of ['rechargeladder', 'rechargeladderschema', 'mallruntimeconfig', 'tb_recharge_ladder']) {
+        assert.ok(recharge.has(term), `recharge terms missing ${term}`);
+    }
+    assert.equal(recharge.has('activity'), false);
+    assert.equal(recharge.has('gift'), false);
+    assert.equal(recharge.has('ai'), false);
+
+    const login = values('解释 HTTP 登录完成后如何建立 Pinus 游戏会话');
+    for (const term of ['loadingviewcomp', 'userapi', 'gamesessionmgr', 'pkcon']) {
+        assert.ok(login.has(term), `game login terms missing ${term}`);
+    }
+
+    for (const term of ['后台', '检查', '调用方', '统一']) {
+        assert.equal(errorMessage.has(term), false, `generic task term leaked: ${term}`);
+    }
+}
+
 function testChineseTaskRanking(fixture) {
     const captcha = prepareTaskContext({
         ...fixture,
@@ -136,6 +216,7 @@ function testChineseTaskRanking(fixture) {
         'cms-server/src/controllers/authController.ts',
         'cms-server/src/services/captchaService.ts',
     ]);
+    assert.equal(captcha.keyEntrypoints.endpoints.some(item => /activity/i.test(item.file)), false);
 
     const mahjong = prepareTaskContext({
         ...fixture,
@@ -158,7 +239,18 @@ function testChineseTaskRanking(fixture) {
         'xy-client/assets/script/login/LoginViewComp.ts',
         'xy-client/assets/script/session/GameSessionMgr.ts',
         'qy-server/game-server/app/servers/connector/handler/pkconHandler.ts',
-    ]);
+    ], 3);
+    const callChainFiles = login.callChains.map(chain => chain.start.file);
+    assert.equal(new Set(callChainFiles).size, callChainFiles.length, `duplicate call-chain seed files: ${JSON.stringify(callChainFiles)}`);
+}
+
+function testScoredSeedsDeduplicateFilesBeforeLimit(fixture) {
+    const result = prepareTaskContext({
+        ...fixture,
+        task: 'shared component',
+        limit: 3,
+    });
+    assert.ok(result.criticalFiles.includes('src/shared/SharedComponentSecondary.ts'), JSON.stringify(result.criticalFiles));
 }
 
 function testMemoryRequiresSemanticMatch(fixture) {
@@ -441,7 +533,9 @@ async function testMcpAgentProjection(fixture) {
 
 (async () => {
     const fixture = createMixedDomainFixture();
+    testTaskTermPrecision();
     testChineseTaskRanking(fixture);
+    testScoredSeedsDeduplicateFilesBeforeLimit(fixture);
     testMemoryRequiresSemanticMatch(fixture);
     testCompactProjectionBudgets(fixture);
     await testMcpAgentProjection(fixture);

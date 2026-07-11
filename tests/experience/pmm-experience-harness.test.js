@@ -90,11 +90,36 @@ function testFixtureContracts() {
         assert.ok(fixture.requiredFiles.length > 0 || fixture.intent === 'resume');
         assert.equal(fixture.requiredFiles.some(file => /[*?]|actual |found/i.test(file)), false);
         assert.ok(Number.isInteger(fixture.directSourceBaseline.correctionRounds));
+        assert.ok(Array.isArray(fixture.expectedMemory.taskFragments));
     }
+}
+
+function testMemoryScoringContract() {
+    const relevant = scoreMemoryRecall({
+        intent: 'implement',
+        expectedMemory: { taskFragments: ['新版大厅'] },
+    }, [
+        { task: '提交新版大厅当前 prefab 和素材位置调整' },
+        { task: '整改新版大厅 BottomActionModule 按钮节点结构' },
+    ]);
+    assert.equal(relevant.expected, 1);
+    assert.equal(relevant.matching, 2);
+    assert.equal(relevant.precision, 1);
+
+    const mixed = scoreMemoryRecall({
+        intent: 'review',
+        expectedMemory: { taskFragments: ['商品快照'] },
+    }, [
+        { task: '统一钻石充值交易商品快照来源' },
+        { task: '修复后台验证码刷新链路' },
+    ]);
+    assert.equal(mixed.matching, 1);
+    assert.equal(mixed.precision, 0.5);
 }
 
 function main() {
     testFixtureContracts();
+    testMemoryScoringContract();
     if (process.argv.includes('--fixtures-only')) {
         console.log('PMM experience fixture contracts passed');
         return;

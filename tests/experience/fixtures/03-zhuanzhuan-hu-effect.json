@@ -14,6 +14,7 @@
   "forbiddenDomains": ["poker", "cms-server", "mall"],
   "requiredEvidence": {"methods": ["onMJHu", "showHuPaiFanXingEffect", "getSpecialHuEffectType"], "endpoints": [], "requests": [], "messages": ["MJHu"], "tables": []},
   "expectedValidation": ["运行转转麻将胡牌特效外置 contract test"],
+  "expectedMemory": {"taskFragments": []},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
   "directSourceBaseline": {"searchRounds": ["onMJHu MJHu", "showHuPaiFanXingEffect getSpecialHuEffectType"], "readFiles": ["xy-client/assets/script/game/majiang/common/base/MaJiangBaseView.ts", "xy-client/assets/script/game/majiang/common/component/EffectAniComp.ts", "xy-client/assets/script/game/majiang/zhuanzhuan/ZhuanZhuanMJViewComp.ts"], "correctionRounds": 0}
 }

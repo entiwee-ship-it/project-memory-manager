@@ -8,6 +8,11 @@ assert.equal(classifyTaskIntent({ task: '实现商城充值商品快照统一来
 assert.equal(classifyTaskIntent({ task: '继续上次大厅 prefab 调整' }).intent, 'resume');
 assert.equal(classifyTaskIntent({ task: '审查这些改动有没有漏改', changedFiles: ['a.ts'] }).intent, 'review');
 assert.equal(classifyTaskIntent({ task: '把按钮文案改成确定', knownFiles: ['View.vue'] }).intent, 'simple');
+assert.equal(classifyTaskIntent({
+    task: '在新版大厅 prefab 接入通用 HeadFrame 组件并复核绑定范围',
+    knownFiles: ['xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab'],
+}).intent, 'implement');
+assert.equal(classifyTaskIntent({ task: '统一后台前后端错误提示中文化并检查调用方' }).intent, 'implement');
 
 const ambiguous = classifyTaskIntent({ task: '处理商城这块' });
 assert.equal(ambiguous.intent, 'implement');

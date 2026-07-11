@@ -16,6 +16,7 @@
   "forbiddenDomains": ["mall", "activity", "poker"],
   "requiredEvidence": {"methods": ["ensureLoggedIn", "doLogin"], "endpoints": [], "requests": [], "messages": [], "tables": []},
   "expectedValidation": ["登录 HTTP 返回 token 后确认 Pinus 会话绑定参数", "确认断线重连不会重复身份认证"],
+  "expectedMemory": {"taskFragments": []},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
   "directSourceBaseline": {"searchRounds": ["authToken doLogin ensureLoggedIn", "pkcon handler"], "readFiles": ["xy-client/assets/script/game/account/UserApi.ts", "xy-client/assets/script/network/session/GameSessionMgr.ts", "qy-server/game-server/app/servers/pkcon/handler/handler.ts"], "correctionRounds": 1}
 }

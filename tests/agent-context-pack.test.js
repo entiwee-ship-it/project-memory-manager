@@ -181,6 +181,20 @@ function testSimpleUsesKnownFilesOnly(fixture) {
     assert.deepEqual(result.callChains, []);
 }
 
+function testImplementationSeedsKnownFiles(fixture) {
+    const knownFile = 'app/settings/page.tsx';
+    const result = prepareTaskContext({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '接入通用组件并复核绑定范围',
+        knownFiles: [knownFile],
+    });
+
+    assert.equal(result.intent.intent, 'implement');
+    assert.equal(result.criticalFiles[0], knownFile);
+    assert.ok(result.callChains.some(chain => chain.start.file === knownFile));
+}
+
 function testExplainFacebookFeature(fixture) {
     const result = explainFeatureForAgent({
         workspaceRoot: fixture.workspaceRoot,
@@ -300,6 +314,7 @@ async function testMcpTools(fixture) {
     testIntentAwareCurrentFacts(fixture);
     testReviewSeedsChangedFiles(fixture);
     testSimpleUsesKnownFilesOnly(fixture);
+    testImplementationSeedsKnownFiles(fixture);
     testExplainFacebookFeature(fixture);
     testAnalyzeChangeImpact(fixture);
     testDiffFileParsing();

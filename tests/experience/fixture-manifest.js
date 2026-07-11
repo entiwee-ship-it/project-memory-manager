@@ -38,6 +38,15 @@ function validateExperienceFixture(fixture, fileName = '') {
             assertStringArray(fixture[field], field, fixtureId);
         }
     }
+    if (!fixture.expectedMemory || typeof fixture.expectedMemory !== 'object') {
+        throw new Error(`${fixtureId}.expectedMemory must be an object`);
+    }
+    if (!Array.isArray(fixture.expectedMemory.taskFragments)) {
+        throw new Error(`${fixtureId}.expectedMemory.taskFragments must be an array`);
+    }
+    if (fixture.expectedMemory.taskFragments.length > 0) {
+        assertStringArray(fixture.expectedMemory.taskFragments, 'expectedMemory.taskFragments', fixtureId);
+    }
     if (fixture.intent !== 'resume' && fixture.requiredFiles.length === 0) {
         throw new Error(`${fixtureId}.requiredFiles must not be empty`);
     }

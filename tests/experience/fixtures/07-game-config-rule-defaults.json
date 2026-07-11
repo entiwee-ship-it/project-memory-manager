@@ -17,6 +17,7 @@
   "forbiddenDomains": ["mall", "poker", "captcha"],
   "requiredEvidence": {"methods": ["buildLocalSchemaPreview"], "endpoints": [], "requests": [], "messages": [], "tables": ["tb_cms_game_rule_schema", "tb_cms_game_rule_schema_history"]},
   "expectedValidation": ["运行游戏配置规则 contract test", "构建 cms-client", "构建 cms-server"],
+  "expectedMemory": {"taskFragments": ["游戏配置"]},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
   "directSourceBaseline": {"searchRounds": ["rule default schemaJson", "tb_cms_game_rule_schema"], "readFiles": ["cms-client/src/views/gameManage/game/components/GameEdit.vue", "cms-client/src/views/gameManage/game/components/GameSchemaEditor.vue", "cms-server/src/models/gameManagement/gameModel.ts", "cms-server/src/common/schema/game/gameSchema.ts"], "correctionRounds": 1}
 }

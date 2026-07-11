@@ -29,7 +29,7 @@ function createMemoryFixture() {
     fs.mkdirSync(path.join(workspaceRoot, 'lib'), { recursive: true });
     fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"scripts":{"test":"node --test"}}\n');
     fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'callback', 'route.ts'), [
-        "import { saveFacebookToken } from '../../../../../../lib/facebook-client';",
+        "import { saveFacebookToken } from '../../../../../lib/facebook-client';",
         'export async function GET() { return saveFacebookToken(); }',
     ].join('\n'));
     fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'status', 'route.ts'), 'export async function GET() { return { connected: true }; }\n');
@@ -193,6 +193,32 @@ function testResumeBriefCompleteness(fixture) {
     assert.equal(result.historicalExperience.recalledTasks.length, 1);
 }
 
+function testResumeBriefIgnoresGenericTaskSuffix(fixture) {
+    recordTaskOutcome({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '统一会员礼包运行态商品快照来源，减少交易链路直接查询数据库。',
+        outcome: '完成会员礼包商品快照统一并提交 abc12345',
+        validation: ['member-gift-snapshot-contract.test.cjs 通过'],
+        observations: ['月卡礼包仍使用数据库 fallback'],
+        remainingRisks: ['礼包历史类型仍需单独清理'],
+        status: 'completed',
+    });
+    const result = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一会员礼包运行态商品快照来源任务',
+    });
+    const resume = result.historicalExperience.resume;
+
+    assert.equal(result.intent.intent, 'resume');
+    assert.equal(result.historicalExperience.recalledTasks.length, 1);
+    assert.ok(resume.completed.some(item => item.includes('abc12345')));
+    assert.ok(resume.validation.some(item => item.includes('member-gift-snapshot-contract.test.cjs')));
+    assert.ok(resume.remainingRisks.some(item => item.includes('历史类型')));
+    assert.ok(resume.nextAction.includes('确认 abc12345 和当前源码状态'));
+}
+
 function testReviewRecallPrioritizesChangedFiles(fixture) {
     const result = recallTaskMemory({
         workspaceRoot: fixture.workspaceRoot,
@@ -202,6 +228,29 @@ function testReviewRecallPrioritizesChangedFiles(fixture) {
         intent: 'review',
     });
     assert.equal(result.recalledTasks[0].task, '统一钻石充值交易商品快照来源');
+}
+
+function testRecallRejectsFileAliasOnlyMatches(fixture) {
+    const unrelatedTask = 'cms-client 游戏运营工作区主题重构切片';
+    recordTaskOutcome({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: unrelatedTask,
+        outcome: '完成后台页面主题整理并复核登录页样式',
+        changedFiles: [
+            'cms-client/src/views/login/Login.vue',
+            'cms-server/src/routes/system/authRoutes.ts',
+        ],
+        validation: ['npm run build'],
+    });
+
+    const result = recallTaskMemory({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '排查后台登录验证码刷新链路',
+    });
+
+    assert.equal(result.recalledTasks.some(item => item.task === unrelatedTask), false);
 }
 
 function testPrepareAgentBriefPreflightBlocked() {
@@ -395,6 +444,8 @@ async function testMcpTools(fixture) {
     testUpdateProjectPlaybookInference(fixture);
     testCliFallback(fixture);
     await testMcpTools(fixture);
+    testResumeBriefIgnoresGenericTaskSuffix(fixture);
+    testRecallRejectsFileAliasOnlyMatches(fixture);
     console.log('agent-memory-recall validation passed');
 })().catch(error => {
     console.error(error.stack || error.message);

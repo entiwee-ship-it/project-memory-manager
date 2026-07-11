@@ -14,6 +14,7 @@
   "forbiddenDomains": ["mahjong", "poker", "prefab"],
   "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": []},
   "expectedValidation": ["运行 cms-client 错误提示 contract", "运行 cms-server 错误上下文 contract"],
+  "expectedMemory": {"taskFragments": ["错误提示"]},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
   "directSourceBaseline": {"searchRounds": ["errorMessage requestErrorContext"], "readFiles": ["cms-client/src/utils/ui/errorMessage.js", "cms-server/src/utils/errorMessage.ts", "cms-server/src/utils/requestErrorContext.ts"], "correctionRounds": 0}
 }

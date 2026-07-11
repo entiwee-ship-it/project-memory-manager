@@ -156,9 +156,44 @@ function nodeSearchText(node) {
     ].filter(Boolean).join(' '));
 }
 
+function nodeIdentityText(node) {
+    return normalizeText([
+        node?.type,
+        node?.name,
+        node?.file,
+        node?.area,
+        ...(Array.isArray(node?.stack) ? node.stack : []),
+    ].filter(Boolean).join(' '));
+}
+
+function escapeRegex(value = '') {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function termBoundaryMatches(text, term) {
+    const normalized = normalizeText(term);
+    if (!normalized) {
+        return false;
+    }
+    return new RegExp(`(^|[^a-z0-9])${escapeRegex(normalized)}([^a-z0-9]|$)`, 'i').test(text);
+}
+
+function comparableNodeNames(node) {
+    const fileBase = normalizeText(path.basename(node?.file || ''));
+    const nodeName = normalizeText(node?.name || '');
+    const withoutExtension = value => value.replace(/\.[a-z0-9]+$/i, '');
+    return new Set([
+        fileBase,
+        withoutExtension(fileBase),
+        nodeName,
+        withoutExtension(nodeName),
+    ].filter(Boolean));
+}
+
 function scoreNode(node, terms = []) {
     const text = nodeSearchText(node);
     const normalizedName = normalizeText(node.name || '');
+    const exactNames = comparableNodeNames(node);
     let matchScore = 0;
     const matchedTerms = [];
     for (const input of terms) {
@@ -168,8 +203,10 @@ function scoreNode(node, terms = []) {
             continue;
         }
         let contribution = 0;
-        if (normalizedName === normalized) {
+        if (normalizedName === normalized || exactNames.has(normalized)) {
             contribution = 12 * (term.weight || 1);
+        } else if (termBoundaryMatches(text, normalized)) {
+            contribution = (normalized.includes('/') ? 8 : 7) * (term.weight || 1);
         } else if (text.includes(normalized)) {
             contribution = (normalized.includes('/') ? 8 : 5) * (term.weight || 1);
         }
@@ -342,14 +379,60 @@ function evidenceFileMatches(evidenceFile = '', file = '') {
 
 function pickScoredNodes(graph, terms, options = {}) {
     const limit = options.limit || DEFAULT_LIMIT;
-    return [...(graph.nodes || [])]
+    const scored = [...(graph.nodes || [])]
         .map(node => ({ node, ...scoreNode(node, terms) }))
         .filter(item => item.score > 0)
         .sort((left, right) => right.score - left.score
             || right.matchScore - left.matchScore
             || right.matchedTerms.length - left.matchedTerms.length
-            || String(left.node.name).localeCompare(String(right.node.name)))
-        .slice(0, limit);
+            || String(left.node.name).localeCompare(String(right.node.name)));
+    return uniqBy(scored, item => normalizeText(item.node.file || '') || item.node.id).slice(0, limit);
+}
+
+function selectPreciseScoredNodes(scoredNodes, terms = []) {
+    const preciseTerms = new Set(terms
+        .filter(term => term?.source === 'alias' && Number(term.weight) >= 6)
+        .map(term => normalizeText(term.value))
+        .filter(Boolean));
+    if (!preciseTerms.size) {
+        return { nodes: scoredNodes, precise: false };
+    }
+    const preciseNodes = scoredNodes.filter(item => {
+        const text = nodeIdentityText(item.node);
+        return item.matchedTerms.some(term => preciseTerms.has(term) && termBoundaryMatches(text, term));
+    });
+    return preciseNodes.length > 0
+        ? { nodes: preciseNodes, precise: true }
+        : { nodes: scoredNodes, precise: false };
+}
+
+function findNearbySchemaFiles(workspaceRoot, files = [], terms = []) {
+    const shouldSearch = terms.some(term => term?.value === 'schema.sql' || term?.value === 'schema.prisma');
+    if (!shouldSearch) {
+        return [];
+    }
+    const root = path.resolve(workspaceRoot);
+    const candidates = [];
+    for (const file of files) {
+        let current = path.dirname(path.isAbsolute(file) ? file : path.join(root, file));
+        while (current.toLowerCase().startsWith(root.toLowerCase())) {
+            for (const relative of ['schema.sql', 'schema.prisma', path.join('prisma', 'schema.prisma')]) {
+                const candidate = path.join(current, relative);
+                if (pathExists(candidate)) {
+                    candidates.push(workspaceRelative(root, candidate));
+                }
+            }
+            if (current === root) {
+                break;
+            }
+            const parent = path.dirname(current);
+            if (parent === current) {
+                break;
+            }
+            current = parent;
+        }
+    }
+    return uniq(candidates);
 }
 
 function traverse(lookup, startIds = [], options = {}) {
@@ -366,6 +449,11 @@ function traverse(lookup, startIds = [], options = {}) {
             const bucket = direction === 'upstream' ? lookup.adjacency?.incoming : lookup.adjacency?.outgoing;
             const edges = bucket?.[current.id] || [];
             for (const edge of edges) {
+                const fromNode = lookup.nodesById?.[edge.from] || null;
+                const toNode = lookup.nodesById?.[edge.to] || null;
+                if (edge.type === 'contains' && (fromNode?.type === 'module' || toNode?.type === 'module')) {
+                    continue;
+                }
                 const nextId = direction === 'upstream' ? edge.from : edge.to;
                 const edgeKey = `${direction}:${edge.from}:${edge.to}:${edge.type}:${edge.sourceKind || ''}`;
                 if (!edgeSeen.has(edgeKey)) {
@@ -578,22 +666,34 @@ function prepareTaskContext(options = {}) {
     const { graph, lookup } = loadProjectArtifacts(context);
     const limit = options.limit || INTENT_LIMITS[intent.intent] || DEFAULT_LIMIT;
     const scoredNodes = pickScoredNodes(graph, taskInfo.terms, { limit: Math.max(limit * 3, 20) });
+    const scoredSelection = selectPreciseScoredNodes(scoredNodes, taskInfo.terms);
+    const selectedScoredNodes = scoredSelection.nodes;
     const changedFiles = intent.intent === 'review' ? parseChangedFiles(options) : [];
+    const normalizedKnownFiles = knownFiles.map(file => workspaceRelative(context.workspaceRoot, file));
     const changedNodes = intent.intent === 'review'
         ? (graph.nodes || []).filter(node => changedFiles.some(file => nodeMatchesChangedFile(node, file, context.workspaceRoot)))
         : [];
+    const knownNodes = (graph.nodes || [])
+        .filter(node => knownFiles.some(file => nodeMatchesChangedFile(node, file, context.workspaceRoot)));
     const startNodes = uniqBy([
         ...changedNodes,
-        ...scoredNodes.map(item => item.node),
-    ], node => node.id).slice(0, limit);
+        ...knownNodes,
+        ...selectedScoredNodes.map(item => item.node),
+    ], node => workspaceRelative(context.workspaceRoot, node.file || '') || node.id).slice(0, limit);
     const startIds = startNodes.map(node => node.id);
     const traversal = traverse(lookup, startIds, { depth: options.depth || DEFAULT_DEPTH, directions: ['downstream', 'upstream'] });
     const relatedNodes = uniqBy([...startNodes, ...nodesFromTraversal(traversal)], node => node.id);
     const files = uniq([
         ...changedFiles.map(file => workspaceRelative(context.workspaceRoot, file)),
+        ...normalizedKnownFiles,
         ...relatedNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean),
     ]);
     const startFiles = uniq(startNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean));
+    const inputFiles = uniq([
+        ...changedFiles.map(file => workspaceRelative(context.workspaceRoot, file)),
+        ...normalizedKnownFiles,
+    ]);
+    const schemaFiles = findNearbySchemaFiles(context.workspaceRoot, startFiles, taskInfo.terms);
     const featureScoringFiles = startFiles.length ? startFiles : files;
     const features = makeFeatureCatalog(context)
         .map(feature => ({ feature, score: scoreFeature(feature, taskInfo.terms, featureScoringFiles) }))
@@ -640,7 +740,10 @@ function prepareTaskContext(options = {}) {
         requests,
         methods: methods.slice(0, limit),
     };
-    const criticalFiles = files.slice(0, 16);
+    const preciseFileLimit = Math.min(12, Math.max(6, inputFiles.length + 2));
+    const criticalFiles = scoredSelection.precise
+        ? uniq([...inputFiles, ...schemaFiles, ...startFiles]).slice(0, preciseFileLimit)
+        : files.slice(0, 16);
     const dataAccessResult = {
         tables: dataAccess.tables.length ? dataAccess.tables : tables.map(table => ({ ...table, reads: [], writes: [] })),
     };
@@ -681,19 +784,25 @@ function prepareTaskContext(options = {}) {
         callers,
         dataAccess: dataAccessResult,
         externalServices,
-        editBoundary: buildEditBoundary(files, features),
+        editBoundary: buildEditBoundary(criticalFiles, features),
         validation: {
             recommendedCommands: validationCommands,
         },
         uncertainties: buildUncertainties({ taskInfo, features, startNodes, dataAccess, externalServices }),
         evidence: uniqBy(
             [
-                ...scoredNodes.slice(0, 16).map(item => evidenceFromNode(
+                ...selectedScoredNodes.slice(0, 16).map(item => evidenceFromNode(
                     item.node,
                     context.workspaceRoot,
                     `任务词命中 ${item.matchedTerms.slice(0, 6).join(', ')}，score=${item.score}`,
                     confidenceFromScore(item.score)
                 )),
+                ...schemaFiles.map(file => ({
+                    kind: 'file',
+                    file,
+                    confidence: 'high',
+                    reason: '在高置信数据链种子邻近目录发现 schema 文件',
+                })),
                 ...dataAccess.evidence.slice(0, 8),
             ],
             item => `${item.kind}:${item.nodeId || item.edgeType}:${item.name || ''}:${item.file || ''}:${item.line || ''}`
