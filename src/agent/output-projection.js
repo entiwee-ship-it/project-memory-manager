@@ -67,7 +67,7 @@ function collectShrinkableArrays(value, arrays = []) {
 }
 
 function serializedLength(value) {
-    return JSON.stringify(value).length;
+    return JSON.stringify(value, null, 2).length;
 }
 
 function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {

@@ -7,6 +7,7 @@ const { recallTaskMemory } = require('../src/agent/memory-recall');
 const { projectAgentOutput } = require('../src/agent/output-projection');
 const { recordTaskOutcome } = require('../src/agent/execution-loop');
 const { buildLookup } = require('../src/graph/build-chain-kb');
+const { handleMcpRequest } = require('../src/mcp/server');
 const { ensureDir, writeJsonAtomic } = require('../src/shared/common');
 const { createWorkspaceContext } = require('../src/shared/workspace-layout');
 
@@ -267,8 +268,46 @@ function testCompactProjectionBudgets(fixture) {
     assert.equal(fullQuery._output.detail, 'full');
 }
 
-const fixture = createMixedDomainFixture();
-testChineseTaskRanking(fixture);
-testMemoryRequiresSemanticMatch(fixture);
-testCompactProjectionBudgets(fixture);
-console.log('agent token efficiency validation passed');
+async function callTool(name, args) {
+    const response = await handleMcpRequest({
+        jsonrpc: '2.0',
+        id: Math.floor(Math.random() * 100000),
+        method: 'tools/call',
+        params: { name, arguments: args },
+    });
+    assert.equal(response.result.content[0].type, 'text');
+    return response.result.content[0].text;
+}
+
+async function testMcpAgentProjection(fixture) {
+    const contextText = await callTool('prepare_task_context', {
+        ...fixture,
+        task: '后台验证码链路',
+        freshnessPolicy: 'allow_stale',
+    });
+    const context = JSON.parse(contextText);
+    assert.ok(contextText.length <= 8000, `MCP task context exceeded budget: ${contextText.length}`);
+    assert.equal(context._output.detail, 'compact');
+    assert.ok(context.criticalFiles.includes('cms-server/src/services/captchaService.ts'));
+
+    const memoryText = await callTool('recall_task_memory', {
+        ...fixture,
+        task: '后台验证码链路',
+    });
+    const memory = JSON.parse(memoryText);
+    assert.ok(memoryText.length <= 6000, `MCP memory recall exceeded budget: ${memoryText.length}`);
+    assert.equal(memory._output.detail, 'compact');
+    assert.equal(memory.recalledTasks[0].outcomeConfidence, 'high');
+}
+
+(async () => {
+    const fixture = createMixedDomainFixture();
+    testChineseTaskRanking(fixture);
+    testMemoryRequiresSemanticMatch(fixture);
+    testCompactProjectionBudgets(fixture);
+    await testMcpAgentProjection(fixture);
+    console.log('agent token efficiency validation passed');
+})().catch(error => {
+    console.error(error.stack || error.message);
+    process.exit(1);
+});

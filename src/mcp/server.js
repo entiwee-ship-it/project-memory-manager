@@ -1539,7 +1539,8 @@ function runAgentProjectTool(args, toolName, fn) {
         limit: options.limit,
         depth: options.depth || args.depth,
     });
-    return textResult(attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, toolName)));
+    const enriched = attachAgentMcpMetadata(payload, freshnessGate.freshnessMeta, agentQueryMeta(args, toolName));
+    return textResult(projectAgentOutput(enriched, args, toolName));
 }
 
 function prepareTaskContextTool(args) {
@@ -1704,10 +1705,11 @@ function recallTaskMemoryTool(args) {
         ...args,
         layout: 'external-data',
     });
-    return textResult({
+    const enriched = {
         ...payload,
         _mcpQuery: agentQueryMeta(args, 'recall_task_memory'),
-    });
+    };
+    return textResult(projectAgentOutput(enriched, args, 'recall_task_memory'));
 }
 
 function mcpRuntimeContext() {
@@ -1773,10 +1775,11 @@ function summarizeProjectMemoryTool(args) {
         ...args,
         layout: 'external-data',
     });
-    return textResult({
+    const enriched = {
         ...payload,
         _mcpQuery: agentQueryMeta(args, 'summarize_project_memory'),
-    });
+    };
+    return textResult(projectAgentOutput(enriched, args, 'summarize_project_memory'));
 }
 
 function updateProjectPlaybookTool(args) {
@@ -1947,7 +1950,7 @@ function queryProjectChain(args) {
 
     const cached = projectQueryCache.get(cacheKey);
     if (cached) {
-        return textResult(withMcpQueryMetadata(cached.payload, {
+        const enriched = withMcpQueryMetadata(cached.payload, {
             hit: true,
             invalidatedByMtime: false,
             invalidatedBySource: false,
@@ -1955,12 +1958,13 @@ function queryProjectChain(args) {
             elapsedMs: 0,
             artifacts: artifactState.artifacts,
             projectGlobalFreshness: artifactState.projectGlobalFreshness,
-        }, queryMeta, freshnessGate.freshnessMeta));
+        }, queryMeta, freshnessGate.freshnessMeta);
+        return textResult(projectAgentOutput(enriched, args, 'query_project_chain'));
     }
 
     const result = runQueryScript('query-project.js', argv, options.timeoutMs);
     if (!result.ok) {
-        return textResult({
+        const failure = {
             ok: false,
             error: result.error,
             timedOut: result.timedOut,
@@ -1976,7 +1980,8 @@ function queryProjectChain(args) {
             },
             _mcpQuery: queryMeta,
             _mcpFreshness: freshnessGate.freshnessMeta,
-        });
+        };
+        return textResult(projectAgentOutput(failure, args, 'query_project_chain'));
     }
 
     const payload = parseJsonOutput(result.stdout);
@@ -1992,7 +1997,7 @@ function queryProjectChain(args) {
         payload,
         cachedAt,
     });
-    return textResult(withMcpQueryMetadata(payload, {
+    const enriched = withMcpQueryMetadata(payload, {
         hit: false,
         invalidatedByMtime,
         invalidatedBySource,
@@ -2000,7 +2005,8 @@ function queryProjectChain(args) {
         elapsedMs: result.elapsedMs,
         artifacts: artifactState.artifacts,
         projectGlobalFreshness: artifactState.projectGlobalFreshness,
-    }, queryMeta, freshnessGate.freshnessMeta));
+    }, queryMeta, freshnessGate.freshnessMeta);
+    return textResult(projectAgentOutput(enriched, args, 'query_project_chain'));
 }
 
 function queryFeatureChain(args) {
@@ -2014,7 +2020,7 @@ function queryFeatureChain(args) {
     appendQuerySelectorArgs(argv, args, options);
     const result = runQueryScript('query-feature.js', argv, options.timeoutMs);
     if (!result.ok) {
-        return textResult({
+        const failure = {
             ok: false,
             error: result.error,
             timedOut: result.timedOut,
@@ -2027,10 +2033,11 @@ function queryFeatureChain(args) {
                 freshnessPolicy,
             },
             _mcpFreshness: freshnessGate.freshnessMeta,
-        });
+        };
+        return textResult(projectAgentOutput(failure, args, 'query_feature_chain'));
     }
     const payload = parseJsonOutput(result.stdout);
-    return textResult(withMcpQueryMetadata(payload, {
+    const enriched = withMcpQueryMetadata(payload, {
         hit: false,
         supported: false,
         elapsedMs: result.elapsedMs,
@@ -2040,7 +2047,8 @@ function queryFeatureChain(args) {
         depth: options.depth,
         timeoutMs: options.timeoutMs,
         freshnessPolicy,
-    }, freshnessGate.freshnessMeta));
+    }, freshnessGate.freshnessMeta);
+    return textResult(projectAgentOutput(enriched, args, 'query_feature_chain'));
 }
 
 async function handleMcpRequest(request) {

@@ -51,7 +51,11 @@ function writeWebsiteWorkspace(workspaceRoot) {
             '@vitejs/plugin-vue': '^6.0.0',
         },
     }, null, 2));
-    fs.writeFileSync(path.join(websiteRoot, 'src', 'main.js'), 'export function mountApp(){ return "ok"; }\n');
+    fs.writeFileSync(path.join(websiteRoot, 'src', 'main.js'), [
+        'export function helper(){ return "ok"; }',
+        'export function mountApp(){ return helper(); }',
+        '',
+    ].join('\n'));
 }
 
 function writeFeatureDiscoveryWorkspace(workspaceRoot) {
@@ -713,6 +717,36 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     assert.equal(third._mcpCache.invalidatedByMtime, true);
 }
 
+async function testQueryProjectChainCompactAndFullProjection() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+
+    const args = {
+        workspaceRoot,
+        dataRoot,
+        method: 'main.mountApp',
+        downstream: true,
+        freshnessPolicy: 'allow_stale',
+    };
+    const compact = parseTextResult(await callTool('query_project_chain', args));
+    assert.equal(compact._output.detail, 'compact');
+    assert.ok(JSON.stringify(compact).length <= 8000);
+    assert.equal(compact.resolvedStart.name, 'main.mountApp');
+    assert.equal(Object.hasOwn(compact.resolvedStart, 'meta'), false);
+    assert.equal(Object.hasOwn(compact, 'node'), false);
+    assert.equal(Array.isArray(compact.traversal), true);
+
+    const cached = parseTextResult(await callTool('query_project_chain', args));
+    assert.equal(cached._mcpCache.hit, true);
+    assert.equal(cached._output.detail, 'compact');
+
+    const full = parseTextResult(await callTool('query_project_chain', { ...args, detail: 'full' }));
+    assert.equal(full._output.detail, 'full');
+    assert.equal(Object.hasOwn(full, 'node'), true);
+    assert.equal(Object.hasOwn(full.resolvedStart, 'meta'), true);
+}
+
 async function testQueryProjectChainAutoRebuildsStaleKb() {
     const { workspaceRoot, dataRoot } = makeWorkspace();
     writeWebsiteWorkspace(workspaceRoot);
@@ -942,6 +976,7 @@ Promise.all([
     testProjectFreshnessDetectsSourceChanges(),
     testProjectFreshnessUnknownWithoutSourceSnapshot(),
     testQueryProjectChainCacheInvalidatesOnKbMtime(),
+    testQueryProjectChainCompactAndFullProjection(),
     testQueryProjectChainAutoRebuildsStaleKb(),
     testQueryProjectChainRequireFreshBlocksStaleKb(),
     testAsyncBuildJob(),
