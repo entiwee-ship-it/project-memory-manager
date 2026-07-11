@@ -216,6 +216,45 @@ function testReviewSupportFilesDoNotForceScopeReview(fixture) {
     assertIncludes(result.informationalOutOfScopeFiles, 'CHANGELOG.md');
 }
 
+function testDeclaredFilesExtendContextBoundary(fixture) {
+    const declaredFiles = [
+        'package.json',
+        '.github/workflows/ci.yml',
+        'README.md',
+    ];
+    const plan = planTaskExecution({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '补齐项目发布质量门禁和说明文档',
+        knownFiles: declaredFiles,
+    });
+    for (const file of declaredFiles) {
+        assertIncludes(plan.targetFiles, file);
+        assertIncludes(plan.editBoundary.primaryFiles, file);
+    }
+
+    const result = validateEditScope({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '补齐项目发布质量门禁和说明文档',
+        knownFiles: declaredFiles,
+        changedFiles: declaredFiles,
+    });
+    assert.equal(result.verdict, 'within_scope');
+    assert.deepEqual(result.outOfScopeFiles, []);
+    assert.deepEqual(result.informationalOutOfScopeFiles, []);
+
+    const review = reviewPatchForAgent({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '补齐项目发布质量门禁和说明文档',
+        knownFiles: declaredFiles,
+        changedFiles: declaredFiles,
+    });
+    assert.equal(review.verdict, 'review_ready');
+    assert.equal(review.findings.some(item => item.title === '改动范围需要复核'), false);
+}
+
 function testDesignTokenFilesDoNotCreateHighRiskReview(fixture) {
     const result = reviewPatchForAgent({
         workspaceRoot: fixture.workspaceRoot,
@@ -341,6 +380,7 @@ async function testMcpTools(fixture) {
     testValidateSettingsScope(fixture);
     testReviewPatchForAgent(fixture);
     testReviewSupportFilesDoNotForceScopeReview(fixture);
+    testDeclaredFilesExtendContextBoundary(fixture);
     testDesignTokenFilesDoNotCreateHighRiskReview(fixture);
     testRecordTaskOutcome(fixture);
     testCliFallback(fixture);

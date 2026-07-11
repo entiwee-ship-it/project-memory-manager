@@ -89,11 +89,11 @@ PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM �
 - `summarize_project_memory` / `summarize-project-memory.js`：适合跨会话接力或阶段复盘时查看 PMM 已记住什么。
 - `update_project_playbook` / `update-project-playbook.js`：适合把稳定项目规则沉淀成可召回 playbook。
 - `decide_pmm_usage` / `decide-pmm-usage.js`：适合任务开始时使用。少量明确 UI 源文件可以得到 `optional_skip_allowed`，但必须保留门禁证据并在提交前复核；涉及 API、数据、鉴权、外部服务、交易/活动或跨模块时会要求深度 PMM。
-- `plan_task_execution` / `plan-task-execution.js`：适合动手前使用。它会把门禁、PMM 上下文、目标文件、编辑边界和验证命令组合成 AI 可执行计划。
+- `plan_task_execution` / `plan-task-execution.js`：适合动手前使用。它会把门禁、PMM 上下文、目标文件、编辑边界和验证命令组合成 AI 可执行计划；显式 `knownFiles` 会优先进入目标文件并合并进上下文边界。
 - `prepare_task_context` / `prepare-task-context.js`：适合任务开始前使用，例如“修改 settings 页 AI 配置保存逻辑”。输出会给出任务理解、相关 feature、关键入口、关键文件、调用链、数据表影响、外部服务、建议编辑边界和验证命令。
 - `explain_feature_for_agent` / `explain-feature-for-agent.js`：适合进入某个功能前使用，例如 `featureKey=chat`、`settings`、`facebook-oauth`。输出是功能记忆卡片。
 - `analyze_change_impact` / `analyze-change-impact.js`：适合提交前或 review 前使用，输入 changed files 或 git diff，输出影响范围、风险等级、重点复核链路、推荐测试和是否需要重建 feature KB。
-- `validate_edit_scope` / `validate-edit-scope.js`：适合提交前使用。它会检查 changed files 是否落在 PMM 建议边界内，并指出越界文件、高风险文件或疑似漏改文件。
+- `validate_edit_scope` / `validate-edit-scope.js`：适合提交前使用。它会检查 changed files 是否落在 PMM 建议边界内，并指出越界文件、高风险文件或疑似漏改文件；显式 `knownFiles` 会合并进上下文边界，适合声明图谱外的根配置、CI workflow 和说明文档。
 - `review_patch_for_agent` / `review-patch-for-agent.js`：适合 AI 自检和 code review 前使用，返回 review verdict、findings 和检查清单。
 - `record_task_outcome` / `record-task-outcome.js`：适合完成任务后使用，把结果摘要、改动文件、验证命令和观察写进外置数据根目录。
 

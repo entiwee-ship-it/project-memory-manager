@@ -17,6 +17,7 @@
 - 更新真实 qy-server 集成断言，按稳定 Pinus RPC 路由和实现方法元数据校验链路，避免远程实现类名变化造成误报。
 
 ### 修复
+- `plan_task_execution` 和 `validate_edit_scope` 会把调用方明确传入的 `knownFiles` 合并进 PMM 上下文边界，避免 `package.json`、`.github` workflow、`README.md` 等已声明任务文件从计划中丢失或被误报为越界。
 - Agent 改动范围复核会把 `implementation-artifacts`、`tests` 等合同/规格/QA 辅助文件作为非阻塞图外文件记录，避免纯验证留痕触发 `scope_review_needed` 噪声。
 - 根目录 `CHANGELOG.md` 作为发布说明支撑文件时会进入 `informationalOutOfScopeFiles`，不再单独阻塞范围复核。
 - `analyze_change_impact` 风险等级不再把前端 `design-tokens` 文件误判为 auth token 高风险，并避免通过 `contains` / `depends_on` 宽边扩散到无关 API、Prisma 或外部服务链路。

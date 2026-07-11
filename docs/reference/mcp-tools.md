@@ -209,11 +209,15 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 {
   "workspaceRoot": "E:/xile-workspace/next-app",
   "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
-  "task": "修改 settings 页 AI 配置保存逻辑"
+  "task": "修改 settings 页 AI 配置保存逻辑",
+  "knownFiles": [
+    "app/settings/page.tsx"
+  ]
 }
 ```
 
 返回内容包括 `pmmGate`、`contextStatus`、`targetFiles`、`editBoundary`、步骤、验证命令、不确定点和证据。
+显式 `knownFiles` 会优先进入 `targetFiles`，并与 PMM 生成的 `editBoundary` 合并。
 
 ### `prepare_task_context`
 
@@ -267,6 +271,10 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
   "workspaceRoot": "E:/xile-workspace/next-app",
   "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
   "task": "修改 settings 页 AI 配置保存逻辑",
+  "knownFiles": [
+    "app/settings/page.tsx",
+    "app/api/ai/config/route.ts"
+  ],
   "changedFiles": [
     "app/settings/page.tsx",
     "app/api/ai/config/route.ts"
@@ -275,6 +283,8 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、执行计划�
 ```
 
 返回 `verdict`、越界文件、高风险文件、疑似漏改文件、影响摘要和必须跟进的复核项。
+
+`knownFiles` 表示任务开始前明确声明的编辑范围，会与 PMM 生成的上下文边界合并。根配置、CI workflow 或说明文档不在源码图谱中时，应显式传入 `knownFiles`；未声明的 changed files 仍会进入越界复核。
 
 ### `review_patch_for_agent`
 

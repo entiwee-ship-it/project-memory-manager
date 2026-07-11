@@ -120,6 +120,14 @@ function shouldRequireExpectedRuntimeFiles({ gate, changedFiles }) {
     return hasRuntimeCompletenessSignal(gate, changedFiles);
 }
 
+function mergeKnownFilesIntoBoundary(boundary = {}, knownFiles = []) {
+    return {
+        ...boundary,
+        primaryFiles: uniq([...knownFiles, ...(boundary.primaryFiles || [])]),
+        relatedRoots: boundary.relatedRoots || [],
+    };
+}
+
 function confidenceFromGate(decision, riskSignals = []) {
     if (decision === 'required' || riskSignals.length >= 2) {
         return 'high';
@@ -258,22 +266,25 @@ function runOptionalImpact(options = {}) {
 
 function planTaskExecution(options = {}) {
     const gate = decidePmmUsage(options);
+    const knownFiles = collectKnownFiles(options);
     const context = gate.deepPmmRequired
         ? runOptionalContext({ ...options, task: gate.task })
         : null;
-    const targetFiles = context && !context.unavailable
+    const contextTargetFiles = context && !context.unavailable
         ? context.criticalFiles.slice(0, 12)
         : gate.files.slice(0, 12);
+    const targetFiles = uniq([...knownFiles, ...contextTargetFiles]).slice(0, 12);
     const validationCommands = context && !context.unavailable
         ? context.validation.recommendedCommands || []
         : ['运行项目已有的最小相关测试或构建命令。'];
-    const editBoundary = context && !context.unavailable
+    const contextBoundary = context && !context.unavailable
         ? context.editBoundary
         : {
             primaryFiles: gate.files,
             relatedRoots: [],
             guidance: gate.skipConditions,
         };
+    const editBoundary = mergeKnownFilesIntoBoundary(contextBoundary, knownFiles);
 
     return {
         kind: 'agent-task-execution-plan',
@@ -334,9 +345,10 @@ function validateEditScope(options = {}) {
         ? runOptionalContext({ ...options, task: gate.task })
         : null;
     const impact = changedFiles.length ? runOptionalImpact(options) : null;
-    const boundary = context && !context.unavailable
+    const contextBoundary = context && !context.unavailable
         ? context.editBoundary
         : { primaryFiles: knownFiles.length ? knownFiles : gate.files, relatedRoots: [] };
+    const boundary = mergeKnownFilesIntoBoundary(contextBoundary, knownFiles);
     const boundaryOutOfScopeFiles = changedFiles.filter(file => !pathIsWithinBoundary(file, boundary));
     const informationalOutOfScopeFiles = boundaryOutOfScopeFiles.filter(isReviewSupportFile);
     const outOfScopeFiles = boundaryOutOfScopeFiles.filter(file => !isReviewSupportFile(file));

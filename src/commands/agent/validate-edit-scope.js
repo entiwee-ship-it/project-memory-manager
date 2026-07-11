@@ -6,7 +6,7 @@ const { hasTaskOrChangeInput, parseExecutionArgs, printJsonIfRequested } = requi
 function parseArgs(argv = []) {
     const args = parseExecutionArgs(argv);
     if (!hasTaskOrChangeInput(args)) {
-        throw new Error('用法: node src/bin/validate-edit-scope.js --workspace-root <project-root> --task <任务> --changed-file <path> [--json]');
+        throw new Error('用法: node src/bin/validate-edit-scope.js --workspace-root <project-root> --task <任务> [--known-file <path>] --changed-file <path> [--json]');
     }
     return args;
 }
