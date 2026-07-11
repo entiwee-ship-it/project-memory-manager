@@ -10,7 +10,7 @@
     "test:registry": "node tests/workspace-registry.test.js",
     "test:mcp": "node tests/mcp-server.test.js",
     "test:preflight": "node tests/agent-preflight.test.js",
-    "test:agent": "node tests/agent-task-intent.test.js && node tests/agent-context-pack.test.js && node tests/agent-execution-loop.test.js && node tests/agent-memory-recall.test.js && node tests/agent-preflight.test.js && node tests/agent-token-efficiency.test.js",
+    "test:agent": "node tests/agent-task-intent.test.js && node tests/agent-brief-readiness.test.js && node tests/agent-context-pack.test.js && node tests/agent-execution-loop.test.js && node tests/agent-memory-recall.test.js && node tests/agent-preflight.test.js && node tests/agent-token-efficiency.test.js",
     "test:token-roi": "node tests/agent-token-efficiency.test.js",
     "test:experience": "node tests/experience/pmm-experience-harness.test.js",
     "test:experience:baseline": "node tests/experience/pmm-experience-harness.test.js --write-baseline tests/experience/baselines/2026-07-11-current.json",
