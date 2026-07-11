@@ -8,6 +8,18 @@ node src/bin/validate-package.js .
 git diff --check
 ```
 
+`test:all` 包含 `test:experience:contracts`，用于在独立 PMM checkout 和 GitHub Actions 中校验 Experience fixture schema、评分合同和发布脚本边界，不依赖 qyProject 或外置 PMM 数据根。
+
+真实 Experience Value 发布门禁需要目标项目和已构建 KB，单独运行：
+
+```powershell
+$env:PMM_EXPERIENCE_WORKSPACE = 'E:/xile-workspace/qyProject'
+$env:PMM_EXPERIENCE_DATA_ROOT = 'E:/xile-workspace/codex-tools/project-memory-data'
+npm run test:experience
+```
+
+不要把 `test:experience:contracts` 通过描述成真实 12 任务语料通过；发布结论必须引用完整 `test:experience` 输出。
+
 `test:all` 会串行运行当前全部测试入口。GitHub Actions 在 `windows-latest` 和 Node.js 22 上执行同一组测试与包校验。
 
 按改动范围运行的测试：
@@ -19,6 +31,8 @@ npm run test:registry
 npm run test:mcp
 npm run test:agent
 npm run test:token-roi
+npm run test:experience:contracts
+npm run test:experience
 npm run test:feature
 npm run test:path
 npm run test:summary

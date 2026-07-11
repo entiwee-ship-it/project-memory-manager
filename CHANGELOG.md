@@ -23,6 +23,7 @@
 
 ### 测试
 - Experience Value 语料最终达到 Top-5 recall `0.9861`、Top-10 recall `1.0`、最大噪声 `0.1667`、计划可采用率 `1.0`、历史精度 `1.0`、工作流改善率 `0.75`，高风险核心漏项和恢复失败均为 `0`。
+- 新增 `test:experience:contracts` 可移植门禁并纳入 `test:all` / CI；完整 `test:experience` 保持为依赖目标项目与外置 KB 的本地发布门禁，避免 GitHub runner 因不存在 qyProject 而失败或误报真实体验已验证。
 
 ## [0.83.0] - 2026-07-11
 

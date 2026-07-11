@@ -6,8 +6,8 @@ const QY_ROOT = process.env.PMM_EXPERIENCE_WORKSPACE || 'E:/xile-workspace/qyPro
 const ALLOWED_INTENTS = new Set(['understand', 'implement', 'debug', 'resume', 'review', 'simple']);
 const ALLOWED_RISKS = new Set(['low', 'medium', 'high']);
 
-function resolveFixturePath(file) {
-    return path.isAbsolute(file) ? file : path.join(QY_ROOT, file);
+function resolveFixturePath(file, workspaceRoot = QY_ROOT) {
+    return path.isAbsolute(file) ? file : path.join(workspaceRoot, file);
 }
 
 function assertStringArray(value, field, fixtureId) {
@@ -16,8 +16,10 @@ function assertStringArray(value, field, fixtureId) {
     }
 }
 
-function validateExperienceFixture(fixture, fileName = '') {
+function validateExperienceFixture(fixture, fileName = '', options = {}) {
     const fixtureId = fixture?.id || fileName || 'unknown-fixture';
+    const checkPaths = options.checkPaths !== false;
+    const workspaceRoot = options.workspaceRoot || QY_ROOT;
     if (!fixture || typeof fixture !== 'object') {
         throw new Error(`${fixtureId} must be an object`);
     }
@@ -54,7 +56,7 @@ function validateExperienceFixture(fixture, fileName = '') {
         if (/[*?]|actual |found/i.test(file)) {
             throw new Error(`${fixtureId}.requiredFiles contains an unresolved path: ${file}`);
         }
-        if (!fs.existsSync(resolveFixturePath(file))) {
+        if (checkPaths && !fs.existsSync(resolveFixturePath(file, workspaceRoot))) {
             throw new Error(`${fixtureId}.requiredFiles path does not exist: ${file}`);
         }
     }
@@ -66,13 +68,13 @@ function validateExperienceFixture(fixture, fileName = '') {
     return fixture;
 }
 
-function loadExperienceFixtures() {
+function loadExperienceFixtures(options = {}) {
     return fs.readdirSync(FIXTURE_DIR)
         .filter(file => file.endsWith('.json'))
         .sort()
         .map(file => {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, file), 'utf8'));
-            return validateExperienceFixture(fixture, file);
+            return validateExperienceFixture(fixture, file, options);
         });
 }
 

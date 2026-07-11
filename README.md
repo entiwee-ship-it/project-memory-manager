@@ -89,7 +89,7 @@ PMM v0.80 起，AI 接到开发任务时先调用 `agent_preflight` 判断 PMM �
 - `simple` 任务只在 `decide_pmm_usage` 返回 `optional_skip_allowed` 且目标是少量明确 UI/prefab 源文件时跳过深度查询；仍要保留 `knownFiles`，并在提交前运行 `validate_edit_scope`。
 - `prepare_agent_brief.readiness !== "ready"` 时，不得把 `executionPlan` 当成可直接执行的计划。先处理 `missingEvidence`、`sourceConfirmation` 和 `nextAction`，直到当前证据足够。
 - `currentFacts` 来自 fresh KB，是当前代码证据；`historicalExperience` 来自历史 outcome，只能提供经验并可能过期；`projectRules` 是稳定约束，不能替代当前实现事实。
-- token 和耗时用于约束成本，不是首要成功标准。发布前以 `npm run test:experience` 验证真实任务的文件召回、噪声、计划可采用性、历史精度、恢复完整性和工作流改善。
+- token 和耗时用于约束成本，不是首要成功标准。发布前以 `npm run test:experience` 验证真实任务的文件召回、噪声、计划可采用性、历史精度、恢复完整性和工作流改善。独立 PMM 仓库的 `test:all` / CI 运行 `test:experience:contracts`，只校验可移植 fixture 与评分合同；完整 Experience 仍要求本机存在目标项目和外置 PMM 数据根。
 
 - `agent_preflight` / `agent-preflight.js`：适合开发任务开始前使用，先确认 MCP tool、数据根、KB freshness 和 skill 版本是否可用。MCP 默认紧凑；CLI `--json` 默认完整，`--compact` 输出紧凑。
 - `prepare_agent_brief` / `prepare-agent-brief.js`：适合 preflight ready 后使用，是任务级高层上下文入口。MCP 默认返回 `preflightSummary`，调试时传 `detail=full` 才返回完整 `preflight`。

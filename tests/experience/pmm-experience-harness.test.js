@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { loadExperienceFixtures } = require('./fixture-manifest');
+const { loadExperienceFixtures, validateExperienceFixture } = require('./fixture-manifest');
 const {
     aggregateExperienceResults,
     categorizeExperienceFailures,
@@ -75,8 +75,8 @@ function writeJson(filePath, value) {
     fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
-function testFixtureContracts() {
-    const fixtures = loadExperienceFixtures();
+function testFixtureContracts(options = {}) {
+    const fixtures = loadExperienceFixtures(options);
     assert.equal(fixtures.length, 12);
     assert.deepEqual(new Set(fixtures.map(item => item.intent)), new Set([
         'understand',
@@ -92,6 +92,30 @@ function testFixtureContracts() {
         assert.ok(Number.isInteger(fixture.directSourceBaseline.correctionRounds));
         assert.ok(Array.isArray(fixture.expectedMemory.taskFragments));
     }
+}
+
+function testPortableFixtureValidationDoesNotRequireQyProject() {
+    const fixture = {
+        id: 'portable-contract',
+        task: '验证可移植 Experience fixture 合同',
+        intent: 'understand',
+        risk: 'low',
+        knownFiles: [],
+        changedFiles: [],
+        requiredFiles: ['src/example.ts'],
+        acceptedFiles: [],
+        forbiddenDomains: [],
+        requiredEvidence: { methods: [], endpoints: [], requests: [], messages: [], tables: [] },
+        expectedValidation: [],
+        expectedMemory: { taskFragments: [] },
+        resumeExpectation: { completed: [], validation: [], remainingRisks: [], nextAction: '' },
+        directSourceBaseline: { searchRounds: [], readFiles: [], correctionRounds: 0 },
+    };
+
+    assert.doesNotThrow(() => validateExperienceFixture(fixture, 'portable-contract.json', {
+        checkPaths: false,
+        workspaceRoot: 'Z:/missing-qy-project',
+    }));
 }
 
 function testMemoryScoringContract() {
@@ -118,15 +142,21 @@ function testMemoryScoringContract() {
 }
 
 function main() {
-    testFixtureContracts();
+    const fixturesOnly = process.argv.includes('--fixtures-only');
+    const skipPathCheck = process.argv.includes('--skip-path-check');
+    testPortableFixtureValidationDoesNotRequireQyProject();
+    testFixtureContracts({
+        checkPaths: !skipPathCheck,
+        workspaceRoot: WORKSPACE_ROOT,
+    });
     testMemoryScoringContract();
-    if (process.argv.includes('--fixtures-only')) {
+    if (fixturesOnly) {
         console.log('PMM experience fixture contracts passed');
         return;
     }
 
     const before = gitSnapshots();
-    const fixtures = loadExperienceFixtures();
+    const fixtures = loadExperienceFixtures({ workspaceRoot: WORKSPACE_ROOT });
     const results = fixtures.map(runFixture);
     const summary = aggregateExperienceResults(results);
     const failures = categorizeExperienceFailures(results);

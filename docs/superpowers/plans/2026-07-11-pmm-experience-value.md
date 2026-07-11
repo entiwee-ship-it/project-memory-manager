@@ -839,4 +839,5 @@ PMM 已证明对真实代码开发有必要使用价值，但价值来自任务�
 - PMM 自身 project-global KB 重建成功，包含 117 个脚本和 1,159 个方法。
 - `review_patch_for_agent` 返回 `review_ready`。声明实施计划中的生产文件和发布文档为 `knownFiles` 后，没有运行代码越界项。
 - 唯一 medium scope warning 来自 4 个测试文件或 fixture 文件名包含 login/mall 等高风险词。它们只保存测试逻辑和评测真值，生产代码没有引用 `tests/experience`，已通过 `npm run test:all`、`npm run test:experience` 和隔离检查，手工判定为非运行态风险。
+- 首次 GitHub Actions 暴露出独立 PMM runner 不存在 qyProject 和外置 KB。修复后 `test:all` / CI 运行可移植的 `test:experience:contracts`，完整 `test:experience` 继续作为有目标项目环境的本地发布门禁；二者结果不会混用。
 - 所有硬门禁均达到。剩余风险是 Experience Corpus 当前固定为 12 个 qyProject 任务，后续新增技术栈或新业务域时需要扩充 fixture，不能把本次结果外推为所有项目永久有效。
