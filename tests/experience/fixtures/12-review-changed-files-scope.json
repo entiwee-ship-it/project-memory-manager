@@ -1,0 +1,26 @@
+{
+  "id": "review-changed-files-scope",
+  "task": "复核充值商品快照 changed files 是否越界或漏改",
+  "intent": "review",
+  "risk": "high",
+  "knownFiles": [],
+  "changedFiles": [
+    "qy-server/game-server/app/modules/commodity.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts",
+    "qy-server/game-server/app/payment/services/orderService.ts"
+  ],
+  "requiredFiles": [
+    "qy-server/game-server/app/modules/commodity.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts",
+    "qy-server/game-server/app/payment/services/orderService.ts",
+    "qy-server/game-server/schema.sql"
+  ],
+  "acceptedFiles": ["qy-server/game-server/app/http/routes/commodity.ts"],
+  "forbiddenDomains": ["xy-client/assets/script/game/common/gameApis/DressUpApi.ts", "mahjong", "captcha"],
+  "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": ["tb_recharge_ladder"]},
+  "expectedValidation": ["validate_edit_scope", "review_patch_for_agent", "mall-recharge-product-snapshot-contract.test.cjs", "npm run build:dev"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["changed files callers", "tb_recharge_ladder"], "readFiles": ["qy-server/game-server/app/modules/commodity.ts", "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts", "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts", "qy-server/game-server/app/payment/services/orderService.ts", "qy-server/game-server/schema.sql"], "correctionRounds": 0}
+}

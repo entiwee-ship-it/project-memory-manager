@@ -1,0 +1,26 @@
+{
+  "id": "mall-runtime-product-snapshot",
+  "task": "审查商城运行态配置和充值商品快照改动是否漏掉交易调用方或数据表",
+  "intent": "review",
+  "risk": "high",
+  "knownFiles": [],
+  "changedFiles": [
+    "qy-server/game-server/app/modules/commodity.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts",
+    "qy-server/game-server/app/payment/services/orderService.ts"
+  ],
+  "requiredFiles": [
+    "qy-server/game-server/app/modules/commodity.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts",
+    "qy-server/game-server/app/payment/services/orderService.ts",
+    "qy-server/game-server/schema.sql"
+  ],
+  "acceptedFiles": ["qy-server/game-server/app/http/routes/commodity.ts"],
+  "forbiddenDomains": ["mahjong", "captcha", "lobby/newLobby"],
+  "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": ["tb_recharge_ladder"]},
+  "expectedValidation": ["mall-recharge-product-snapshot-contract.test.cjs", "mall-runtime-config-contract.test.cjs", "npm run build:dev"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["mallRechargeProductSnapshot", "tb_recharge_ladder orderService commodity"], "readFiles": ["qy-server/game-server/app/modules/commodity.ts", "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts", "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts", "qy-server/game-server/app/payment/services/orderService.ts", "qy-server/game-server/schema.sql"], "correctionRounds": 0}
+}

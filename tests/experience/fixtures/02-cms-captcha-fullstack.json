@@ -1,0 +1,21 @@
+{
+  "id": "cms-captcha-fullstack",
+  "task": "排查后台登录验证码刷新链路",
+  "intent": "debug",
+  "risk": "high",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [
+    "cms-client/src/views/login/Login.vue",
+    "cms-client/src/utils/api/modules/authApi.js",
+    "cms-server/src/routes/system/authRoutes.ts",
+    "cms-server/src/controllers/system/authController.ts",
+    "cms-server/src/common/utils/captcha.ts"
+  ],
+  "acceptedFiles": [],
+  "forbiddenDomains": ["mahjong", "poker", "mall"],
+  "requiredEvidence": {"methods": ["getCaptcha"], "endpoints": ["GET /captcha"], "requests": ["GET /captcha"], "messages": [], "tables": []},
+  "expectedValidation": ["请求 cms-server captcha API", "通过 cms-client 代理访问 captcha API", "确认登录页可替换 captchaKey"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["captcha 验证码", "GET /captcha"], "readFiles": ["cms-client/src/views/login/Login.vue", "cms-client/src/utils/api/modules/authApi.js", "cms-server/src/routes/system/authRoutes.ts", "cms-server/src/controllers/system/authController.ts", "cms-server/src/common/utils/captcha.ts"], "correctionRounds": 0}
+}

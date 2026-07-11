@@ -1,0 +1,21 @@
+{
+  "id": "mall-recharge-three-sides",
+  "task": "解释商城充值配置在后台前端、后台后端和游戏服之间的一致性链路",
+  "intent": "understand",
+  "risk": "high",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [
+    "cms-client/src/views/mall/recharge/RechargeLadderList.vue",
+    "cms-server/src/models/mallManagement/rechargeLadderModel.ts",
+    "cms-server/src/common/schema/mall/rechargeLadderSchema.ts",
+    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/schema.sql"
+  ],
+  "acceptedFiles": ["cms-server/src/controllers/mallManagement/rechargeLadderController.ts"],
+  "forbiddenDomains": ["mahjong", "poker", "captcha"],
+  "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": ["tb_recharge_ladder"]},
+  "expectedValidation": ["运行商城充值配置三端 contract", "构建 cms-client/cms-server/qy-server"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["recharge ladder", "mallRuntimeConfig tb_recharge_ladder"], "readFiles": ["cms-client/src/views/mall/recharge/RechargeLadderList.vue", "cms-server/src/models/mallManagement/rechargeLadderModel.ts", "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts", "qy-server/game-server/schema.sql"], "correctionRounds": 1}
+}

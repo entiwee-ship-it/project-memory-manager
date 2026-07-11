@@ -1,0 +1,19 @@
+{
+  "id": "cms-error-message-chinese",
+  "task": "统一后台前后端错误提示中文化并检查调用方",
+  "intent": "implement",
+  "risk": "medium",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [
+    "cms-client/src/utils/ui/errorMessage.js",
+    "cms-server/src/utils/errorMessage.ts",
+    "cms-server/src/utils/requestErrorContext.ts"
+  ],
+  "acceptedFiles": ["qy-server/game-server/app/http/comm/error-handler.ts"],
+  "forbiddenDomains": ["mahjong", "poker", "prefab"],
+  "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": []},
+  "expectedValidation": ["运行 cms-client 错误提示 contract", "运行 cms-server 错误上下文 contract"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["errorMessage requestErrorContext"], "readFiles": ["cms-client/src/utils/ui/errorMessage.js", "cms-server/src/utils/errorMessage.ts", "cms-server/src/utils/requestErrorContext.ts"], "correctionRounds": 0}
+}

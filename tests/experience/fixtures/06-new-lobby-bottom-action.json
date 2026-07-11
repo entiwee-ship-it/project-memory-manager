@@ -1,0 +1,18 @@
+{
+  "id": "new-lobby-bottom-action",
+  "task": "调整新版大厅 BottomActionModule 节点结构并避免 prefab 引用损坏",
+  "intent": "implement",
+  "risk": "medium",
+  "knownFiles": ["xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"],
+  "changedFiles": ["xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"],
+  "requiredFiles": [
+    "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab",
+    "E:/xile-workspace/codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs"
+  ],
+  "acceptedFiles": ["xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts"],
+  "forbiddenDomains": ["cms-server", "mahjong", "payment"],
+  "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": []},
+  "expectedValidation": ["node E:/xile-workspace/codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs", "prefab integrity scan badRefs=0 parentErrors=0 cycles=0 unreachable=0"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["BottomActionModule"], "readFiles": ["xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab", "E:/xile-workspace/codex-work/tests/xy-client/lobbyViewEntryPrefabContract.test.cjs"], "correctionRounds": 0}
+}

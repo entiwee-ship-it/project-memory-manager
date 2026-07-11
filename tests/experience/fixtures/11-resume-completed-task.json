@@ -1,0 +1,20 @@
+{
+  "id": "resume-completed-task",
+  "task": "继续统一钻石充值交易商品快照来源任务",
+  "intent": "resume",
+  "risk": "high",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [],
+  "acceptedFiles": [],
+  "forbiddenDomains": ["mahjong", "captcha", "lobby/newLobby"],
+  "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": []},
+  "expectedValidation": [],
+  "resumeExpectation": {
+    "completed": ["完成 qy-server commit e61e81d6", "统一钻石充值创建订单、发放回调和金豆购买的商品快照来源"],
+    "validation": ["mall-recharge-product-snapshot-contract.test.cjs 通过 4/4", "mall-runtime-config-contract.test.cjs 通过 9/9", "npm run build:dev 通过"],
+    "remainingRisks": ["月卡 productId=17 仍使用数据库 fallback", "ProductInfo.typeOfExpenditure 与 schema.sql 历史类型不一致"],
+    "nextAction": "先确认 e61e81d6 和当前源码状态，再决定是否单独清理 typeOfExpenditure 类型债"
+  },
+  "directSourceBaseline": {"searchRounds": ["读取精确历史 outcome"], "readFiles": [], "correctionRounds": 0}
+}

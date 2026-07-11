@@ -1,0 +1,21 @@
+{
+  "id": "login-pinus-session",
+  "task": "解释 HTTP 登录完成后如何建立 Pinus 游戏会话",
+  "intent": "understand",
+  "risk": "high",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [
+    "xy-client/assets/script/game/initialize/view/LoadingViewComp.ts",
+    "xy-client/assets/script/game/account/view/LoginViewComp.ts",
+    "xy-client/assets/script/game/account/UserApi.ts",
+    "xy-client/assets/script/network/session/GameSessionMgr.ts",
+    "qy-server/game-server/app/servers/pkcon/handler/handler.ts"
+  ],
+  "acceptedFiles": ["qy-server/game-server/app/servers/pkcon/remote/Rpc.ts"],
+  "forbiddenDomains": ["mall", "activity", "poker"],
+  "requiredEvidence": {"methods": ["ensureLoggedIn", "doLogin"], "endpoints": [], "requests": [], "messages": [], "tables": []},
+  "expectedValidation": ["登录 HTTP 返回 token 后确认 Pinus 会话绑定参数", "确认断线重连不会重复身份认证"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["authToken doLogin ensureLoggedIn", "pkcon handler"], "readFiles": ["xy-client/assets/script/game/account/UserApi.ts", "xy-client/assets/script/network/session/GameSessionMgr.ts", "qy-server/game-server/app/servers/pkcon/handler/handler.ts"], "correctionRounds": 1}
+}

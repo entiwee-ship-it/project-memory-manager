@@ -1,0 +1,21 @@
+{
+  "id": "new-lobby-enter-animation",
+  "task": "排查新版大厅入场动画首帧闪现",
+  "intent": "debug",
+  "risk": "medium",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [
+    "xy-client/assets/script/game/common/ui/UINodeAnimation.ts",
+    "xy-client/assets/script/game/lobby/LobbyView.ts",
+    "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts",
+    "xy-client/assets/script/game/common/config/GameUIConfig.ts",
+    "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"
+  ],
+  "acceptedFiles": [],
+  "forbiddenDomains": ["cms-server", "mall", "mahjong"],
+  "requiredEvidence": {"methods": ["playEnterAnimations"], "endpoints": [], "requests": [], "messages": [], "tables": []},
+  "expectedValidation": ["验证首帧前移动节点保持透明", "验证缓存界面 onEnable 可重新触发入场"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["playEnterAnimations 首帧 闪现", "NewLobbyView GameUIConfig"], "readFiles": ["xy-client/assets/script/game/common/ui/UINodeAnimation.ts", "xy-client/assets/script/game/lobby/LobbyView.ts", "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts", "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"], "correctionRounds": 1}
+}

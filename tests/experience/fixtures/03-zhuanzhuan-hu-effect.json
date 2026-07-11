@@ -1,0 +1,19 @@
+{
+  "id": "zhuanzhuan-hu-effect",
+  "task": "解释转转麻将胡牌特效从消息到显示的调用链",
+  "intent": "understand",
+  "risk": "medium",
+  "knownFiles": [],
+  "changedFiles": [],
+  "requiredFiles": [
+    "xy-client/assets/script/game/majiang/common/base/MaJiangBaseView.ts",
+    "xy-client/assets/script/game/majiang/common/component/EffectAniComp.ts",
+    "xy-client/assets/script/game/majiang/zhuanzhuan/ZhuanZhuanMJViewComp.ts"
+  ],
+  "acceptedFiles": [],
+  "forbiddenDomains": ["poker", "cms-server", "mall"],
+  "requiredEvidence": {"methods": ["onMJHu", "showHuPaiFanXingEffect", "getSpecialHuEffectType"], "endpoints": [], "requests": [], "messages": ["MJHu"], "tables": []},
+  "expectedValidation": ["运行转转麻将胡牌特效外置 contract test"],
+  "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
+  "directSourceBaseline": {"searchRounds": ["onMJHu MJHu", "showHuPaiFanXingEffect getSpecialHuEffectType"], "readFiles": ["xy-client/assets/script/game/majiang/common/base/MaJiangBaseView.ts", "xy-client/assets/script/game/majiang/common/component/EffectAniComp.ts", "xy-client/assets/script/game/majiang/zhuanzhuan/ZhuanZhuanMJViewComp.ts"], "correctionRounds": 0}
+}
