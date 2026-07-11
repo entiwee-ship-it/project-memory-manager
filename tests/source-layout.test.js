@@ -94,6 +94,9 @@ function testReleaseQualityGate() {
 
     assert.equal(exists('.github/workflows/ci.yml'), true, 'missing GitHub Actions CI workflow');
     const workflow = readText('.github/workflows/ci.yml');
+    for (const action of ['actions/checkout@v7', 'actions/setup-node@v6']) {
+        assert.equal(workflow.includes(action), true, `CI workflow must use: ${action}`);
+    }
     for (const command of [
         'npm ci',
         'npm run test:all',

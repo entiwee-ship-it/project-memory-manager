@@ -10,6 +10,7 @@
 ### 改进
 - 新增统一的 `npm run test:all` 完整回归入口，避免发布前人工逐条执行测试时漏掉 `registry`、`agent` 等测试组。
 - 新增 Windows GitHub Actions CI，在 `main` 推送和 Pull Request 上自动执行依赖安装、完整测试、包校验和 `git diff --check`。
+- CI 使用 Node.js 24 runtime 的 `actions/checkout@v7` 和 `actions/setup-node@v6`，避免 GitHub Actions 的 Node.js 20 弃用告警。
 
 ### 测试
 - 扩展源码布局测试，锁定统一测试入口和 CI 必须执行的发布质量门禁命令。
