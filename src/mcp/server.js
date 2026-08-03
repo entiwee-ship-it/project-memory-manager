@@ -25,6 +25,7 @@ const {
     reviewPatchForAgent,
     validateEditScope,
 } = require('../agent/execution-loop');
+const { prepareCocosEditBrief } = require('../agent/cocos-edit-brief');
 const {
     prepareAgentBrief,
     recallTaskMemory,
@@ -371,6 +372,36 @@ const TOOL_DEFINITIONS = [
                 limit: { type: 'number' },
                 freshnessPolicy: { type: 'string', enum: Array.from(FRESHNESS_POLICIES) },
             },
+        },
+    },
+    {
+        name: 'prepare_cocos_edit_brief',
+        description: 'Prepare a compact, read-only Cocos Prefab/scene editing brief from a live target asset plus safely labelled PMM base-KB context; never writes Creator serialized files or auto-rebuilds the whole KB.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                workspaceRoot: { type: 'string', description: 'Cocos Creator project root containing the target assets/ directory.' },
+                dataRoot: { type: 'string' },
+                task: { type: 'string' },
+                query: { type: 'string' },
+                prefab: { type: 'string' },
+                feature: { type: 'string' },
+                featureKey: { type: 'string' },
+                nodeQueries: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                knownFiles: {
+                    type: 'array',
+                    items: { type: 'string' },
+                },
+                detail: { type: 'string', enum: ['compact', 'full'] },
+            },
+            required: ['workspaceRoot', 'prefab'],
+            anyOf: [
+                { required: ['task'] },
+                { required: ['query'] },
+            ],
         },
     },
     {
@@ -1660,6 +1691,53 @@ function planTaskExecutionTool(args) {
     return runExecutionLoopTool(args, 'plan_task_execution', planTaskExecution);
 }
 
+function prepareCocosEditBriefTool(args) {
+    if (!hasWorkspaceRoot(args)) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_WORKSPACE_ROOT',
+            message: 'prepare_cocos_edit_brief 需要 workspaceRoot。',
+        });
+    }
+    if (!String(args.task || args.query || '').trim()) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_TASK',
+            message: 'prepare_cocos_edit_brief 需要 task 或 query。',
+        });
+    }
+    if (!String(args.prefab || '').trim()) {
+        return textResult({
+            ok: false,
+            error: 'MISSING_COCOS_ASSET',
+            message: 'prepare_cocos_edit_brief 需要 prefab。',
+        });
+    }
+    try {
+        const payload = prepareCocosEditBrief({
+            ...args,
+            layout: 'external-data',
+        });
+        return textResult({
+            ...payload,
+            _mcpQuery: {
+                tool: 'prepare_cocos_edit_brief',
+                detail: args.detail === 'full' ? 'full' : 'compact',
+                strategy: 'target-prefab-live-overlay',
+                autoRebuild: false,
+            },
+        });
+    } catch (error) {
+        return textResult({
+            ok: false,
+            error: error?.code || 'COCOS_EDIT_BRIEF_FAILED',
+            message: error instanceof Error ? error.message : String(error),
+            candidates: error?.candidates || [],
+            directFileWriteAllowed: false,
+        });
+    }
+}
+
 function validateEditScopeTool(args) {
     return runExecutionLoopTool(args, 'validate_edit_scope', validateEditScope);
 }
@@ -2112,6 +2190,8 @@ async function handleMcpRequest(request) {
                                                                                         ? decidePmmUsageTool(args)
                                                                                         : name === 'plan_task_execution'
                                                                                             ? planTaskExecutionTool(args)
+                                                                                            : name === 'prepare_cocos_edit_brief'
+                                                                                                ? prepareCocosEditBriefTool(args)
                                                                                             : name === 'validate_edit_scope'
                                                                                                 ? validateEditScopeTool(args)
                                                                                                 : name === 'review_patch_for_agent'

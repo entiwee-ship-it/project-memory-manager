@@ -37,21 +37,22 @@ MCP 可用时，不要先读生成的 JSON 文件，也不要直接大范围 `rg
 6. `diagnose_workspace`：单个项目状态缺失、路径不确定或 KB 疑似过期时先诊断。
 7. `register_workspace`：新项目、新电脑首次接入、或需要刷新 workspace registry 时登记当前项目；`init_workspace` 和 `detect_topology` 也会自动刷新登记。
 8. `init_workspace` + `detect_topology`：新项目或新电脑首次接入时初始化外置记忆。
-9. `prepare_agent_brief`：接到开发任务且 preflight ready 后优先使用，聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。默认读取 `preflightSummary`，不要要求完整 `preflight`；调试时才传 `detail=full`。
-10. `decide_pmm_usage`：只需要判断是否必须深度 PMM 时使用。
-11. `plan_task_execution`：需要单独生成执行计划时使用，输出 PMM gate、目标文件、编辑边界、步骤、验证命令和证据。
-12. `recall_task_memory`：需要单独召回历史任务 outcome、相关文件、验证命令和观察时使用。
-13. `prepare_task_context`：需要更细任务上下文时使用，输出 AI 可直接行动的上下文包。可直接传中文业务任务；任务词模型会提取 CJK 片段并扩展常用业务别名。
-14. `explain_feature_for_agent`：已经知道 feature key 时使用，输出功能记忆卡片。
-15. `analyze_change_impact`：改完或 review 前使用，按 changed files / diff 判断影响面和验证建议。
-16. `validate_edit_scope`：提交前使用，复核 changed files 是否越过 PMM 建议边界、是否含高风险文件、是否疑似漏改关键文件。
-17. `review_patch_for_agent`：AI 自检或 code review 前使用，生成 verdict、findings 和复核清单。
-18. `record_task_outcome`：任务结束后记录结果、改动文件、验证命令和观察，供后续会话参考。
-19. `update_project_playbook`：阶段性沉淀稳定项目规则，或从 task/outcome/changedFiles 中推断项目惯例。
-20. `summarize_project_memory`：跨会话接力或复盘时查看当前项目已沉淀的记忆。
-21. `query_project_chain` / `query_feature_chain`：需要进一步追某条 selector 链路时使用；默认 `freshnessPolicy=auto_rebuild`，工具会在 KB 过期、缺失或未知时同步重建并等待 `fresh` 后再返回结果。MCP 默认返回 compact 节点/边，排查完整 meta 时才传 `detail=full`。
-22. `build_project_index` / `build_feature_index`：只在需要手动维护、预热或排查构建问题时直接调用。手动预热 project-global 时优先用 `start_build_project_index` 并传 `wait:true`。
-23. `discover_features` + `build_feature_index`：需要功能级链路、入口拆分或多模块边界时生成功能 KB。
+9. `prepare_agent_brief`：接到普通开发任务且 preflight ready 后优先使用，聚合 Usage Gate、执行计划、历史任务记忆、项目 playbook、推荐文件和验证命令。默认读取 `preflightSummary`，不要要求完整 `preflight`；调试时才传 `detail=full`。
+10. `prepare_cocos_edit_brief`：任务涉及 `.prefab` / `.scene` 查看或编辑时使用；`workspaceRoot` 必须是包含目标 `assets/` 的 Creator 工程根。先看 `readiness`、`queryViewStatus`、`mappingReadiness`，不可信时重建 KB，需要现场解析时转 Creator MCP；它本身绝不直接写 Creator 资源。
+11. `decide_pmm_usage`：只需要判断是否必须深度 PMM 时使用。Cocos 轻量门禁必须显式提供 Creator 工程 `workspaceRoot`。
+12. `plan_task_execution`：需要单独生成执行计划时使用，输出 PMM gate、目标文件、编辑边界、步骤、验证命令和证据。
+13. `recall_task_memory`：需要单独召回历史任务 outcome、相关文件、验证命令和观察时使用。
+14. `prepare_task_context`：需要更细任务上下文时使用，输出 AI 可直接行动的上下文包。可直接传中文业务任务；任务词模型会提取 CJK 片段并扩展常用业务别名。
+15. `explain_feature_for_agent`：已经知道 feature key 时使用，输出功能记忆卡片。
+16. `analyze_change_impact`：改完或 review 前使用，按 changed files / diff 判断影响面和验证建议。
+17. `validate_edit_scope`：提交前使用，复核 changed files 是否越过 PMM 建议边界、是否含高风险文件、是否疑似漏改关键文件。
+18. `review_patch_for_agent`：AI 自检或 code review 前使用，生成 verdict、findings 和复核清单。
+19. `record_task_outcome`：任务结束后记录结果、改动文件、验证命令和观察，供后续会话参考。
+20. `update_project_playbook`：阶段性沉淀稳定项目规则，或从 task/outcome/changedFiles 中推断项目惯例。
+21. `summarize_project_memory`：跨会话接力或复盘时查看当前项目已沉淀的记忆。
+22. `query_project_chain` / `query_feature_chain`：需要进一步追某条 selector 链路时使用；默认 `freshnessPolicy=auto_rebuild`，工具会在 KB 过期、缺失或未知时同步重建并等待 `fresh` 后再返回结果。MCP 默认返回 compact 节点/边，排查完整 meta 时才传 `detail=full`。
+23. `build_project_index` / `build_feature_index`：只在需要手动维护、预热或排查构建问题时直接调用。手动预热 project-global 时优先用 `start_build_project_index` 并传 `wait:true`。
+24. `discover_features` + `build_feature_index`：需要功能级链路、入口拆分或多模块边界时生成功能 KB。
 
 CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` 命令。
 
@@ -70,6 +71,7 @@ CLI 只作为兜底或维护入口。MCP 不可用时再使用 `src/bin/*.js` �
 ## 常用查询配方
 
 - 自然语言开发任务：先用 `agent_preflight`，ready 后再用 `prepare_agent_brief`，例如 task=`修改 settings 页 AI 配置保存逻辑`。
+- Cocos Prefab/Scene 任务：用 Creator 工程根调用 `prepare_cocos_edit_brief`；它只读资源并给出 Creator MCP 写入与 Preview 验证步骤。
 - 只看历史经验：用 `recall_task_memory`，例如 task=`修复 Facebook OAuth token 保存逻辑`。
 - 看项目已记住什么：用 `summarize_project_memory`。
 - 沉淀项目规则：用 `update_project_playbook`，例如 rule=`涉及 Facebook OAuth 时必须同时复核 authorize、callback、status route 和 token 加密边界`。

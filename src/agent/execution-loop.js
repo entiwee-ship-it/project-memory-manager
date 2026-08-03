@@ -4,8 +4,12 @@ const { analyzeChangeImpact, parseChangedFiles, prepareTaskContext } = require('
 const { ensureDir } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 
-const UI_FILE_PATTERN = /\.(vue|tsx|jsx|css|scss|less|html)$/i;
-const SOURCE_FILE_PATTERN = /\.(ts|tsx|js|jsx|vue|css|scss|less|html|prisma)$/i;
+const WEB_UI_FILE_PATTERN = /\.(vue|tsx|jsx|css|scss|less|html)$/i;
+const SOURCE_FILE_PATTERN = /\.(ts|tsx|js|jsx|vue|css|scss|less|html|prisma|prefab|scene)$/i;
+const COCOS_ASSET_PATTERN = /\.(prefab|scene)$/i;
+const COCOS_PREFAB_PATTERN = /\.prefab$/i;
+const COCOS_TASK_PATTERN = /\bcocos\b|creator|assetdb|预制体|prefab|creator\s*bridge/i;
+const COCOS_SCRIPT_PATH_PATTERN = /(?:^|\/)assets\/scripts?(?:\/|$)/i;
 const BROAD_ROOTS = new Set(['app', 'src', 'lib', 'components', 'server', 'cms-client', 'cms-server', 'frontend', 'backend']);
 const REVIEW_SUPPORT_TASK_PATTERN = /qa|合同|规格|spec|contract|文档|docs|documentation|checklist|核查|hash|证据|evidence|artifact|报告|留痕/i;
 
@@ -77,12 +81,43 @@ function fileRoots(files = []) {
     return uniq(files.map(file => normalizeText(file).split('/').filter(Boolean)[0] || '').filter(Boolean));
 }
 
-function classifyFiles(files = []) {
+function creatorScopedFileKind(file = '', workspaceRoot = '') {
+    const raw = String(file || '').trim();
+    if (!raw || !String(workspaceRoot || '').trim()) {
+        return '';
+    }
+    const creatorRoot = path.resolve(workspaceRoot);
+    const assetsRoot = path.join(creatorRoot, 'assets');
+    const resolvedFile = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(creatorRoot, raw);
+    const relative = path.relative(assetsRoot, resolvedFile);
+    if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        return '';
+    }
+    if (COCOS_PREFAB_PATTERN.test(resolvedFile)) {
+        return 'prefab';
+    }
+    const relativePosix = toPosix(relative);
+    if (/^scripts?\/.*\.[cm]?[jt]sx?$/i.test(relativePosix)) {
+        return 'script';
+    }
+    return '';
+}
+
+function classifyFiles(files = [], workspaceRoot = '', task = '') {
     const roots = fileRoots(files);
     const sourceFiles = files.filter(file => SOURCE_FILE_PATTERN.test(file));
-    const uiFiles = files.filter(file => UI_FILE_PATTERN.test(file));
+    const uiFiles = files.filter(file => WEB_UI_FILE_PATTERN.test(file) || COCOS_PREFAB_PATTERN.test(file));
     const apiFiles = files.filter(file => /(?:^|\/)app\/api\/|route\.(ts|js)$|(?:^|\/)api\//i.test(file));
     const dataFiles = files.filter(file => /(?:^|\/)prisma\/|schema\.prisma|(?:^|\/)db\//i.test(file));
+    const cocosAssets = files.filter(file => COCOS_ASSET_PATTERN.test(file));
+    const cocosScopedKinds = files.map(file => creatorScopedFileKind(file, workspaceRoot));
+    const hasCocosInput = COCOS_TASK_PATTERN.test(String(task || ''))
+        || cocosAssets.length > 0
+        || files.some(file => COCOS_SCRIPT_PATH_PATTERN.test(normalizeText(file)));
+    const isScopedCocosUi = Boolean(String(workspaceRoot || '').trim())
+        && cocosScopedKinds.includes('prefab')
+        && sourceFiles.length === files.length
+        && cocosScopedKinds.every(kind => kind === 'prefab' || kind === 'script');
     const broadRootCount = roots.filter(root => BROAD_ROOTS.has(root)).length;
     return {
         roots,
@@ -90,7 +125,11 @@ function classifyFiles(files = []) {
         uiFiles,
         apiFiles,
         dataFiles,
-        allUiSource: sourceFiles.length > 0 && sourceFiles.every(file => UI_FILE_PATTERN.test(file)),
+        allUiSource: files.length > 0 && sourceFiles.length === files.length && (
+            (!hasCocosInput && sourceFiles.every(file => WEB_UI_FILE_PATTERN.test(file)))
+            || isScopedCocosUi
+        ),
+        cocosAssets,
         crossRoot: roots.length > 1 && broadRootCount > 1,
     };
 }
@@ -173,7 +212,7 @@ function buildGateEvidence({ task, files, riskSignals, decision, fileInfo }) {
 function decidePmmUsage(options = {}) {
     const task = String(options.task || options.query || '').trim();
     const files = collectInputFiles(options);
-    const fileInfo = classifyFiles(files);
+    const fileInfo = classifyFiles(files, options.workspaceRoot, task);
     const riskSignals = matchSignals(task, files);
     const hasDiff = Boolean(String(options.diff || options.diffFile || '').trim());
     const hasChangedFiles = files.length > 0 || hasDiff;
@@ -195,7 +234,7 @@ function decidePmmUsage(options = {}) {
         reasons.push('未提供任务或文件范围，需要先用 PMM 定位项目上下文。');
     } else if (isSmallScopedUi) {
         decision = 'optional_skip_allowed';
-        reasons.push('输入是少量明确 UI 源文件，允许跳过深度链路查询，但必须留下 PMM 使用门禁证据。');
+        reasons.push('输入是少量明确 UI/Cocos 资源文件，允许跳过深度链路查询，但必须留下 PMM 使用门禁证据。');
         skipConditions.push('只修改列出的 UI 文件。');
         skipConditions.push('不新增 API、数据表、auth、外部服务或跨模块调用。');
         skipConditions.push('提交前至少运行 validate_edit_scope 或等价 changed files 复核。');

@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-const { run: runCocosAuthoring } = require('./cocos-authoring');
+const {
+    assertLegacyDirectCocosApplyEnabled,
+    run: runCocosAuthoring,
+} = require('./cocos-authoring');
 
 function translateArgs(argv = []) {
     const translated = [];
@@ -79,6 +82,9 @@ function translateArgs(argv = []) {
 }
 
 function run(argv = process.argv.slice(2)) {
+    if (argv.includes('--apply')) {
+        assertLegacyDirectCocosApplyEnabled();
+    }
     return runCocosAuthoring(translateArgs(argv));
 }
 

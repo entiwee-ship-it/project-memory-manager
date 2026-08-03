@@ -182,7 +182,7 @@ node src/bin/cocos-authoring.js --feature <key> --prefab <name> --intent field-b
 - `--feature <key>`: 功能键
 - `--prefab <name>`: Prefab 名称
 - `--intent <type>`: profile | click-event | field-binding
-- `--apply`: 实际应用更改（默认只输出规划）
+- `--apply`: 仅用于兼容旧流程；默认拒绝直接修改 Creator 序列化资源。日常写入必须走 Cocos Creator Bridge/MCP；只有显式设置 `PMM_ENABLE_LEGACY_DIRECT_COCOS_APPLY=1` 才会启用旧直写实现
 - `--json`: JSON 输出
 
 ---

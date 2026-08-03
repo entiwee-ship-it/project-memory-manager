@@ -216,6 +216,98 @@ function testReviewSupportFilesDoNotForceScopeReview(fixture) {
     assertIncludes(result.informationalOutOfScopeFiles, 'CHANGELOG.md');
 }
 
+function testSmallCocosUiGate() {
+    const creatorRoot = path.resolve('CocosProject');
+    for (const scriptFile of [
+        'assets/script/game/game_entry/friends_room/FriendsRoomViewComp.ts',
+        'assets/script/game/game_entry/friends_room/FriendsRoomViewComp.tsx',
+        'assets/script/game/game_entry/friends_room/FriendsRoomViewComp.jsx',
+    ]) {
+        const result = decidePmmUsage({
+            workspaceRoot: creatorRoot,
+            task: '调整亲友房预制体布局和脚本绑定',
+            knownFiles: [
+                'assets/bundle/gui/game_entry/friends_room/FriendsRoomView.prefab',
+                scriptFile,
+            ],
+        });
+        assert.equal(result.kind, 'agent-pmm-usage-decision');
+        assert.equal(result.decision, 'optional_skip_allowed', `同工程 Prefab + 脚本应允许轻量门禁: ${scriptFile}`);
+        assert.equal(result.pmmRequired, false);
+        assert.equal(result.deepPmmRequired, false);
+        assert.equal(result.recommendedTool, 'validate_edit_scope');
+    }
+}
+
+function testSmallCocosUiGateRejectsUnsafeCompanions() {
+    const creatorRoot = path.resolve('CocosProject');
+    const otherCreatorRoot = path.resolve('OtherCocosProject');
+    const unsafeFileSets = [
+        [
+            'assets/bundle/gui/game_entry/friends_room/FriendsRoomView.prefab',
+            'assets/bundle/gui/game_entry/friends_room/FriendsRoomView.prefab.meta',
+        ],
+        [
+            'assets/bundle/gui/game_entry/friends_room/FriendsRoomView.prefab',
+            'package.json',
+        ],
+        ['assets/scenes/Main.scene'],
+        ['assets/script/game/game_entry/friends_room/FriendsRoomViewComp.ts'],
+        ['assets/script/game/game_entry/friends_room/FriendsRoomViewComp.tsx'],
+        ['assets/script/game/game_entry/friends_room/FriendsRoomViewComp.jsx'],
+        ['assets/script/game/game_entry/friends_room/FriendsRoomViewComp.vue'],
+        ['assets/styles/friends-room.css'],
+        [path.join(otherCreatorRoot, 'assets', 'script', 'FriendsRoomViewComp.tsx')],
+        ['../OtherCocosProject/assets/script/FriendsRoomViewComp.tsx'],
+        [
+            'xy-client/assets/bundle/gui/FriendsRoomView.prefab',
+            'other-client/assets/script/FriendsRoomViewComp.ts',
+        ],
+        [
+            'assets/bundle/gui/game_entry/friends_room/FriendsRoomView.prefab',
+            path.join(otherCreatorRoot, 'assets', 'script', 'FriendsRoomViewComp.tsx'),
+        ],
+        [
+            'prefabs/FriendsRoomView.prefab',
+            'assets/script/FriendsRoomViewComp.ts',
+        ],
+        [
+            'assets/ui/../../outside/FriendsRoomView.prefab',
+            'assets/script/FriendsRoomViewComp.ts',
+        ],
+    ];
+    for (const knownFiles of unsafeFileSets) {
+        const result = decidePmmUsage({
+            workspaceRoot: creatorRoot,
+            task: '调整 Cocos 界面',
+            knownFiles,
+        });
+        assert.notEqual(
+            result.decision,
+            'optional_skip_allowed',
+            `不安全或不完整的 Cocos 文件范围不能跳过深度 PMM: ${knownFiles.join(', ')}`
+        );
+        assert.equal(result.deepPmmRequired, true);
+    }
+}
+
+function testSmallCocosUiGateAcceptsMixedPathsOnlyWithCreatorRoot() {
+    const creatorRoot = path.resolve('CocosProject');
+    const prefabPath = path.join(creatorRoot, 'assets', 'ui', 'FriendsRoomView.prefab');
+    const knownFiles = [prefabPath, 'assets/script/FriendsRoomViewComp.ts'];
+
+    assert.notEqual(
+        decidePmmUsage({ task: '调整 Cocos 界面', knownFiles }).decision,
+        'optional_skip_allowed',
+        '绝对与相对路径混用但未声明 Creator root 时不能证明同工程'
+    );
+    assert.equal(decidePmmUsage({
+        workspaceRoot: creatorRoot,
+        task: '调整 Cocos 界面',
+        knownFiles,
+    }).decision, 'optional_skip_allowed');
+}
+
 function testDeclaredFilesExtendContextBoundary(fixture) {
     const declaredFiles = [
         'package.json',
@@ -372,6 +464,9 @@ async function testMcpTools(fixture) {
 
 (async () => {
     testSmallUiGate();
+    testSmallCocosUiGate();
+    testSmallCocosUiGateRejectsUnsafeCompanions();
+    testSmallCocosUiGateAcceptsMixedPathsOnlyWithCreatorRoot();
     testSettingsGateRequiresPmm();
     testOptionalUiValidation();
     testOptionalUiOutOfScopeValidation();

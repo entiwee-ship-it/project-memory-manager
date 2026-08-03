@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { normalize, readJson } = require('../../shared/common');
 const { createAuthoringError, findAssetCandidates } = require('./cocos-authoring');
+const { assertLegacyDirectCocosApplyEnabled } = require('./legacy-direct-apply-policy');
 
 function detectEol(text) {
     return text.includes('\r\n') ? '\r\n' : '\n';
@@ -423,6 +424,7 @@ function insertMethodStub(scriptPath, componentName, handlerName) {
 }
 
 function applyClickEventChange({ artifacts, plan, sourceNodePath, targetNodePath, componentName, handlerName }) {
+    assertLegacyDirectCocosApplyEnabled();
     const scriptMetaCatalog = buildScriptMetaCatalog(artifacts.scan);
     const assetUuidToPath = buildAssetUuidPathMap(artifacts.graph);
     const scriptRecord = scriptMetaCatalog.byComponentName.get(componentName);
@@ -503,6 +505,7 @@ function resolveTargetComponent(doc, componentName, query = '') {
 }
 
 function applyFieldBindingChange({ artifacts, plan, componentNodePath, componentName, fieldName, targetNode, targetComponent, targetAsset }) {
+    assertLegacyDirectCocosApplyEnabled();
     const scriptMetaCatalog = buildScriptMetaCatalog(artifacts.scan);
     const assetCatalog = buildAssetCatalog(artifacts.graph);
     const assetUuidToPath = buildAssetUuidPathMap(artifacts.graph);

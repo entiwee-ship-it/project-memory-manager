@@ -68,6 +68,7 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 - `recall_task_memory`：按任务召回历史 outcome、相关文件、验证命令、观察和 playbook 规则。
 - `agent_preflight`：AI 开发任务开始前的 PMM 自检入口，返回 health、findings、repairPlan 和 nextAction。
 - `prepare_agent_brief`：任务开始前聚合 usage gate、执行计划、历史记忆、playbook、推荐文件和验证命令。
+- `prepare_cocos_edit_brief`：以 Creator 工程根为 `workspaceRoot`，实时只读解析目标 Prefab/Scene，并把 PMM KB 新鲜度、组件映射、嵌套 Prefab 限制、Creator 写入步骤和 Preview 验证压缩成一份 brief；它绝不直接写 `.prefab/.scene/.meta`。
 - `summarize_project_memory`：汇总当前项目已沉淀的任务记录和规则。
 - `update_project_playbook`：把稳定项目规则写入外置 PMM playbook，或从任务结果中确定性推断规则。
 - `prepare_task_context`：输入自然语言任务，返回 AI 可直接使用的上下文包。

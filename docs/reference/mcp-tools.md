@@ -29,6 +29,7 @@
 - `recall_task_memory`
 - `agent_preflight`
 - `prepare_agent_brief`
+- `prepare_cocos_edit_brief`
 - `summarize_project_memory`
 - `update_project_playbook`
 - `prepare_task_context`
@@ -148,6 +149,31 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、任务意图�
 - `projectRules`：项目 playbook 中的稳定约束，用于指导执行和 review，不用于证明当前代码行为。
 
 默认 `detail=compact` 时返回 `preflightSummary`，不会嵌入完整 `preflight`。传 `detail=full` 时返回完整 `preflight`、完整 `memory` 和完整 MCP freshness 元数据，适合调试 PMM 自身问题。
+
+### `prepare_cocos_edit_brief`
+
+面向 Cocos Creator 3.8.x 的实时只读编辑上下文入口。`workspaceRoot` 必须是包含目标 `assets/` 的 Creator 工程根，不是其上级多项目目录。工具读取当前磁盘上的 Prefab/Scene，合并经过新鲜度门禁的 project-global KB 脚本映射和历史记录，但不会修改 Creator 序列化资源，也不会自动重建整个 KB。
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/qyProject/xy-client",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "调整新版亲友房左侧列表",
+  "prefab": "FriendsRoomView",
+  "nodeQueries": ["GameScrollView", "Content"],
+  "knownFiles": ["assets/script/game/game_entry/friends_room/FriendsRoomViewComp.ts"],
+  "detail": "compact"
+}
+```
+
+关键合同：
+
+- `livePrefab`、`target.sha256` 和 `target.assetUrl` 来自实时只读解析；`baseKb` 只提供明确标注来源的映射与新鲜度。
+- `readiness="blocked"` 或 `queryViewStatus="base_untrusted"/"overlay_unsafe"` 时，不能把旧 KB 映射当成当前事实；先按 `baseKb.freshness.recommendedAction` 重建。
+- fresh KB 也必须同时带有与当前 PMM 一致的构建版本；缺少任一版本戳时会阻断，而不是因源码快照未变化就默认可信。
+- 少量 stale overlay 只接受 1 至 8 个既有 `.prefab/.scene/.ts/.tsx/.js/.jsx` 文件变化；新增、删除、`.meta`、版本漂移或截断变化样本都会拒绝。
+- 遇到未知组件、变化中的组件脚本或嵌套 Prefab 实例时，`mappingReadiness="creator_resolution_required"`。离线节点查询不会把嵌套实例内部的未命中误报为不存在，而会返回 `creator_resolution_required`。
+- `creatorWorkflow.directFileWriteAllowed` 永远为 `false`。实际写入必须通过 Cocos Creator Bridge/MCP，并以逐项回读 verification 和 Preview 作为验证证据；真机验收仍由用户负责。
 
 ### `recall_task_memory`
 

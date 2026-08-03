@@ -13,9 +13,13 @@ const {
     planClickEvent,
     planFieldBinding,
 } = require('../../extraction/cocos/cocos-authoring');
-const { applyClickEventChange, applyFieldBindingChange } = require('../../extraction/cocos/cocos-authoring-apply');
 const { run: buildChainKb } = require('../../graph/build-chain-kb');
 const { run: buildCocosAuthoringProfile } = require('./build-cocos-authoring-profile');
+const {
+    LEGACY_DIRECT_APPLY_ENV,
+    assertLegacyDirectCocosApplyEnabled,
+    legacyDirectCocosApplyEnabled,
+} = require('../../extraction/cocos/legacy-direct-apply-policy');
 
 function parseArgs(argv) {
     const args = {
@@ -422,6 +426,8 @@ function runIntent(args, artifacts, featureProfile) {
 }
 
 function applyIntent(args, root, artifacts, result) {
+    assertLegacyDirectCocosApplyEnabled();
+    const { applyClickEventChange, applyFieldBindingChange } = require('../../extraction/cocos/cocos-authoring-apply');
     if (args.intent === 'click-event') {
         return applyClickEventChange({
             artifacts,
@@ -449,6 +455,9 @@ function applyIntent(args, root, artifacts, result) {
 
 function run(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
+    if (args.apply) {
+        assertLegacyDirectCocosApplyEnabled();
+    }
     const root = resolveProjectRoot(args.root || process.cwd());
     
     // 验证 root 是否有效
@@ -502,6 +511,9 @@ function run(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
+    LEGACY_DIRECT_APPLY_ENV,
+    assertLegacyDirectCocosApplyEnabled,
+    legacyDirectCocosApplyEnabled,
     parseArgs,
     run,
 };

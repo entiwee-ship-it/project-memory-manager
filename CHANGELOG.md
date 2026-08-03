@@ -7,16 +7,23 @@
 
 ## [未发布]
 
+## [0.84.0] - 2026-08-03
+
 ### 新增
+- 新增 `prepare_cocos_edit_brief`，用实时只读 Prefab/Scene 解析叠加明确标注新鲜度的 PMM 上下文，并输出 Creator Bridge/MCP 写入与 Preview 验证步骤。
 - 新增 `npm run test:experience` 真实开发体验发布门禁，以 12 个已完成 qyProject 任务持续评估文件召回、跨域噪声、计划可采用性、历史召回精度、恢复完整性和工作流改善。
 - `prepare_agent_brief` 新增任务意图、readiness、证据覆盖、缺失证据和 source confirmation 合同，并把 `currentFacts`、`historicalExperience`、`projectRules` 分层返回。
 
 ### 改进
+- Cocos 小范围 Usage Gate 只对白名单内且可证明属于同一 Creator 工程的 Prefab 与脚本开放，拒绝 `.meta`、配置文件、单独 Scene、跨工程路径和 `assets/` 外 Prefab；资源名称查找不再被前 200 个候选截断。
 - Context Pack 按任务意图组织推荐结果：已知文件和 changed files 进入种子，精确业务别名优先匹配节点身份，推荐列表在截断前按文件去重，并为数据任务发现邻近 schema。
 - 中文任务词补充验证码、登录会话、转转麻将、新版大厅、游戏配置、错误提示、商城充值和商品快照等稳定业务语义，同时过滤后台、检查、调用方、配置等弱片段噪声。
 - review 任务优先保留 changed files 及其图邻居，simple 任务保持轻量 Usage Gate，resume 任务输出已完成项、验证、剩余风险和当前源码确认动作。
 
 ### 修复
+- PMM legacy Cocos `--apply` 默认拒绝，并在底层写 API 再次执行环境门禁，避免内部调用绕过 Creator 唯一写入边界。
+- Cocos live brief 即使源码快照为 fresh，也要求 KB 构建版本与当前 PMM 版本均存在且一致；嵌套 Prefab 内未展开节点会明确要求 Creator 现场解析，不再误报为不存在。
+- Cocos live brief 将不可信或已变化的脚本映射隔离在 `baseKb`，`livePrefab` 只保留实时序列化事实并标注映射来源；显式目标也必须位于 Creator 工程的 `assets/` 内。
 - 历史任务召回不再允许 `cms-client`、`cms-server`、`Login.vue` 等 scope/file alias 单独证明任务相关性；非 resume 任务需要 task/outcome 核心语义或显式文件精确命中。
 - 阻止通过 project-global module 的 `contains` 边扩散到全仓，降低 Context Pack 中与任务无关的跨域文件噪声。
 - 修复“接入并复核”“统一错误提示并检查调用方”等实现任务被误判为 review 的问题，并保持 debug、review、resume、simple 的既有优先级。

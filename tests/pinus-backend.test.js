@@ -17,8 +17,15 @@ const { run: queryChainKb } = require('../src/query/query-chain');
 const { run: queryKb } = require('../src/commands/query/query-feature');
 const { run: queryProjectKb } = require('../src/commands/query/query-project');
 const { run: buildCocosAuthoringProfile } = require('../src/commands/cocos/build-cocos-authoring-profile');
-const { run: cocosAuthoring } = require('../src/commands/cocos/cocos-authoring');
+const {
+    LEGACY_DIRECT_APPLY_ENV,
+    run: cocosAuthoring,
+} = require('../src/commands/cocos/cocos-authoring');
 const { run: planCocosBinding } = require('../src/commands/cocos/plan-cocos-binding');
+const {
+    applyClickEventChange,
+    applyFieldBindingChange,
+} = require('../src/extraction/cocos/cocos-authoring-apply');
 const { run: rebuildKbs } = require('../src/commands/lifecycle/rebuild-kbs');
 const { run: refreshMemoryIndexes } = require('../src/lifecycle/refresh-memory-indexes');
 const { detectInstallContext, loadSkillVersion, run: showSkillVersion } = require('../src/maintenance/show-version');
@@ -50,6 +57,21 @@ function runWithCapturedOutput(fn, args, cwd) {
         console.log = originalLog;
         console.warn = originalWarn;
         process.chdir(originalCwd);
+    }
+}
+
+function withLegacyCocosApplyEnabled(fn) {
+    const existed = Object.prototype.hasOwnProperty.call(process.env, LEGACY_DIRECT_APPLY_ENV);
+    const previous = process.env[LEGACY_DIRECT_APPLY_ENV];
+    process.env[LEGACY_DIRECT_APPLY_ENV] = '1';
+    try {
+        return fn();
+    } finally {
+        if (existed) {
+            process.env[LEGACY_DIRECT_APPLY_ENV] = previous;
+        } else {
+            delete process.env[LEGACY_DIRECT_APPLY_ENV];
+        }
     }
 }
 
@@ -110,7 +132,8 @@ function runVersionAssertions() {
     assert.ok(Array.isArray(versionInfo.capabilities) && versionInfo.capabilities.length > 0);
     assert.ok(versionInfo.capabilities.includes('cocos-prefab-binding-kb'));
     assert.ok(versionInfo.capabilities.includes('cocos-authoring-plan'));
-    assert.ok(versionInfo.capabilities.includes('cocos-authoring-apply'));
+    assert.ok(versionInfo.capabilities.includes('cocos-authoring-legacy-apply-opt-in'));
+    assert.ok(versionInfo.capabilities.includes('cocos-live-edit-brief'));
     assert.equal(versionInfo.upgradePolicy, 'edit-source-repo-only');
     assert.ok(String(versionInfo.rebuildCommand || '').includes('src/bin/rebuild-kbs.js'));
     assert.ok(String(versionInfo.rebuildCommand || '').includes('--workspace-root'));
@@ -1010,8 +1033,49 @@ function runCocosAuthoringAssertions() {
     );
     assert.equal(aliasProfile.kind, 'cocos-authoring-profile');
 
+    const guardedPrefabPath = path.join(tempRoot, 'assets', 'ui', 'prefabs', 'SamplePanel.prefab');
+    const guardedPrefabBefore = fs.readFileSync(guardedPrefabPath);
+    assert.throws(
+        () => applyClickEventChange({}),
+        error => error?.code === 'LEGACY_DIRECT_COCOS_APPLY_DISABLED'
+    );
+    assert.throws(
+        () => applyFieldBindingChange({}),
+        error => error?.code === 'LEGACY_DIRECT_COCOS_APPLY_DISABLED'
+    );
+    assert.throws(() => runWithCapturedOutput(
+        cocosAuthoring,
+        [
+            '--feature', 'cocos-prefab-sample',
+            '--prefab', 'SamplePanel',
+            '--intent', 'click-event',
+            '--source-node', 'RootPanel/CardSlot',
+            '--target-component', 'ExtraBinder',
+            '--handler', 'onClickSecondary',
+            '--apply',
+            '--json',
+        ],
+        nestedCwd
+    ), error => error?.code === 'LEGACY_DIRECT_COCOS_APPLY_DISABLED');
+    assert.deepEqual(fs.readFileSync(guardedPrefabPath), guardedPrefabBefore);
+    assert.throws(() => runWithCapturedOutput(
+        planCocosBinding,
+        [
+            '--feature', 'cocos-prefab-sample',
+            '--prefab', 'SamplePanel',
+            '--node', 'RootPanel',
+            '--component', 'SampleView',
+            '--field', 'slotNode',
+            '--target-node', 'RootPanel/CardSlot',
+            '--apply',
+            '--json',
+        ],
+        nestedCwd
+    ), error => error?.code === 'LEGACY_DIRECT_COCOS_APPLY_DISABLED');
+    assert.deepEqual(fs.readFileSync(guardedPrefabPath), guardedPrefabBefore);
+
     const clickApply = parseTraversal(
-        runWithCapturedOutput(
+        withLegacyCocosApplyEnabled(() => runWithCapturedOutput(
             cocosAuthoring,
             [
                 '--feature', 'cocos-prefab-sample',
@@ -1024,7 +1088,7 @@ function runCocosAuthoringAssertions() {
                 '--json',
             ],
             nestedCwd
-        )
+        ))
     );
     assert.ok(Array.isArray(clickApply.applyResult?.changes) && clickApply.applyResult.changes.length >= 3);
     const updatedPrefab = readJson(path.join(tempRoot, 'assets', 'ui', 'prefabs', 'SamplePanel.prefab'));
@@ -1034,7 +1098,7 @@ function runCocosAuthoringAssertions() {
     assert.ok(updatedBinder.includes('public onClickSecondary()'));
 
     const nodeFieldApply = parseTraversal(
-        runWithCapturedOutput(
+        withLegacyCocosApplyEnabled(() => runWithCapturedOutput(
             cocosAuthoring,
             [
                 '--feature', 'cocos-prefab-sample',
@@ -1048,12 +1112,12 @@ function runCocosAuthoringAssertions() {
                 '--json',
             ],
             nestedCwd
-        )
+        ))
     );
     assert.ok(nodeFieldApply.applyResult.changes.some(item => item.action === 'bind-field'));
 
     const assetFieldApply = parseTraversal(
-        runWithCapturedOutput(
+        withLegacyCocosApplyEnabled(() => runWithCapturedOutput(
             cocosAuthoring,
             [
                 '--feature', 'cocos-prefab-sample',
@@ -1067,12 +1131,12 @@ function runCocosAuthoringAssertions() {
                 '--json',
             ],
             nestedCwd
-        )
+        ))
     );
     assert.ok(assetFieldApply.applyResult.changes.some(item => item.action === 'bind-field'));
 
     const nestedFieldApply = parseTraversal(
-        runWithCapturedOutput(
+        withLegacyCocosApplyEnabled(() => runWithCapturedOutput(
             cocosAuthoring,
             [
                 '--feature', 'cocos-prefab-sample',
@@ -1086,7 +1150,7 @@ function runCocosAuthoringAssertions() {
                 '--json',
             ],
             nestedCwd
-        )
+        ))
     );
     assert.ok(nestedFieldApply.applyResult.changes.some(item => item.action === 'bind-field-override'));
     const finalPrefab = readJson(path.join(tempRoot, 'assets', 'ui', 'prefabs', 'SamplePanel.prefab'));
