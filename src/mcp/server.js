@@ -398,10 +398,6 @@ const TOOL_DEFINITIONS = [
                 detail: { type: 'string', enum: ['compact', 'full'] },
             },
             required: ['workspaceRoot', 'prefab'],
-            anyOf: [
-                { required: ['task'] },
-                { required: ['query'] },
-            ],
         },
     },
     {

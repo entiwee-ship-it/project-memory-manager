@@ -338,14 +338,30 @@ async function testMcpTool() {
     const tool = list.result.tools.find(item => item.name === 'prepare_cocos_edit_brief');
     assert.ok(tool);
     assert.deepEqual(tool.inputSchema.required, ['workspaceRoot', 'prefab']);
-    assert.deepEqual(tool.inputSchema.anyOf, [
-        { required: ['task'] },
-        { required: ['query'] },
-    ]);
+    assert.equal(Object.hasOwn(tool.inputSchema, 'anyOf'), false);
+    assert.ok(tool.inputSchema.properties.task);
+    assert.ok(tool.inputSchema.properties.query);
+
+    const missingTaskResponse = await handleMcpRequest({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: {
+            name: 'prepare_cocos_edit_brief',
+            arguments: {
+                workspaceRoot,
+                prefab: 'SamplePanel',
+            },
+        },
+    });
+    const missingTask = parseTextResult(missingTaskResponse);
+    assert.equal(missingTask.ok, false);
+    assert.equal(missingTask.error, 'MISSING_TASK');
+    assert.equal(missingTask.message, 'prepare_cocos_edit_brief 需要 task 或 query。');
 
     const response = await handleMcpRequest({
         jsonrpc: '2.0',
-        id: 2,
+        id: 3,
         method: 'tools/call',
         params: {
             name: 'prepare_cocos_edit_brief',
