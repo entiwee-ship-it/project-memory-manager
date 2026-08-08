@@ -52,6 +52,22 @@ function validateExperienceFixture(fixture, fileName = '', options = {}) {
     if (fixture.intent !== 'resume' && fixture.requiredFiles.length === 0) {
         throw new Error(`${fixtureId}.requiredFiles must not be empty`);
     }
+    if (!fixture.resumeExpectation || typeof fixture.resumeExpectation !== 'object') {
+        throw new Error(`${fixtureId}.resumeExpectation must be an object`);
+    }
+    const migrationCandidates = fixture.resumeExpectation.migrationCandidates || [];
+    if (!Array.isArray(migrationCandidates)) {
+        throw new Error(`${fixtureId}.resumeExpectation.migrationCandidates must be an array`);
+    }
+    for (const migration of migrationCandidates) {
+        if (!migration || typeof migration.historicalFile !== 'string' || !migration.historicalFile.trim()
+            || typeof migration.currentCandidate !== 'string' || !migration.currentCandidate.trim()) {
+            throw new Error(`${fixtureId}.resumeExpectation.migrationCandidates contains an invalid mapping`);
+        }
+        if (checkPaths && !fs.existsSync(resolveFixturePath(migration.currentCandidate, workspaceRoot))) {
+            throw new Error(`${fixtureId}.resumeExpectation current candidate does not exist: ${migration.currentCandidate}`);
+        }
+    }
     for (const file of fixture.requiredFiles) {
         if (/[*?]|actual |found/i.test(file)) {
             throw new Error(`${fixtureId}.requiredFiles contains an unresolved path: ${file}`);

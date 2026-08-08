@@ -40,19 +40,23 @@ function truncateText(value, maxLength = 240) {
     return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
-function truncateStrings(value, maxLength = 240) {
+function preserveCompactString(path = []) {
+    return /^pathMigrationCandidates\.\d+\.(historicalFile|currentCandidate)$/.test(path.join('.'));
+}
+
+function truncateStrings(value, maxLength = 240, path = []) {
     if (typeof value === 'string') {
-        return truncateText(value, maxLength);
+        return preserveCompactString(path) ? value : truncateText(value, maxLength);
     }
     if (Array.isArray(value)) {
-        return value.map(item => truncateStrings(item, maxLength));
+        return value.map((item, index) => truncateStrings(item, maxLength, [...path, String(index)]));
     }
     if (!value || typeof value !== 'object') {
         return value;
     }
     const result = {};
     for (const [key, item] of Object.entries(value)) {
-        result[key] = truncateStrings(item, maxLength);
+        result[key] = truncateStrings(item, maxLength, [...path, key]);
     }
     return result;
 }
@@ -78,7 +82,7 @@ function shrinkPriority(path = '') {
     if (/^(historicalExperience|projectRules|memory)(\.|$)/.test(path)) {
         return -2;
     }
-    if (/^(missingEvidence|sourceConfirmation)(\.|$)/.test(path)) {
+    if (/^(missingEvidence|sourceConfirmation|pathMigrationCandidates)(\.|$)/.test(path)) {
         return 4;
     }
     if (/^currentFacts(\.|$)/.test(path)) {
@@ -106,10 +110,11 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
         budgetChars: budget,
     };
     let truncated = false;
+    let omittedPathMigrationCandidates = 0;
     let attempts = 0;
     while (serializedLength(result) > targetBudget && attempts < 500) {
         const arrays = collectShrinkableArrays(result)
-            .filter(entry => entry.items.length > 1)
+            .filter(entry => entry.items.length > 1 && entry.path !== 'pathMigrationCandidates')
             .sort((left, right) => shrinkPriority(left.path) - shrinkPriority(right.path)
                 || serializedLength(right.items) - serializedLength(left.items));
         if (!arrays.length) {
@@ -127,12 +132,20 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
         result = truncateStrings(result, 64);
         truncated = true;
     }
+    while (serializedLength(result) > targetBudget && asArray(result.pathMigrationCandidates).length > 0) {
+        result.pathMigrationCandidates.pop();
+        omittedPathMigrationCandidates += 1;
+        truncated = true;
+    }
     result._output = {
         ...(result._output || {}),
         detail: DETAIL_COMPACT,
         budgetChars: budget,
         truncated,
     };
+    if (omittedPathMigrationCandidates > 0) {
+        result._output.omittedPathMigrationCandidates = omittedPathMigrationCandidates;
+    }
     return result;
 }
 
@@ -644,11 +657,50 @@ function compactSourceConfirmation(items = [], dataRoot = '', workspaceRoot = ''
         if (item?.files) {
             result.files = filterSourceFiles(item.files, dataRoot, workspaceRoot).slice(0, 8);
         }
+        if (item?.staleFiles) {
+            result.staleFiles = filterSourceFiles(item.staleFiles, dataRoot, workspaceRoot).slice(0, 8);
+        }
         if (item?.recommendedSelector) {
             result.recommendedSelector = cloneJson(item.recommendedSelector);
         }
         return result;
     });
+}
+
+function compactPathMigrationCandidates(items = [], dataRoot = '', workspaceRoot = '') {
+    return asArray(items).map(item => {
+        const historicalFile = isSourceCandidate(item?.historicalFile, dataRoot, workspaceRoot)
+            ? item.historicalFile
+            : '';
+        if (!historicalFile) {
+            return null;
+        }
+        const currentCandidate = isSourceCandidate(item?.currentCandidate, dataRoot, workspaceRoot)
+            ? item.currentCandidate
+            : '';
+        const result = {
+            historicalFile,
+            currentCandidate,
+            confidence: item?.confidence || 'low',
+            status: item?.status || 'not-found',
+            confirmationRequired: item?.confirmationRequired !== false,
+            equivalenceProven: Boolean(item?.equivalenceProven),
+        };
+        if (item?.ambiguous || !currentCandidate) {
+            result.score = item?.score ?? 0;
+            result.reason = item?.reason || '';
+        }
+        if (item?.ambiguous) {
+            result.ambiguous = true;
+            result.alternatives = asArray(item?.alternatives).slice(0, 2).map(alternative => ({
+                currentCandidate: isSourceCandidate(alternative?.currentCandidate, dataRoot, workspaceRoot)
+                    ? alternative.currentCandidate
+                    : '',
+                score: alternative?.score ?? 0,
+            })).filter(alternative => alternative.currentCandidate);
+        }
+        return result;
+    }).filter(Boolean).slice(0, 8);
 }
 
 function compactFactNode(node = {}, dataRoot = '', workspaceRoot = '') {
@@ -890,12 +942,20 @@ function compactAgentBrief(brief = {}) {
     const readiness = brief.readiness || '';
     const blocked = readiness === 'blocked';
     const currentFacts = compactCurrentFacts(brief.currentFacts || {}, dataRoot, workspaceRoot);
+    const pathMigrationCandidates = compactPathMigrationCandidates(brief.pathMigrationCandidates, dataRoot, workspaceRoot);
+    const hasPathMigrationCandidates = pathMigrationCandidates.length > 0;
     const historicalExperience = compactHistoricalExperience(brief.historicalExperience || {
         recalledTasks: memory.recalledTasks,
         relatedFiles: memory.relatedFiles,
         validationCommands: memory.validationCommands,
         observations: memory.observations,
     }, dataRoot, workspaceRoot);
+    if (hasPathMigrationCandidates && historicalExperience.resume) {
+        historicalExperience.recalledTasks = [];
+        historicalExperience.relatedFiles = [];
+        historicalExperience.validationCommands = [];
+        historicalExperience.observations = [];
+    }
     const projectRules = compactProjectRules(brief.projectRules || {
         relevantRules: memory.relevantRules,
     }, dataRoot, workspaceRoot);
@@ -913,7 +973,7 @@ function compactAgentBrief(brief = {}) {
     if (preflightSummary.repairPlan.length) {
         compactPreflight.repairPlan = preflightSummary.repairPlan;
     }
-    if (preflightSummary.nextAction) {
+    if (preflightSummary.nextAction && !hasPathMigrationCandidates) {
         compactPreflight.nextAction = preflightSummary.nextAction;
     }
     const compactGate = {
@@ -924,7 +984,7 @@ function compactAgentBrief(brief = {}) {
     if (brief.pmmGate?.recommendedTool) {
         compactGate.recommendedTool = brief.pmmGate.recommendedTool;
     }
-    if (asArray(brief.pmmGate?.reasons).length) {
+    if (!hasPathMigrationCandidates && asArray(brief.pmmGate?.reasons).length) {
         compactGate.reasons = asArray(brief.pmmGate?.reasons).slice(0, 3);
     }
     if (asArray(brief.pmmGate?.riskSignals).length) {
@@ -946,23 +1006,45 @@ function compactAgentBrief(brief = {}) {
             recalledTasks: [],
             relevantRules: [],
         };
-    return {
-        kind: brief.kind || 'agent-brief',
-        workspaceRoot,
-        dataRoot,
-        task: brief.task || '',
-        intent: compactIntent(brief.intent || {}),
-        readiness,
-        confidence: brief.confidence || 'unknown',
-        coverage: compactCoverage(brief.coverage || {}),
-        missingEvidence: compactMissingEvidence(brief.missingEvidence),
-        sourceConfirmation: compactSourceConfirmation(brief.sourceConfirmation, dataRoot, workspaceRoot),
-        currentFacts,
-        historicalExperience,
-        projectRules,
-        preflightSummary: compactPreflight,
-        pmmGate: compactGate,
-        executionPlan: {
+    const projectedCurrentFacts = hasPathMigrationCandidates
+        ? { criticalFiles: currentFacts.criticalFiles || [] }
+        : currentFacts;
+    const projectedHistoricalExperience = hasPathMigrationCandidates
+        ? { resume: historicalExperience.resume }
+        : (blocked
+            ? {
+                resume: historicalExperience.resume ? {
+                    status: historicalExperience.resume.status,
+                    nextAction: historicalExperience.resume.nextAction,
+                } : null,
+            }
+            : historicalExperience);
+    const projectedPreflight = hasPathMigrationCandidates
+        ? {
+            kind: compactPreflight.kind,
+            status: compactPreflight.status,
+            health: { score: compactPreflight.health.score },
+        }
+        : compactPreflight;
+    const projectedGate = hasPathMigrationCandidates
+        ? {
+            decision: compactGate.decision,
+            pmmRequired: compactGate.pmmRequired,
+            deepPmmRequired: compactGate.deepPmmRequired,
+        }
+        : compactGate;
+    const projectedExecutionPlan = hasPathMigrationCandidates
+        ? {
+            contextStatus: executionPlan.contextStatus,
+            targetFiles: blocked ? [] : executionPlan.targetFiles.slice(0, 8),
+            editBoundary: {
+                primaryFiles: blocked ? [] : executionPlan.editBoundary.primaryFiles.slice(0, 8),
+            },
+            validation: {
+                recommendedCommands: executionPlan.validation.recommendedCommands.slice(0, 5),
+            },
+        }
+        : {
             ...executionPlan,
             targetFiles: blocked ? [] : executionPlan.targetFiles.slice(0, 8),
             editBoundary: {
@@ -978,7 +1060,25 @@ function compactAgentBrief(brief = {}) {
                 recommendedCommands: executionPlan.validation.recommendedCommands.slice(0, 5),
             },
             uncertainties: readiness === 'ready' ? executionPlan.uncertainties.slice(0, 4) : [],
-        },
+        };
+    return {
+        kind: brief.kind || 'agent-brief',
+        workspaceRoot,
+        dataRoot,
+        task: brief.task || '',
+        intent: compactIntent(brief.intent || {}),
+        readiness,
+        confidence: brief.confidence || 'unknown',
+        coverage: compactCoverage(brief.coverage || {}),
+        missingEvidence: compactMissingEvidence(brief.missingEvidence),
+        sourceConfirmation: compactSourceConfirmation(brief.sourceConfirmation, dataRoot, workspaceRoot),
+        currentFacts: projectedCurrentFacts,
+        historicalExperience: projectedHistoricalExperience,
+        ...(hasPathMigrationCandidates || blocked ? {} : { projectRules }),
+        pathMigrationCandidates,
+        preflightSummary: projectedPreflight,
+        pmmGate: projectedGate,
+        executionPlan: projectedExecutionPlan,
         ...(brief.historicalExperience || brief.projectRules ? {} : { memory: compactBriefMemory }),
         recommendedFiles: blocked ? [] : filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 10),
         _output: {

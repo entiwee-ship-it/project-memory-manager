@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-08T06:43:04.337Z",
+  "generatedAt": "2026-08-08T07:50:29.389Z",
   "workspaceRoot": "E:/xile-workspace/qyProject",
   "results": [
     {
@@ -44,9 +44,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 90013,
-        "estimatedTokens": 22504,
-        "elapsedMs": 7533
+        "chars": 90042,
+        "estimatedTokens": 22511,
+        "elapsedMs": 8069
       }
     },
     {
@@ -91,9 +91,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 68464,
-        "estimatedTokens": 17116,
-        "elapsedMs": 6221
+        "chars": 68493,
+        "estimatedTokens": 17124,
+        "elapsedMs": 6660
       }
     },
     {
@@ -136,9 +136,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 72581,
-        "estimatedTokens": 18146,
-        "elapsedMs": 8157
+        "chars": 72610,
+        "estimatedTokens": 18153,
+        "elapsedMs": 8542
       }
     },
     {
@@ -183,9 +183,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 103959,
-        "estimatedTokens": 25990,
-        "elapsedMs": 7908
+        "chars": 103988,
+        "estimatedTokens": 25997,
+        "elapsedMs": 8387
       }
     },
     {
@@ -229,9 +229,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 106934,
-        "estimatedTokens": 26734,
-        "elapsedMs": 6551
+        "chars": 106955,
+        "estimatedTokens": 26739,
+        "elapsedMs": 6726
       }
     },
     {
@@ -273,9 +273,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 88063,
-        "estimatedTokens": 22016,
-        "elapsedMs": 5615
+        "chars": 88161,
+        "estimatedTokens": 22041,
+        "elapsedMs": 5714
       }
     },
     {
@@ -321,9 +321,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 110421,
-        "estimatedTokens": 27606,
-        "elapsedMs": 7080
+        "chars": 110450,
+        "estimatedTokens": 27613,
+        "elapsedMs": 7424
       }
     },
     {
@@ -366,9 +366,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 92137,
-        "estimatedTokens": 23035,
-        "elapsedMs": 5373
+        "chars": 92166,
+        "estimatedTokens": 23042,
+        "elapsedMs": 5476
       }
     },
     {
@@ -413,9 +413,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 115356,
-        "estimatedTokens": 28839,
-        "elapsedMs": 8483
+        "chars": 115385,
+        "estimatedTokens": 28847,
+        "elapsedMs": 8802
       }
     },
     {
@@ -463,9 +463,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 258701,
-        "estimatedTokens": 64676,
-        "elapsedMs": 41333
+        "chars": 258730,
+        "estimatedTokens": 64683,
+        "elapsedMs": 42787
       }
     },
     {
@@ -506,12 +506,15 @@
         "statusComplete": true,
         "validationComplete": true,
         "riskComplete": true,
+        "migrationCandidatesComplete": true,
+        "migrationCandidatesUnconfirmed": true,
+        "migrationCandidatesIsolated": true,
         "nextActionCorrect": true
       },
       "cost": {
-        "chars": 25647,
-        "estimatedTokens": 6412,
-        "elapsedMs": 1089
+        "chars": 30227,
+        "estimatedTokens": 7557,
+        "elapsedMs": 1460
       }
     },
     {
@@ -559,9 +562,9 @@
       },
       "resumeMetrics": null,
       "cost": {
-        "chars": 256695,
-        "estimatedTokens": 64174,
-        "elapsedMs": 32291
+        "chars": 256724,
+        "estimatedTokens": 64181,
+        "elapsedMs": 33772
       }
     }
   ],

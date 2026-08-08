@@ -20,6 +20,12 @@
     "completed": ["完成并提交 qy-server commit e61e81d6", "让钻石充值创建订单、钻石发放回调、金豆购买优先使用运行期商城配置"],
     "validation": ["mall-recharge-product-snapshot-contract.test.cjs 通过 4/4", "mall-runtime-config-contract.test.cjs 通过 9/9", "npm run build:dev 通过"],
     "remainingRisks": ["月卡 productId=17 仍走 tb_recharge_ladder DB fallback", "typeOfExpenditure 在 schema.sql 中是 varchar(10)"],
+    "migrationCandidates": [
+      {"historicalFile": "qy-server/game-server/app/modules/commodity.ts", "currentCandidate": "qy-server/game-server/app/application/modules/commodity.ts"},
+      {"historicalFile": "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts", "currentCandidate": "qy-server/game-server/app/application/modules/mallConfig/mallRuntimeConfig.ts"},
+      {"historicalFile": "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts", "currentCandidate": "qy-server/game-server/app/application/modules/mallConfig/mallRechargeProductSnapshot.ts"},
+      {"historicalFile": "qy-server/game-server/app/payment/services/orderService.ts", "currentCandidate": "qy-server/game-server/app/application/payment/services/orderService.ts"}
+    ],
     "nextAction": "先确认 e61e81d6 和当前源码状态，再处理剩余风险"
   },
   "directSourceBaseline": {"searchRounds": ["读取精确历史 outcome"], "readFiles": [], "correctionRounds": 0}

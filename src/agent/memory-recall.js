@@ -7,6 +7,7 @@ const { classifyTaskIntent } = require('./task-intent');
 const { ensureDir, readJsonSafe, writeJsonAtomic } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 const { parseTaskTerms, termValues } = require('./task-terms');
+const { resolvePathMigrationCandidates } = require('./path-migration');
 
 const DEFAULT_RECALL_LIMIT = 3;
 const DEFAULT_SCAN_LIMIT = 200;
@@ -704,7 +705,8 @@ function currentWorkspaceFile(workspaceRoot, file) {
     }
 }
 
-function resumeExecutionPlan(historicalExperience, workspaceRoot) {
+function resumeExecutionPlan(historicalExperience, options = {}) {
+    const { workspaceRoot, dataRoot, freshnessStatus } = options;
     const resume = historicalExperience.resume;
     const historicalFiles = (historicalExperience.relatedFiles || []).map(item => item.value).filter(Boolean);
     const resolvedFiles = historicalFiles.map(file => ({
@@ -715,6 +717,22 @@ function resumeExecutionPlan(historicalExperience, workspaceRoot) {
     const staleFiles = resolvedFiles.filter(item => !item.currentFile).map(item => item.historicalFile);
     const staleFileNote = staleFiles.length > 0
         ? `历史 outcome 中有 ${staleFiles.length} 个文件在当前 workspace 不存在或已迁移：${staleFiles.join(', ')}`
+        : '';
+    const migrationResult = staleFiles.length > 0
+        ? resolvePathMigrationCandidates({
+            workspaceRoot,
+            dataRoot,
+            freshnessStatus,
+            historicalFiles: staleFiles,
+            historicalText: JSON.stringify({
+                recalledTasks: historicalExperience.recalledTasks || [],
+                resume: historicalExperience.resume || null,
+            }),
+        })
+        : { candidates: [], warnings: [] };
+    const migrationCandidateCount = migrationResult.candidates.filter(item => item.currentCandidate).length;
+    const migrationNote = migrationCandidateCount > 0
+        ? `fresh KB 提供了 ${migrationCandidateCount} 个未确认的当前路径候选；确认内容和 Git 状态前不得作为编辑目标。`
         : '';
     return {
         contextStatus: resume ? 'resume-memory-ready' : 'resume-memory-missing',
@@ -732,11 +750,17 @@ function resumeExecutionPlan(historicalExperience, workspaceRoot) {
             recommendedCommands: (historicalExperience.validationCommands || []).map(item => item.value).filter(Boolean),
         },
         uncertainties: resume
-            ? ['历史状态尚未与当前源码进行精确确认。', staleFileNote].filter(Boolean)
+            ? [
+                '历史状态尚未与当前源码进行精确确认。',
+                staleFileNote,
+                migrationNote,
+                ...(migrationResult.warnings || []),
+            ].filter(Boolean)
             : ['没有召回可证明的历史任务状态。'],
         currentFacts: emptyCurrentFacts(),
+        pathMigrationCandidates: migrationResult.candidates,
         sourceConfirmation: resume ? [{
-            reason: staleFileNote || '历史 outcome 需要与当前源码和提交状态确认。',
+            reason: migrationNote || staleFileNote || '历史 outcome 需要与当前源码和提交状态确认。',
             files: targetFiles,
             staleFiles,
         }] : [],
@@ -779,6 +803,7 @@ function prepareAgentBrief(options = {}) {
             pmmGate,
             executionPlan: blockedExecutionPlan(preflight),
             memory,
+            pathMigrationCandidates: [],
             recommendedFiles: [],
             validation: { recommendedCommands: [] },
             risksAndNotes: [
@@ -791,7 +816,11 @@ function prepareAgentBrief(options = {}) {
     }
 
     const executionPlan = intent.intent === 'resume'
-        ? resumeExecutionPlan(historicalExperience, memory.workspaceRoot)
+        ? resumeExecutionPlan(historicalExperience, {
+            workspaceRoot: memory.workspaceRoot,
+            dataRoot: memory.dataRoot,
+            freshnessStatus: freshness,
+        })
         : planTaskExecution({ ...options, intent: intent.intent });
     const currentFacts = executionPlan.currentFacts || {
         ...emptyCurrentFacts(options.changedFiles || options.changedFile),
@@ -851,6 +880,7 @@ function prepareAgentBrief(options = {}) {
             uncertainties: executionPlan.uncertainties,
         },
         memory,
+        pathMigrationCandidates: executionPlan.pathMigrationCandidates || [],
         recommendedFiles,
         validation: {
             recommendedCommands: validationCommands,

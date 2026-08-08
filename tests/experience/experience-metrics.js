@@ -77,10 +77,28 @@ function scoreResumeCompleteness(fixture, payload = {}) {
     const text = JSON.stringify(payload).toLowerCase();
     const expectation = fixture.resumeExpectation;
     const containsAll = values => values.every(value => text.includes(String(value).toLowerCase()));
+    const expectedMigrations = expectation.migrationCandidates || [];
+    const actualMigrations = payload?.brief?.pathMigrationCandidates || [];
+    const migrationMatches = expectedMigrations.map(expected => actualMigrations.find(actual => (
+        pathMatches(actual.historicalFile, expected.historicalFile)
+        && pathMatches(actual.currentCandidate, expected.currentCandidate)
+    )) || null);
+    const currentTargets = uniquePaths([
+        ...(payload?.brief?.recommendedFiles || []),
+        ...(payload?.brief?.executionPlan?.targetFiles || []),
+        ...(payload?.brief?.currentFacts?.criticalFiles || []),
+    ]);
     return {
         statusComplete: containsAll(expectation.completed),
         validationComplete: containsAll(expectation.validation),
         riskComplete: containsAll(expectation.remainingRisks),
+        migrationCandidatesComplete: migrationMatches.every(Boolean),
+        migrationCandidatesUnconfirmed: migrationMatches.every(item => item && (
+            item.confirmationRequired === true && item.equivalenceProven !== true
+        )),
+        migrationCandidatesIsolated: expectedMigrations.every(expected => (
+            !currentTargets.some(file => pathMatches(file, expected.currentCandidate))
+        )),
         nextActionCorrect: text.includes(expectation.nextAction.toLowerCase()),
     };
 }

@@ -26,6 +26,8 @@ function createMemoryFixture() {
     fs.mkdirSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'status'), { recursive: true });
     fs.mkdirSync(path.join(workspaceRoot, 'app', 'api', 'chat'), { recursive: true });
     fs.mkdirSync(path.join(workspaceRoot, 'app', 'chat'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'app', 'application', 'modules', 'mallConfig'), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, 'app', 'application', 'payment', 'services'), { recursive: true });
     fs.mkdirSync(path.join(workspaceRoot, 'lib'), { recursive: true });
     fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{"scripts":{"test":"node --test"}}\n');
     fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'callback', 'route.ts'), [
@@ -35,6 +37,10 @@ function createMemoryFixture() {
     fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'facebook', 'oauth', 'status', 'route.ts'), 'export async function GET() { return { connected: true }; }\n');
     fs.writeFileSync(path.join(workspaceRoot, 'app', 'api', 'chat', 'route.ts'), 'export async function POST() { return { ok: true }; }\n');
     fs.writeFileSync(path.join(workspaceRoot, 'app', 'chat', 'page.tsx'), 'export default function ChatPage() { return null; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'application', 'modules', 'commodity.ts'), 'export function purchaseGoldenBeans() { return true; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'application', 'modules', 'mallConfig', 'mallRuntimeConfig.ts'), 'export class MallRuntimeConfig {}\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'application', 'modules', 'mallConfig', 'mallRechargeProductSnapshot.ts'), 'export function getRechargeProductSnapshot() { return {}; }\n');
+    fs.writeFileSync(path.join(workspaceRoot, 'app', 'application', 'payment', 'services', 'orderService.ts'), 'export class OrderService {}\n');
     fs.writeFileSync(path.join(workspaceRoot, 'lib', 'facebook-client.ts'), 'export function saveFacebookToken() { return { ok: true }; }\n');
 
     const context = createWorkspaceContext({ workspaceRoot, dataRoot, layout: 'external-data' });
@@ -88,6 +94,7 @@ function createMemoryFixture() {
         outcome: '完成商品快照统一并提交 e61e81d6',
         changedFiles: [
             'app/modules/commodity.ts',
+            'app/modules/mallConfig/mallRuntimeConfig.ts',
             'app/modules/mallConfig/mallRechargeProductSnapshot.ts',
             'app/payment/services/orderService.ts',
         ],
@@ -195,6 +202,35 @@ function testResumeBriefCompleteness(fixture) {
     assert.deepEqual(result.executionPlan.targetFiles, []);
     assert.deepEqual(result.recommendedFiles, []);
     assert.ok(result.risksAndNotes.some(note => note.includes('app/modules/commodity.ts')));
+    const expectedMigrations = new Map([
+        ['app/modules/commodity.ts', 'app/application/modules/commodity.ts'],
+        ['app/modules/mallConfig/mallRuntimeConfig.ts', 'app/application/modules/mallConfig/mallRuntimeConfig.ts'],
+        ['app/modules/mallConfig/mallRechargeProductSnapshot.ts', 'app/application/modules/mallConfig/mallRechargeProductSnapshot.ts'],
+        ['app/payment/services/orderService.ts', 'app/application/payment/services/orderService.ts'],
+    ]);
+    assert.equal(result.pathMigrationCandidates.length, expectedMigrations.size);
+    for (const migration of result.pathMigrationCandidates) {
+        assert.equal(migration.currentCandidate, expectedMigrations.get(migration.historicalFile));
+        assert.equal(migration.confidence, 'high');
+        assert.equal(migration.confirmationRequired, true);
+        assert.equal(migration.equivalenceProven, false);
+        assert.equal(JSON.stringify(result.currentFacts).includes(migration.currentCandidate), false);
+    }
+    const compact = projectAgentOutput(result, {}, 'prepare_agent_brief');
+    assert.equal(compact.pathMigrationCandidates.length, expectedMigrations.size);
+    for (const migration of compact.pathMigrationCandidates) {
+        assert.equal(migration.currentCandidate, expectedMigrations.get(migration.historicalFile));
+        assert.equal(migration.confirmationRequired, true);
+        assert.equal(migration.equivalenceProven, false);
+    }
+    assert.deepEqual(compact.executionPlan.targetFiles, []);
+    assert.deepEqual(compact.recommendedFiles, []);
+    const compactLength = JSON.stringify(compact, null, 2).length;
+    const compactBreakdown = Object.fromEntries(Object.entries(compact).map(([key, value]) => [key, JSON.stringify(value).length]));
+    assert.ok(compactLength <= 4000, `compact agent brief exceeded budget: ${compactLength} ${JSON.stringify(compactBreakdown)}`);
+    const full = projectAgentOutput(result, { detail: 'full' }, 'prepare_agent_brief');
+    assert.equal(full.pathMigrationCandidates.length, expectedMigrations.size);
+    assert.deepEqual(full.historicalExperience, result.historicalExperience);
 }
 
 function testResumeBriefIgnoresGenericTaskSuffix(fixture) {
@@ -271,8 +307,26 @@ function testPrepareAgentBriefPreflightBlocked() {
     assert.equal(result.preflight.status, 'blocked');
     assert.equal(result.executionPlan.contextStatus, 'preflight-blocked');
     assert.deepEqual(result.recommendedFiles, []);
+    assert.deepEqual(result.pathMigrationCandidates, []);
     assert.equal(result.nextActions[0].type, result.preflight.nextAction.type);
     assert.equal(result.nextActions[0].action, result.preflight.nextAction.action);
+}
+
+function testResumeBriefStaleKbStaysCompact(fixture) {
+    fs.writeFileSync(path.join(fixture.workspaceRoot, 'app', 'stale-marker.ts'), 'export const staleMarker = true;\n', 'utf8');
+    const result = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一钻石充值交易商品快照来源',
+    });
+    const compact = projectAgentOutput(result, {}, 'prepare_agent_brief');
+
+    assert.equal(result.readiness, 'blocked');
+    assert.deepEqual(result.pathMigrationCandidates, []);
+    assert.deepEqual(compact.pathMigrationCandidates, []);
+    assert.deepEqual(compact.executionPlan.targetFiles, []);
+    assert.deepEqual(compact.recommendedFiles, []);
+    assert.ok(JSON.stringify(compact, null, 2).length <= 4000);
 }
 
 function testAgentBriefCompactFiltersExternalDataRootFiles(fixture) {
@@ -354,6 +408,65 @@ function testAgentBriefCompactFiltersExternalDataRootFiles(fixture) {
     assert.equal(serialized.includes('PROJECT_Overview.md'), false);
     assert.equal(serialized.includes('.agents'), false);
     assert.equal(projected.dataRoot, fixture.dataRoot);
+}
+
+function testAgentBriefCompactOmitsLongMigrationCandidatesAtomically(fixture) {
+    const candidates = Array.from({ length: 8 }, (_, index) => ({
+        historicalFile: `qy-server/game-server/app/${'legacy-segment/'.repeat(6)}module-${index}.ts`,
+        currentCandidate: `qy-server/game-server/app/${'application-segment/'.repeat(6)}module-${index}.ts`,
+        confidence: 'high',
+        score: 95,
+        status: 'candidate-found',
+        ambiguous: false,
+        confirmationRequired: true,
+        equivalenceProven: false,
+    }));
+    const compact = projectAgentOutput({
+        kind: 'agent-brief',
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续一个包含大量历史路径迁移候选的任务',
+        intent: { intent: 'resume', confidence: 'high' },
+        readiness: 'needs_source_confirmation',
+        confidence: 'medium',
+        coverage: {},
+        missingEvidence: [],
+        sourceConfirmation: [{ reason: '所有候选均需要确认当前源码和 Git 状态。' }],
+        currentFacts: { criticalFiles: [] },
+        historicalExperience: {
+            resume: {
+                status: 'completed',
+                completed: ['历史任务已完成'],
+                validation: ['历史测试已通过'],
+                remainingRisks: ['候选路径尚未确认'],
+                nextAction: '确认当前源码和 Git 状态',
+            },
+        },
+        projectRules: { relevantRules: [] },
+        preflight: { kind: 'agent-preflight', status: 'ready', health: { score: 100, checks: [] } },
+        pmmGate: { decision: 'required', pmmRequired: true, deepPmmRequired: true },
+        executionPlan: {
+            contextStatus: 'resume-memory-ready',
+            targetFiles: [],
+            editBoundary: { primaryFiles: [], relatedRoots: [], guidance: [] },
+            steps: [],
+            validation: { recommendedCommands: [] },
+            uncertainties: ['候选路径尚未确认'],
+        },
+        pathMigrationCandidates: candidates,
+        recommendedFiles: [],
+    }, {}, 'prepare_agent_brief');
+
+    assert.ok(JSON.stringify(compact, null, 2).length <= 4000);
+    assert.ok(compact.pathMigrationCandidates.length < candidates.length);
+    assert.equal(compact._output.omittedPathMigrationCandidates, candidates.length - compact.pathMigrationCandidates.length);
+    for (const candidate of compact.pathMigrationCandidates) {
+        const original = candidates.find(item => item.historicalFile === candidate.historicalFile);
+        assert.ok(original);
+        assert.equal(candidate.currentCandidate, original.currentCandidate);
+        assert.equal(candidate.historicalFile.includes('...'), false);
+        assert.equal(candidate.currentCandidate.includes('...'), false);
+    }
 }
 
 function testSummarizeProjectMemory(fixture) {
@@ -444,12 +557,14 @@ async function testMcpTools(fixture) {
     testReviewRecallPrioritizesChangedFiles(fixture);
     testPrepareAgentBriefPreflightBlocked();
     testAgentBriefCompactFiltersExternalDataRootFiles(fixture);
+    testAgentBriefCompactOmitsLongMigrationCandidatesAtomically(fixture);
     testSummarizeProjectMemory(fixture);
     testUpdateProjectPlaybookInference(fixture);
     testCliFallback(fixture);
     await testMcpTools(fixture);
     testResumeBriefIgnoresGenericTaskSuffix(fixture);
     testRecallRejectsFileAliasOnlyMatches(fixture);
+    testResumeBriefStaleKbStaysCompact(fixture);
     console.log('agent-memory-recall validation passed');
 })().catch(error => {
     console.error(error.stack || error.message);

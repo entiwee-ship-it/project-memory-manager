@@ -141,6 +141,74 @@ function testMemoryScoringContract() {
     assert.equal(mixed.precision, 0.5);
 }
 
+function testResumeMigrationScoringContract() {
+    const fixture = {
+        intent: 'resume',
+        resumeExpectation: {
+            completed: ['历史任务完成'],
+            validation: ['历史测试通过'],
+            remainingRisks: ['仍需确认当前源码'],
+            migrationCandidates: [{
+                historicalFile: 'app/modules/commodity.ts',
+                currentCandidate: 'app/application/modules/commodity.ts',
+            }],
+            nextAction: '先确认当前源码',
+        },
+    };
+    const payload = {
+        brief: {
+            historicalExperience: {
+                resume: {
+                    completed: ['历史任务完成'],
+                    validation: ['历史测试通过'],
+                    remainingRisks: ['仍需确认当前源码'],
+                    nextAction: '先确认当前源码',
+                },
+            },
+            pathMigrationCandidates: [{
+                historicalFile: 'app/modules/commodity.ts',
+                currentCandidate: 'app/application/modules/commodity.ts',
+                confirmationRequired: true,
+                equivalenceProven: false,
+            }],
+            recommendedFiles: [],
+            executionPlan: { targetFiles: [] },
+            currentFacts: { criticalFiles: [] },
+        },
+    };
+
+    const safe = scoreResumeCompleteness(fixture, payload);
+    assert.equal(Object.values(safe).every(Boolean), true);
+
+    const leaked = scoreResumeCompleteness(fixture, {
+        brief: {
+            ...payload.brief,
+            recommendedFiles: ['app/application/modules/commodity.ts'],
+        },
+    });
+    assert.equal(leaked.migrationCandidatesIsolated, false);
+
+    const overclaimed = scoreResumeCompleteness(fixture, {
+        brief: {
+            ...payload.brief,
+            pathMigrationCandidates: [{
+                ...payload.brief.pathMigrationCandidates[0],
+                equivalenceProven: true,
+            }],
+        },
+    });
+    assert.equal(overclaimed.migrationCandidatesUnconfirmed, false);
+
+    const missing = scoreResumeCompleteness(fixture, {
+        brief: {
+            ...payload.brief,
+            pathMigrationCandidates: [],
+        },
+    });
+    assert.equal(missing.migrationCandidatesComplete, false);
+    assert.equal(missing.migrationCandidatesUnconfirmed, false);
+}
+
 function fixtureLoadOptions({ skipPathCheck = false, workspaceRoot = WORKSPACE_ROOT } = {}) {
     return {
         checkPaths: !skipPathCheck,
@@ -159,6 +227,7 @@ function main(argv = process.argv.slice(2)) {
     testPortableFixtureValidationDoesNotRequireQyProject();
     testFixtureContracts(fixtureOptions);
     testMemoryScoringContract();
+    testResumeMigrationScoringContract();
     if (fixturesOnly) {
         console.log('PMM experience fixture contracts passed');
         return;
