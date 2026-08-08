@@ -81,6 +81,20 @@ function copyFixtureToTemp(fixtureRoot, prefix) {
     return tempRoot;
 }
 
+function resolveQyserverPath(qyserverRoot, candidates, label, options = {}) {
+    const resolved = candidates
+        .map(candidate => path.join(qyserverRoot, candidate))
+        .find(candidate => fs.existsSync(candidate));
+    if (!resolved && options.optional === true) {
+        return '';
+    }
+    assert.ok(
+        resolved,
+        `qyserver integration path missing for ${label}: ${candidates.join(', ')}`
+    );
+    return resolved;
+}
+
 function buildFixture(tempRoot, configName, featureKey) {
     runWithCapturedOutput(buildChainKb, ['--root', tempRoot, '--config', configName], repoRoot);
     return {
@@ -413,6 +427,47 @@ function runFixtureAssertions() {
     const featureIndex = readJson(path.join(tempRoot, 'project-memory', 'kb', 'indexes', 'features.json'));
     assert.equal(registry.features[0].featureKey, 'pinus-sample');
     assert.equal(featureIndex.features[0].featureKey, 'pinus-sample');
+}
+
+function runCurrentPinusLayoutAssertions() {
+    const tempRoot = copyFixtureToTemp(pinusFixtureRoot, 'pmm-pinus-current-');
+    const { graph } = buildFixture(tempRoot, 'pinus-current-kb.json', 'pinus-current-sample');
+
+    assert.ok(graph.nodes.some(node => (
+        node.type === 'endpoint'
+        && node.name === 'GET /activity/goldenEgg/getGoldenEggReward'
+        && /\/app\/servers\/pkweb\/http\/routes\/activity\/goldenEgg\.ts$/i.test(node.file || '')
+    )));
+    assert.ok(graph.nodes.some(node => (
+        node.type === 'table'
+        && node.name === 'goldenEggLotteryRecordTable'
+        && /infrastructure\/database\/schema\/activity\/goldenEggLotteryRecordSchema$/i.test(node.meta?.importPath || '')
+    )));
+    assert.ok(graph.nodes.some(node => (
+        node.type === 'table'
+        && node.name === 'goldenEggUserInfoTable'
+        && /infrastructure\/database\/schema\/activity\/goldenEggUserInfoSchema$/i.test(node.meta?.importPath || '')
+    )));
+    assert.ok(graph.nodes.some(node => (
+        node.type === 'table'
+        && node.name === 'tbUserAccount'
+        && /infrastructure\/database\/schema\/users$/i.test(node.meta?.importPath || '')
+    )));
+    assert.ok(graph.nodes.some(node => node.type === 'route' && node.name === 'reqSyncTable'));
+    for (const falsePositive of ['notAProtocol', 'stringProtocol', 'commentProtocol', 'notTableProtocol']) {
+        assert.ok(!graph.nodes.some(node => node.type === 'route' && node.name === falsePositive));
+    }
+
+    const nestedCwd = path.join(tempRoot, 'app', 'servers', 'pkweb', 'http', 'routes', 'activity');
+    const routeTraversal = namesFromTraversal(
+        runWithCapturedOutput(queryChainKb, [
+            '--feature', 'pinus-current-sample',
+            '--downstream', 'reqSyncTable',
+            '--depth', '2',
+            '--json',
+        ], nestedCwd)
+    );
+    assert.ok(routeTraversal.includes('CommonTableMessageHandler.handleRequestSyncTable'));
 }
 
 function runFrontendHttpAssertions() {
@@ -1383,6 +1438,34 @@ function runQyserverAssertions() {
         return;
     }
 
+    const schemaRoot = resolveQyserverPath(qyserverRoot, [
+        'app/infrastructure/database/schema',
+        'app/db/schema',
+    ], 'database schema root');
+    const goldenEggModule = resolveQyserverPath(qyserverRoot, [
+        'app/application/modules/activity/goldenEgg.ts',
+        'app/modules/activity/goldenEgg.ts',
+    ], 'golden egg module');
+    const goldenEggRoute = resolveQyserverPath(qyserverRoot, [
+        'app/servers/pkweb/http/routes/activity/goldenEgg.ts',
+        'app/http/routes/activity/goldenEgg.ts',
+    ], 'golden egg route');
+    const lotteryRecordSchema = resolveQyserverPath(qyserverRoot, [
+        'app/infrastructure/database/schema/activity/goldenEggLotteryRecordSchema.ts',
+        'app/db/schema/activity/goldenEggLotteryRecordSchema.ts',
+    ], 'golden egg lottery record schema');
+    const userInfoSchema = resolveQyserverPath(qyserverRoot, [
+        'app/infrastructure/database/schema/activity/goldenEggUserInfoSchema.ts',
+        'app/db/schema/activity/goldenEggUserInfoSchema.ts',
+    ], 'golden egg user info schema');
+    const usersSchema = resolveQyserverPath(qyserverRoot, [
+        'app/infrastructure/database/schema/users.ts',
+        'app/db/schema/users.ts',
+    ], 'users schema');
+    const commonTableMessageHandler = resolveQyserverPath(qyserverRoot, [
+        'app/servers/pkroom/games/messages/common-table-message.handler.ts',
+    ], 'common table message handler', { optional: true });
+
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-qyserver-'));
     fs.mkdirSync(path.join(tempRoot, 'project-memory', 'state'), { recursive: true });
     fs.mkdirSync(path.join(tempRoot, 'project-memory', 'docs', 'features', 'backend-core'), { recursive: true });
@@ -1392,7 +1475,7 @@ function runQyserverAssertions() {
         `${JSON.stringify({
             areas: {
                 backend: [path.join(qyserverRoot, 'app')],
-                data: [path.join(qyserverRoot, 'app', 'db', 'schema')],
+                data: [schemaRoot],
             },
             stacks: {
                 backend: ['node', 'pinus'],
@@ -1412,12 +1495,16 @@ function runQyserverAssertions() {
             scanTargets: {
                 handlers: [path.join(qyserverRoot, 'app', 'servers', 'pkroom', 'handler', 'handler.ts')],
                 remotes: [path.join(qyserverRoot, 'app', 'servers', 'pkplayer', 'remote', 'Rpc.ts')],
-                modules: [path.join(qyserverRoot, 'app', 'modules', 'activity', 'goldenEgg.ts'), path.join(qyserverRoot, 'app', 'servers', 'pkroom', 'games', 'modules', 'TableMsg.ts')],
-                routes: [path.join(qyserverRoot, 'app', 'http', 'routes', 'activity', 'goldenEgg.ts')],
+                modules: [
+                    goldenEggModule,
+                    path.join(qyserverRoot, 'app', 'servers', 'pkroom', 'games', 'modules', 'TableMsg.ts'),
+                    commonTableMessageHandler,
+                ].filter(Boolean),
+                routes: [goldenEggRoute],
                 schemas: [
-                    path.join(qyserverRoot, 'app', 'db', 'schema', 'activity', 'goldenEggLotteryRecordSchema.ts'),
-                    path.join(qyserverRoot, 'app', 'db', 'schema', 'activity', 'goldenEggUserInfoSchema.ts'),
-                    path.join(qyserverRoot, 'app', 'db', 'schema', 'users.ts'),
+                    lotteryRecordSchema,
+                    userInfoSchema,
+                    usersSchema,
                 ],
             },
             outputs: {
@@ -1455,7 +1542,11 @@ function runQyserverAssertions() {
     const roomTraversal = namesFromTraversal(
         runWithCapturedOutput(queryChainKb, ['--feature', 'backend-core', '--from', 'reqSyncTable', '--direction', 'downstream', '--depth', '2', '--json'], nestedCwd)
     );
-    assert.ok(roomTraversal.includes('TableMsg.reqSyncTable'));
+    assert.ok(roomTraversal.some(name => (
+        name === 'TableMsg.reqSyncTable'
+        || name === 'CommonTableMessageHandler.handleRequestSyncTable'
+        || name === 'reqSyncTable'
+    )));
 }
 
 try {
@@ -1463,6 +1554,7 @@ try {
     runPrototypePollutionAssertions();
     runQueryDisambiguationAssertions();
     runFixtureAssertions();
+    runCurrentPinusLayoutAssertions();
     runFrontendHttpAssertions();
     runAdminFullstackAssertions();
     runNextFullstackAssertions();

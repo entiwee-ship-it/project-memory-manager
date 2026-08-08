@@ -93,7 +93,19 @@ function testReleaseQualityGate() {
     );
     assert.equal(
         pkg.scripts['test:all'],
-        'npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:contracts'
+        'npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:options && npm run test:experience:contracts && npm run test:benchmark:contract'
+    );
+    assert.equal(
+        pkg.scripts['test:experience:options'],
+        'node tests/experience/harness-options.test.js'
+    );
+    assert.equal(
+        pkg.scripts['test:benchmark:contract'],
+        'node tests/benchmark/pmm-kb-benchmark.test.js'
+    );
+    assert.equal(
+        pkg.scripts['benchmark:kb'],
+        'node tests/benchmark/pmm-kb-benchmark.js'
     );
 
     assert.equal(exists('.github/workflows/ci.yml'), true, 'missing GitHub Actions CI workflow');

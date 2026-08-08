@@ -5,7 +5,7 @@
   "description": "Runtime helpers for the project-memory-manager Codex skill.",
   "scripts": {
     "test": "node tests/pinus-backend.test.js",
-    "test:all": "npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:contracts",
+    "test:all": "npm test && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:options && npm run test:experience:contracts && npm run test:benchmark:contract",
     "test:layout": "node tests/workspace-layout.test.js",
     "test:registry": "node tests/workspace-registry.test.js",
     "test:mcp": "node tests/mcp-server.test.js",
@@ -13,12 +13,15 @@
     "test:agent": "node tests/agent-task-intent.test.js && node tests/agent-brief-readiness.test.js && node tests/agent-context-pack.test.js && node tests/agent-execution-loop.test.js && node tests/agent-memory-recall.test.js && node tests/agent-preflight.test.js && node tests/agent-token-efficiency.test.js && node tests/cocos-edit-brief.test.js",
     "test:token-roi": "node tests/agent-token-efficiency.test.js",
     "test:experience": "node tests/experience/pmm-experience-harness.test.js",
+    "test:experience:options": "node tests/experience/harness-options.test.js",
     "test:experience:contracts": "node tests/experience/pmm-experience-harness.test.js --fixtures-only --skip-path-check",
     "test:experience:baseline": "node tests/experience/pmm-experience-harness.test.js --write-baseline tests/experience/baselines/2026-07-11-current.json",
     "test:feature": "node tests/feature-discovery.test.js",
     "test:path": "node tests/path-resolution.test.js",
     "test:summary": "node tests/structured-summary.test.js",
     "test:source-layout": "node tests/source-layout.test.js",
+    "test:benchmark:contract": "node tests/benchmark/pmm-kb-benchmark.test.js",
+    "benchmark:kb": "node tests/benchmark/pmm-kb-benchmark.js",
     "mcp": "node src/bin/mcp.js"
   },
   "dependencies": {

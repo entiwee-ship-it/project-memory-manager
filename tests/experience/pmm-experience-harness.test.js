@@ -141,14 +141,23 @@ function testMemoryScoringContract() {
     assert.equal(mixed.precision, 0.5);
 }
 
-function main() {
-    const fixturesOnly = process.argv.includes('--fixtures-only');
-    const skipPathCheck = process.argv.includes('--skip-path-check');
-    testPortableFixtureValidationDoesNotRequireQyProject();
-    testFixtureContracts({
+function fixtureLoadOptions({ skipPathCheck = false, workspaceRoot = WORKSPACE_ROOT } = {}) {
+    return {
         checkPaths: !skipPathCheck,
-        workspaceRoot: WORKSPACE_ROOT,
-    });
+        workspaceRoot,
+    };
+}
+
+function loadRunFixtures(options = {}) {
+    return loadExperienceFixtures(fixtureLoadOptions(options));
+}
+
+function main(argv = process.argv.slice(2)) {
+    const fixturesOnly = argv.includes('--fixtures-only');
+    const skipPathCheck = argv.includes('--skip-path-check');
+    const fixtureOptions = fixtureLoadOptions({ skipPathCheck });
+    testPortableFixtureValidationDoesNotRequireQyProject();
+    testFixtureContracts(fixtureOptions);
     testMemoryScoringContract();
     if (fixturesOnly) {
         console.log('PMM experience fixture contracts passed');
@@ -156,14 +165,14 @@ function main() {
     }
 
     const before = gitSnapshots();
-    const fixtures = loadExperienceFixtures({ workspaceRoot: WORKSPACE_ROOT });
+    const fixtures = loadRunFixtures({ skipPathCheck });
     const results = fixtures.map(runFixture);
     const summary = aggregateExperienceResults(results);
     const failures = categorizeExperienceFailures(results);
     const report = { generatedAt: new Date().toISOString(), workspaceRoot: WORKSPACE_ROOT, results, summary, failures };
-    const writeBaselineIndex = process.argv.indexOf('--write-baseline');
+    const writeBaselineIndex = argv.indexOf('--write-baseline');
     if (writeBaselineIndex >= 0) {
-        const target = process.argv[writeBaselineIndex + 1];
+        const target = argv[writeBaselineIndex + 1];
         assert.ok(target, '--write-baseline requires a target file');
         writeJson(path.resolve(target), report);
     }
@@ -175,7 +184,7 @@ function main() {
         console.log(JSON.stringify({ failures: activeFailures }, null, 2));
     }
     if (writeBaselineIndex >= 0) {
-        console.log(`PMM experience baseline written: ${path.resolve(process.argv[writeBaselineIndex + 1])}`);
+        console.log(`PMM experience baseline written: ${path.resolve(argv[writeBaselineIndex + 1])}`);
         return;
     }
 
@@ -189,4 +198,12 @@ function main() {
     console.log('PMM experience value validation passed');
 }
 
-main();
+if (require.main === module) {
+    main();
+}
+
+module.exports = {
+    fixtureLoadOptions,
+    loadRunFixtures,
+    main,
+};

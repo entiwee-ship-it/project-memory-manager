@@ -678,8 +678,9 @@ function findImportedCallFromExpressionPath(expressionPath, importMap) {
 
 function isDbSchemaImport(importInfo) {
     const resolvedPath = normalize(importInfo?.resolvedPath || '');
-    const specifier = String(importInfo?.specifier || '');
-    return /(?:^|\/)app\/db\/schema\//.test(resolvedPath) || /(?:^|\/)db\/schema\//.test(specifier);
+    const specifier = normalize(importInfo?.specifier || '');
+    const schemaPathPattern = /(?:^|\/)(?:app\/)?(?:db\/schema|database\/schema|infrastructure\/database\/schema)\//;
+    return schemaPathPattern.test(resolvedPath) || schemaPathPattern.test(specifier);
 }
 
 function buildDbTableImportMap(imports = []) {
@@ -1397,13 +1398,12 @@ function extractCallableParamNames(callableText) {
 
 function buildHttpRouteBasePath(scriptFile) {
     const normalizedPath = normalize(scriptFile);
-    const marker = '/app/http/routes/';
-    const markerIndex = normalizedPath.indexOf(marker);
-    if (markerIndex === -1) {
+    const markerMatch = normalizedPath.match(/\/app\/(?:servers\/[^/]+\/)?http\/routes\//);
+    if (!markerMatch || markerMatch.index == null) {
         return '';
     }
 
-    const relativePath = normalizedPath.slice(markerIndex + marker.length).replace(/\.[^.]+$/, '');
+    const relativePath = normalizedPath.slice(markerMatch.index + markerMatch[0].length).replace(/\.[^.]+$/, '');
     const segments = relativePath.split('/').filter(Boolean);
     if (segments[segments.length - 1] === 'index') {
         segments.pop();
@@ -1462,17 +1462,66 @@ function inferPinusMessageRouteEntries(scriptFile, methodName) {
 
 function extractTableMessageBindings(source) {
     const bindings = [];
-    const bindingPattern = /\bthis\.regHandler\(\s*['"]([^'"]+)['"]\s*,\s*this\.([A-Za-z_$][\w$]*)\s*\)/g;
-    let match = null;
+    const ts = TYPESCRIPT_RUNTIME;
+    if (!ts) {
+        return bindings;
+    }
 
-    while ((match = bindingPattern.exec(source))) {
+    const sourceFile = ts.createSourceFile(
+        'table-message-bindings.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS
+    );
+    const readRoute = node => {
+        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+            return node.text;
+        }
+        return '';
+    };
+    const readHandler = node => {
+        const expressionPath = getExpressionPathFromAst(node, ts);
+        if (/^this\.[A-Za-z_$][\w$]*$/.test(expressionPath)) {
+            return expressionPath.slice('this.'.length);
+        }
+        return /^[A-Za-z_$][\w$]*$/.test(expressionPath) ? expressionPath : '';
+    };
+    const pushBinding = (route, handler) => {
+        if (!route || !handler) {
+            return;
+        }
         bindings.push({
-            route: match[1],
-            handler: match[2],
+            route,
+            handler,
             kind: 'table-msg',
             protocol: 'table-msg',
         });
-    }
+    };
+
+    const visit = node => {
+        if (ts.isCallExpression(node)) {
+            const expressionPath = getExpressionPathFromAst(node.expression, ts);
+            if (expressionPath === 'this.regHandler') {
+                pushBinding(readRoute(node.arguments[0]), readHandler(node.arguments[1]));
+            } else if (expressionPath.endsWith('.registerMany')) {
+                const receiver = expressionPath.slice(0, -'.registerMany'.length).split('.').pop() || '';
+                if (/registry$/i.test(receiver)) {
+                    for (const entries of [...node.arguments].filter(argument => ts.isArrayLiteralExpression(argument))) {
+                        for (const entry of entries.elements || []) {
+                            if (!ts.isArrayLiteralExpression(entry)) {
+                                continue;
+                            }
+                            pushBinding(readRoute(entry.elements[0]), readHandler(entry.elements[1]));
+                        }
+                    }
+                }
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+
+    visit(sourceFile);
 
     return dedupeBy(bindings, item => `${item.route}::${item.handler}`);
 }
@@ -2614,7 +2663,7 @@ function extractDbAccesses(methodBody, imports = []) {
 function extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames = []) {
     const routeBasePath = buildHttpRouteBasePath(scriptFile);
     const normalizedScriptFile = normalize(scriptFile);
-    const isRouteFile = /(?:^|\/)(?:app\/http\/routes|src\/routes|routes)\//.test(normalizedScriptFile);
+    const isRouteFile = /(?:^|\/)(?:app\/(?:servers\/[^/]+\/)?http\/routes|src\/routes|routes)\//.test(normalizedScriptFile);
     if (!routeBasePath && !isRouteFile) {
         return [];
     }

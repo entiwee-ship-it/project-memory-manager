@@ -1,0 +1,27 @@
+{
+  "featureName": "Pinus Current Layout Sample",
+  "featureKey": "pinus-current-sample",
+  "summary": "current qy-server layout sample for pinus backend extraction",
+  "extractorAdapter": "pinus",
+  "areas": ["backend", "data"],
+  "scanTargets": {
+    "handlers": ["app/servers/*/handler/*.ts"],
+    "remotes": ["app/servers/*/remote/*.ts"],
+    "modules": [
+      "app/application/modules/activity/goldenEgg.ts",
+      "app/servers/pkroom/games/messages/common-table-message.handler.ts"
+    ],
+    "routes": ["app/servers/*/http/routes/**/*.ts"],
+    "schemas": ["app/infrastructure/database/schema/**/*.ts"]
+  },
+  "outputs": {
+    "scan": "project-memory/kb/features/pinus-current-sample/scan.raw.json",
+    "graph": "project-memory/kb/features/pinus-current-sample/chain.graph.json",
+    "lookup": "project-memory/kb/features/pinus-current-sample/chain.lookup.json",
+    "report": "project-memory/kb/features/pinus-current-sample/build.report.json"
+  },
+  "docs": {
+    "featureDir": "project-memory/docs/features/pinus-current-sample",
+    "featureIndex": "project-memory/docs/features/pinus-current-sample/FEATURE.md"
+  }
+}
