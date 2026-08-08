@@ -233,6 +233,40 @@ function testResumeBriefCompleteness(fixture) {
     assert.deepEqual(full.historicalExperience, result.historicalExperience);
 }
 
+function testResumeBriefAppliesExplicitPathConfirmation(fixture) {
+    const result = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一钻石充值交易商品快照来源',
+        pathMigrationConfirmations: [{
+            historicalFile: 'app/modules/commodity.ts',
+            currentCandidate: 'app/application/modules/commodity.ts',
+            confirmationStatus: 'source-confirmed',
+            evidence: [{ kind: 'source-read', file: 'app/application/modules/commodity.ts', line: 1 }],
+        }],
+    });
+    const confirmed = result.pathMigrationCandidates.find(item => item.historicalFile === 'app/modules/commodity.ts');
+
+    assert.equal(confirmed.sourceConfirmed, true);
+    assert.equal(confirmed.confirmationStatus, 'source-confirmed');
+    assert.equal(confirmed.confirmationRequired, false);
+    assert.equal(confirmed.equivalenceProven, false);
+    assert.deepEqual(result.executionPlan.targetFiles, ['app/application/modules/commodity.ts']);
+    assert.deepEqual(result.executionPlan.editBoundary.primaryFiles, ['app/application/modules/commodity.ts']);
+    assert.deepEqual(result.recommendedFiles, ['app/application/modules/commodity.ts']);
+    assert.deepEqual(result.currentFacts.criticalFiles, []);
+
+    const compact = projectAgentOutput(result, {}, 'prepare_agent_brief');
+    const compactConfirmed = compact.pathMigrationCandidates.find(item => item.historicalFile === 'app/modules/commodity.ts');
+    assert.equal(compactConfirmed.sourceConfirmed, true);
+    assert.equal(compactConfirmed.confirmationStatus, 'source-confirmed');
+    assert.equal(compactConfirmed.equivalenceProven, false);
+    assert.equal(compactConfirmed.confirmation.evidence[0].file, 'app/application/modules/commodity.ts');
+    assert.deepEqual(compact.executionPlan.targetFiles, ['app/application/modules/commodity.ts']);
+    assert.deepEqual(compact.recommendedFiles, ['app/application/modules/commodity.ts']);
+    assert.ok(JSON.stringify(compact.sourceConfirmation).includes('source-confirmed'));
+}
+
 function testResumeBriefIgnoresGenericTaskSuffix(fixture) {
     recordTaskOutcome({
         workspaceRoot: fixture.workspaceRoot,
@@ -528,6 +562,8 @@ async function testMcpTools(fixture) {
     ]) {
         assertIncludes(toolNames, expected);
     }
+    const briefTool = listResponse.result.tools.find(tool => tool.name === 'prepare_agent_brief');
+    assert.ok(briefTool.inputSchema.properties.pathMigrationConfirmations);
 
     const recall = parseToolResult(await callTool('recall_task_memory', {
         workspaceRoot: fixture.workspaceRoot,
@@ -546,6 +582,24 @@ async function testMcpTools(fixture) {
     }));
     assert.equal(brief.kind, 'agent-brief');
     assert.equal(brief._mcpFreshness.policy, 'gate-only');
+
+    const confirmedResume = parseToolResult(await callTool('prepare_agent_brief', {
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一钻石充值交易商品快照来源',
+        detail: 'full',
+        pathMigrationConfirmations: [{
+            historicalFile: 'app/modules/commodity.ts',
+            currentCandidate: 'app/application/modules/commodity.ts',
+            confirmationStatus: 'source-confirmed',
+            evidence: [{ kind: 'source-read', file: 'app/application/modules/commodity.ts', line: 1 }],
+        }],
+    }));
+    assert.deepEqual(confirmedResume.executionPlan.targetFiles, ['app/application/modules/commodity.ts']);
+    assert.deepEqual(confirmedResume.recommendedFiles, ['app/application/modules/commodity.ts']);
+    assert.equal(confirmedResume.pathMigrationCandidates.find(item => (
+        item.historicalFile === 'app/modules/commodity.ts'
+    )).sourceConfirmed, true);
 }
 
 (async () => {
@@ -554,6 +608,7 @@ async function testMcpTools(fixture) {
     testPrepareAgentBrief(fixture);
     testSimpleBriefSkipsHistory(fixture);
     testResumeBriefCompleteness(fixture);
+    testResumeBriefAppliesExplicitPathConfirmation(fixture);
     testReviewRecallPrioritizesChangedFiles(fixture);
     testPrepareAgentBriefPreflightBlocked();
     testAgentBriefCompactFiltersExternalDataRootFiles(fixture);

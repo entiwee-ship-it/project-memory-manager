@@ -548,6 +548,29 @@ const TOOL_DEFINITIONS = [
                     items: { type: 'string' },
                 },
                 changedFile: { type: 'string' },
+                pathMigrationConfirmations: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            historicalFile: { type: 'string' },
+                            currentCandidate: { type: 'string' },
+                            confirmationStatus: {
+                                type: 'string',
+                                enum: ['source-confirmed', 'equivalence-proven'],
+                            },
+                            status: {
+                                type: 'string',
+                                enum: ['source-confirmed', 'equivalence-proven'],
+                            },
+                            evidence: {
+                                type: 'array',
+                                items: { type: 'object' },
+                            },
+                        },
+                        required: ['historicalFile', 'currentCandidate'],
+                    },
+                },
                 diff: { type: 'string' },
                 diffFile: { type: 'string' },
                 depth: { type: 'number' },

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-08T07:50:29.389Z",
+  "generatedAt": "2026-08-08T10:04:02.726Z",
   "workspaceRoot": "E:/xile-workspace/qyProject",
   "results": [
     {
@@ -46,7 +46,7 @@
       "cost": {
         "chars": 90042,
         "estimatedTokens": 22511,
-        "elapsedMs": 8069
+        "elapsedMs": 7401
       }
     },
     {
@@ -93,7 +93,7 @@
       "cost": {
         "chars": 68493,
         "estimatedTokens": 17124,
-        "elapsedMs": 6660
+        "elapsedMs": 6093
       }
     },
     {
@@ -138,7 +138,7 @@
       "cost": {
         "chars": 72610,
         "estimatedTokens": 18153,
-        "elapsedMs": 8542
+        "elapsedMs": 7914
       }
     },
     {
@@ -185,7 +185,7 @@
       "cost": {
         "chars": 103988,
         "estimatedTokens": 25997,
-        "elapsedMs": 8387
+        "elapsedMs": 7689
       }
     },
     {
@@ -231,7 +231,7 @@
       "cost": {
         "chars": 106955,
         "estimatedTokens": 26739,
-        "elapsedMs": 6726
+        "elapsedMs": 6372
       }
     },
     {
@@ -275,7 +275,7 @@
       "cost": {
         "chars": 88161,
         "estimatedTokens": 22041,
-        "elapsedMs": 5714
+        "elapsedMs": 5423
       }
     },
     {
@@ -323,7 +323,7 @@
       "cost": {
         "chars": 110450,
         "estimatedTokens": 27613,
-        "elapsedMs": 7424
+        "elapsedMs": 6975
       }
     },
     {
@@ -368,7 +368,7 @@
       "cost": {
         "chars": 92166,
         "estimatedTokens": 23042,
-        "elapsedMs": 5476
+        "elapsedMs": 5221
       }
     },
     {
@@ -415,7 +415,7 @@
       "cost": {
         "chars": 115385,
         "estimatedTokens": 28847,
-        "elapsedMs": 8802
+        "elapsedMs": 8229
       }
     },
     {
@@ -465,7 +465,7 @@
       "cost": {
         "chars": 258730,
         "estimatedTokens": 64683,
-        "elapsedMs": 42787
+        "elapsedMs": 40501
       }
     },
     {
@@ -512,9 +512,9 @@
         "nextActionCorrect": true
       },
       "cost": {
-        "chars": 30227,
-        "estimatedTokens": 7557,
-        "elapsedMs": 1460
+        "chars": 30890,
+        "estimatedTokens": 7723,
+        "elapsedMs": 1435
       }
     },
     {
@@ -564,7 +564,7 @@
       "cost": {
         "chars": 256724,
         "estimatedTokens": 64181,
-        "elapsedMs": 33772
+        "elapsedMs": 31884
       }
     }
   ],

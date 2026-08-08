@@ -7,7 +7,12 @@ const { classifyTaskIntent } = require('./task-intent');
 const { ensureDir, readJsonSafe, writeJsonAtomic } = require('../shared/common');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 const { parseTaskTerms, termValues } = require('./task-terms');
-const { resolvePathMigrationCandidates } = require('./path-migration');
+const {
+    applyPathMigrationConfirmations,
+    currentFileExists,
+    resolvePathMigrationCandidates,
+    verifyPathMigrationSourceEvidence,
+} = require('./path-migration');
 
 const DEFAULT_RECALL_LIMIT = 3;
 const DEFAULT_SCAN_LIMIT = 200;
@@ -706,7 +711,12 @@ function currentWorkspaceFile(workspaceRoot, file) {
 }
 
 function resumeExecutionPlan(historicalExperience, options = {}) {
-    const { workspaceRoot, dataRoot, freshnessStatus } = options;
+    const {
+        workspaceRoot,
+        dataRoot,
+        freshnessStatus,
+        pathMigrationConfirmations,
+    } = options;
     const resume = historicalExperience.resume;
     const historicalFiles = (historicalExperience.relatedFiles || []).map(item => item.value).filter(Boolean);
     const resolvedFiles = historicalFiles.map(file => ({
@@ -730,15 +740,34 @@ function resumeExecutionPlan(historicalExperience, options = {}) {
             }),
         })
         : { candidates: [], warnings: [] };
-    const migrationCandidateCount = migrationResult.candidates.filter(item => item.currentCandidate).length;
+    const confirmedMigrations = applyPathMigrationConfirmations(
+        migrationResult.candidates,
+        pathMigrationConfirmations,
+        {
+            fileExists: file => currentFileExists(workspaceRoot, file),
+            verifySourceEvidence: (evidence, candidate) => verifyPathMigrationSourceEvidence(
+                workspaceRoot,
+                candidate,
+                evidence
+            ),
+        }
+    );
+    const confirmedTargets = confirmedMigrations
+        .filter(item => item.sourceConfirmed && item.currentCandidate)
+        .map(item => item.currentCandidate);
+    const resolvedTargetFiles = uniq([...targetFiles, ...confirmedTargets]);
+    const migrationCandidateCount = confirmedMigrations.filter(item => item.currentCandidate).length;
+    const confirmedMigrationCount = confirmedMigrations.filter(item => item.sourceConfirmed).length;
     const migrationNote = migrationCandidateCount > 0
-        ? `fresh KB 提供了 ${migrationCandidateCount} 个未确认的当前路径候选；确认内容和 Git 状态前不得作为编辑目标。`
+        ? confirmedMigrationCount > 0
+            ? `fresh KB 提供了 ${migrationCandidateCount} 个路径候选，其中 ${confirmedMigrationCount} 个已收到显式 source confirmation；等价证明仍需独立内容或 Git 证据。`
+            : `fresh KB 提供了 ${migrationCandidateCount} 个未确认的当前路径候选；确认内容和 Git 状态前不得作为编辑目标。`
         : '';
     return {
         contextStatus: resume ? 'resume-memory-ready' : 'resume-memory-missing',
-        targetFiles,
+        targetFiles: resolvedTargetFiles,
         editBoundary: {
-            primaryFiles: targetFiles,
+            primaryFiles: resolvedTargetFiles,
             relatedRoots: [],
             guidance: ['历史 outcome 仅用于恢复任务；进入修改前先确认当前源码。'],
         },
@@ -758,11 +787,14 @@ function resumeExecutionPlan(historicalExperience, options = {}) {
             ].filter(Boolean)
             : ['没有召回可证明的历史任务状态。'],
         currentFacts: emptyCurrentFacts(),
-        pathMigrationCandidates: migrationResult.candidates,
+        pathMigrationCandidates: confirmedMigrations,
         sourceConfirmation: resume ? [{
             reason: migrationNote || staleFileNote || '历史 outcome 需要与当前源码和提交状态确认。',
-            files: targetFiles,
+            files: resolvedTargetFiles,
             staleFiles,
+            confirmations: confirmedMigrations
+                .filter(item => item.sourceConfirmed)
+                .map(item => item.confirmation),
         }] : [],
         evidence: [],
     };
@@ -820,6 +852,7 @@ function prepareAgentBrief(options = {}) {
             workspaceRoot: memory.workspaceRoot,
             dataRoot: memory.dataRoot,
             freshnessStatus: freshness,
+            pathMigrationConfirmations: options.pathMigrationConfirmations,
         })
         : planTaskExecution({ ...options, intent: intent.intent });
     const currentFacts = executionPlan.currentFacts || {

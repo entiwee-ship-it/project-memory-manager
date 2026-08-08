@@ -8,6 +8,12 @@ const HIGH_CONFIDENCE_SCORE = 85;
 const MEDIUM_CONFIDENCE_SCORE = 60;
 const MIN_UNAMBIGUOUS_MARGIN = 15;
 const MAX_ALTERNATIVES = 2;
+const CONFIRMATION_STATUSES = new Set(['source-confirmed', 'equivalence-proven']);
+const EQUIVALENCE_EVIDENCE_KINDS = new Set([
+    'content-hash-match',
+    'git-rename-content-match',
+    'ast-equivalence',
+]);
 const catalogCache = new Map();
 
 function toPosix(value = '') {
@@ -20,6 +26,13 @@ function normalizeText(value = '') {
 
 function uniq(values = []) {
     return Array.from(new Set(values.filter(Boolean)));
+}
+
+function asArray(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+    return value == null || value === '' ? [] : [value];
 }
 
 function isAbsolutePath(value = '') {
@@ -275,6 +288,120 @@ function candidateReason(confidence, ambiguous) {
     return '只有弱路径或符号相似证据，不能据此恢复当前编辑目标。';
 }
 
+function normalizeConfirmationEvidence(evidence = []) {
+    const seen = new Set();
+    return asArray(evidence).map(item => {
+        if (typeof item === 'string') {
+            const value = item.trim();
+            if (!value || seen.has(value)) {
+                return null;
+            }
+            seen.add(value);
+            return value;
+        }
+        if (!item || typeof item !== 'object') {
+            return null;
+        }
+        const value = JSON.parse(JSON.stringify(item));
+        const key = JSON.stringify(value);
+        if (seen.has(key)) {
+            return null;
+        }
+        seen.add(key);
+        return value;
+    }).filter(Boolean);
+}
+
+function confirmationKey(historicalFile, currentCandidate) {
+    return `${normalizeText(historicalFile)}\u0000${normalizeText(currentCandidate)}`;
+}
+
+function confirmPathMigrationCandidate(candidate = {}, confirmation = {}, options = {}) {
+    const base = {
+        ...candidate,
+        sourceConfirmed: false,
+        confirmationStatus: 'unconfirmed',
+        confirmation: null,
+    };
+    if (!confirmation || typeof confirmation !== 'object') {
+        return base;
+    }
+
+    const historicalFile = String(confirmation.historicalFile || '').trim();
+    const currentCandidate = String(confirmation.currentCandidate || '').trim();
+    const submittedStatus = String(
+        confirmation.confirmationStatus || confirmation.status || ''
+    ).trim().toLowerCase();
+    const evidence = normalizeConfirmationEvidence(confirmation.evidence);
+    const candidateMatches = confirmationKey(candidate.historicalFile, candidate.currentCandidate)
+        === confirmationKey(historicalFile, currentCandidate);
+    const currentFileExists = typeof options.fileExists === 'function'
+        ? options.fileExists(candidate.currentCandidate)
+        : false;
+    const evidenceObjects = asArray(confirmation.evidence).filter(item => item && typeof item === 'object');
+    const sourceEvidenceVerified = typeof options.verifySourceEvidence === 'function'
+        && evidenceObjects.some(item => options.verifySourceEvidence(item, candidate));
+    const equivalenceEvidence = evidenceObjects.filter(item => EQUIVALENCE_EVIDENCE_KINDS.has(
+        String(item.kind || '').trim().toLowerCase()
+    ));
+    const equivalenceVerified = typeof options.verifyEquivalenceEvidence === 'function'
+        && equivalenceEvidence.some(item => options.verifyEquivalenceEvidence(item, candidate));
+    let rejectionReason = '';
+    if (confirmation.duplicate === true) {
+        rejectionReason = '同一候选收到多个确认输入，已拒绝歧义确认。';
+    } else if (!candidateMatches) {
+        rejectionReason = '确认输入与候选的历史路径或当前路径不一致。';
+    } else if (!CONFIRMATION_STATUSES.has(submittedStatus)) {
+        rejectionReason = '确认状态必须是 source-confirmed 或 equivalence-proven。';
+    } else if (!evidence.length) {
+        rejectionReason = '显式确认必须携带至少一条证据。';
+    } else if (!sourceEvidenceVerified) {
+        rejectionReason = '确认证据未通过当前源码或人工确认验证。';
+    } else if (!currentFileExists) {
+        rejectionReason = '确认时当前候选文件已不存在或越出 workspace。';
+    }
+    if (rejectionReason) {
+        return {
+            ...base,
+            confirmation: {
+                kind: 'confirmation-rejected',
+                submittedStatus,
+                reason: rejectionReason,
+            },
+        };
+    }
+
+    const equivalenceProven = submittedStatus === 'equivalence-proven' && equivalenceVerified;
+    return {
+        ...base,
+        sourceConfirmed: true,
+        confirmationRequired: false,
+        equivalenceProven,
+        confirmationStatus: equivalenceProven ? 'equivalence-proven' : 'source-confirmed',
+        confirmation: {
+            kind: equivalenceProven ? 'equivalence-proven' : 'source-confirmed',
+            submittedStatus,
+            evidence,
+            ...(submittedStatus === 'equivalence-proven' && !equivalenceProven
+                ? { reason: '等价证据未通过内部内容验证，已降级为 source-confirmed。' }
+                : {}),
+        },
+    };
+}
+
+function applyPathMigrationConfirmations(candidates = [], confirmations = [], options = {}) {
+    const confirmationMap = new Map();
+    for (const item of asArray(confirmations).filter(value => value && typeof value === 'object')) {
+        const key = confirmationKey(item.historicalFile, item.currentCandidate);
+        confirmationMap.set(key, confirmationMap.has(key) ? { ...item, duplicate: true } : item);
+    }
+    return asArray(candidates).map(candidate => confirmPathMigrationCandidate(
+        candidate,
+        confirmationMap.get(confirmationKey(candidate.historicalFile, candidate.currentCandidate)),
+        options
+    ));
+}
+
 function normalizeCatalogItems(currentFiles = []) {
     const byFile = new Map();
     for (const item of currentFiles) {
@@ -389,6 +516,33 @@ function currentFileExists(workspaceRoot, relativeFile) {
     }
 }
 
+function verifyPathMigrationSourceEvidence(workspaceRoot, candidate = {}, evidence = {}) {
+    const kind = String(evidence.kind || '').trim().toLowerCase();
+    if (kind === 'manual-confirmation') {
+        return Boolean(String(evidence.reason || '').trim());
+    }
+    if (!['source-read', 'current-symbol-match'].includes(kind)
+        || normalizeText(evidence.file) !== normalizeText(candidate.currentCandidate)
+        || !currentFileExists(workspaceRoot, candidate.currentCandidate)) {
+        return false;
+    }
+    try {
+        const source = fs.readFileSync(path.resolve(workspaceRoot, candidate.currentCandidate), 'utf8');
+        if (kind === 'current-symbol-match') {
+            return Boolean(String(evidence.symbol || '').trim())
+                && source.includes(String(evidence.symbol).trim());
+        }
+        const line = Number(evidence.line);
+        if (!Number.isInteger(line) || line < 1 || line > source.split(/\r?\n/).length) {
+            return false;
+        }
+        const expectedText = String(evidence.contains || '').trim();
+        return !expectedText || source.split(/\r?\n/)[line - 1].includes(expectedText);
+    } catch {
+        return false;
+    }
+}
+
 function resolvePathMigrationCandidates(options = {}) {
     if (options.freshnessStatus !== 'fresh') {
         return {
@@ -421,9 +575,12 @@ function resolvePathMigrationCandidates(options = {}) {
 }
 
 module.exports = {
+    applyPathMigrationConfirmations,
     buildCatalogFromScan,
+    confirmPathMigrationCandidate,
     currentFileExists,
     rankPathMigrationCandidates,
     resolvePathMigrationCandidates,
+    verifyPathMigrationSourceEvidence,
     workspaceRelativePath,
 };

@@ -3,9 +3,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
+    applyPathMigrationConfirmations,
     currentFileExists,
+    confirmPathMigrationCandidate,
     rankPathMigrationCandidates,
     resolvePathMigrationCandidates,
+    verifyPathMigrationSourceEvidence,
 } = require('../src/agent/path-migration');
 
 function findResult(results, historicalFile) {
@@ -150,6 +153,129 @@ function testSymlinkOutsideWorkspaceIsRejected() {
     assert.equal(currentFileExists(workspaceRoot, 'linked/external.ts'), false);
 }
 
+function testSourceConfirmationPromotesOnlyExplicitCandidate() {
+    const candidate = findResult(rankPathMigrationCandidates({
+        historicalFiles: ['app/modules/commodity.ts'],
+        currentFiles: ['app/application/modules/commodity.ts'],
+    }), 'app/modules/commodity.ts');
+    const confirmed = confirmPathMigrationCandidate(candidate, {
+        historicalFile: candidate.historicalFile,
+        currentCandidate: candidate.currentCandidate,
+        confirmationStatus: 'source-confirmed',
+        evidence: [{ kind: 'source-read', file: candidate.currentCandidate, line: 1 }],
+    }, {
+        fileExists: () => true,
+        verifySourceEvidence: () => true,
+    });
+
+    assert.equal(confirmed.sourceConfirmed, true);
+    assert.equal(confirmed.confirmationStatus, 'source-confirmed');
+    assert.equal(confirmed.confirmationRequired, false);
+    assert.equal(confirmed.equivalenceProven, false);
+    assert.equal(confirmed.confirmation.kind, 'source-confirmed');
+    assert.equal(confirmed.confirmation.evidence[0].file, candidate.currentCandidate);
+}
+
+function testEquivalenceRequiresDedicatedEvidence() {
+    const candidate = findResult(rankPathMigrationCandidates({
+        historicalFiles: ['app/modules/commodity.ts'],
+        currentFiles: ['app/application/modules/commodity.ts'],
+    }), 'app/modules/commodity.ts');
+    const weak = confirmPathMigrationCandidate(candidate, {
+        historicalFile: candidate.historicalFile,
+        currentCandidate: candidate.currentCandidate,
+        confirmationStatus: 'equivalence-proven',
+        evidence: [{ kind: 'source-read', file: candidate.currentCandidate }],
+    }, {
+        fileExists: () => true,
+        verifySourceEvidence: () => true,
+    });
+    const strong = confirmPathMigrationCandidate(candidate, {
+        historicalFile: candidate.historicalFile,
+        currentCandidate: candidate.currentCandidate,
+        confirmationStatus: 'equivalence-proven',
+        evidence: [{ kind: 'content-hash-match', file: candidate.currentCandidate }],
+    }, {
+        fileExists: () => true,
+        verifySourceEvidence: () => true,
+        verifyEquivalenceEvidence: evidence => evidence.kind === 'content-hash-match',
+    });
+
+    assert.equal(weak.confirmationStatus, 'source-confirmed');
+    assert.equal(weak.equivalenceProven, false);
+    assert.equal(strong.confirmationStatus, 'equivalence-proven');
+    assert.equal(strong.equivalenceProven, true);
+}
+
+function testInvalidConfirmationCannotPromoteCandidate() {
+    const candidate = findResult(rankPathMigrationCandidates({
+        historicalFiles: ['app/modules/commodity.ts'],
+        currentFiles: ['app/application/modules/commodity.ts'],
+    }), 'app/modules/commodity.ts');
+    const rejected = confirmPathMigrationCandidate(candidate, {
+        historicalFile: candidate.historicalFile,
+        currentCandidate: candidate.currentCandidate,
+        confirmationStatus: 'source-confirmed',
+        evidence: [{ kind: 'source-read' }],
+    }, { fileExists: () => false });
+
+    assert.equal(rejected.sourceConfirmed, false);
+    assert.equal(rejected.confirmationStatus, 'unconfirmed');
+    assert.equal(rejected.confirmationRequired, true);
+    assert.equal(rejected.confirmation.kind, 'confirmation-rejected');
+}
+
+function testDuplicateConfirmationsAreRejected() {
+    const candidate = findResult(rankPathMigrationCandidates({
+        historicalFiles: ['app/modules/commodity.ts'],
+        currentFiles: ['app/application/modules/commodity.ts'],
+    }), 'app/modules/commodity.ts');
+    const confirmations = [1, 2].map(line => ({
+        historicalFile: candidate.historicalFile,
+        currentCandidate: candidate.currentCandidate,
+        confirmationStatus: 'source-confirmed',
+        evidence: [{ kind: 'source-read', file: candidate.currentCandidate, line }],
+    }));
+    const [rejected] = applyPathMigrationConfirmations(
+        [candidate],
+        confirmations,
+        { fileExists: () => true }
+    );
+
+    assert.equal(rejected.sourceConfirmed, false);
+    assert.equal(rejected.confirmationStatus, 'unconfirmed');
+    assert.ok(rejected.confirmation.reason.includes('多个确认输入'));
+}
+
+function testSourceEvidenceIsVerifiedAgainstCurrentFile() {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-migration-source-evidence-'));
+    const relativeFile = 'src/current.ts';
+    fs.mkdirSync(path.join(workspaceRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, relativeFile), 'export const currentSymbol = true;\n', 'utf8');
+    const candidate = { currentCandidate: relativeFile };
+
+    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+        kind: 'source-read',
+        file: relativeFile,
+        line: 1,
+        contains: 'currentSymbol',
+    }), true);
+    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+        kind: 'current-symbol-match',
+        file: relativeFile,
+        symbol: 'currentSymbol',
+    }), true);
+    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+        kind: 'source-read',
+        file: relativeFile,
+        line: 99,
+    }), false);
+    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+        kind: 'manual-confirmation',
+        reason: '人工核对当前文件职责与历史任务一致',
+    }), true);
+}
+
 testUniqueDirectoryMigration();
 testDirectorySeparatorMigration();
 testAmbiguousBasenameStaysUnconfirmed();
@@ -159,4 +285,9 @@ testDeletedAndOutsidePathsDoNotGuess();
 testNonFreshKbCannotProduceCandidates();
 testMissingScanArtifactReturnsWarning();
 testSymlinkOutsideWorkspaceIsRejected();
+testSourceConfirmationPromotesOnlyExplicitCandidate();
+testEquivalenceRequiresDedicatedEvidence();
+testInvalidConfirmationCannotPromoteCandidate();
+testDuplicateConfirmationsAreRejected();
+testSourceEvidenceIsVerifiedAgainstCurrentFile();
 console.log('agent path migration validation passed');

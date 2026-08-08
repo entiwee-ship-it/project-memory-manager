@@ -660,11 +660,48 @@ function compactSourceConfirmation(items = [], dataRoot = '', workspaceRoot = ''
         if (item?.staleFiles) {
             result.staleFiles = filterSourceFiles(item.staleFiles, dataRoot, workspaceRoot).slice(0, 8);
         }
+        if (item?.confirmations) {
+            result.confirmations = asArray(item.confirmations)
+                .slice(0, 4)
+                .map(confirmation => compactMigrationConfirmation(confirmation, dataRoot, workspaceRoot))
+                .filter(Boolean);
+        }
         if (item?.recommendedSelector) {
             result.recommendedSelector = cloneJson(item.recommendedSelector);
         }
         return result;
     });
+}
+
+function compactMigrationConfirmation(confirmation = {}, dataRoot = '', workspaceRoot = '') {
+    if (!confirmation || typeof confirmation !== 'object') {
+        return null;
+    }
+    const result = {};
+    for (const key of ['kind', 'submittedStatus', 'reason']) {
+        if (confirmation[key] !== undefined && confirmation[key] !== '') {
+            result[key] = confirmation[key];
+        }
+    }
+    if (confirmation.evidence) {
+        result.evidence = asArray(confirmation.evidence).slice(0, 4).map(item => {
+            if (typeof item !== 'object' || item === null) {
+                return item;
+            }
+            const compact = {};
+            for (const key of ['kind', 'reason', 'line', 'commit', 'file', 'historicalFile', 'currentCandidate']) {
+                if (item[key] !== undefined && item[key] !== '') {
+                    if (['file', 'historicalFile', 'currentCandidate'].includes(key)
+                        && !isSourceCandidate(item[key], dataRoot, workspaceRoot)) {
+                        continue;
+                    }
+                    compact[key] = item[key];
+                }
+            }
+            return compact;
+        });
+    }
+    return result;
 }
 
 function compactPathMigrationCandidates(items = [], dataRoot = '', workspaceRoot = '') {
@@ -686,6 +723,15 @@ function compactPathMigrationCandidates(items = [], dataRoot = '', workspaceRoot
             confirmationRequired: item?.confirmationRequired !== false,
             equivalenceProven: Boolean(item?.equivalenceProven),
         };
+        if (item?.sourceConfirmed) {
+            result.sourceConfirmed = true;
+        }
+        if (item?.confirmationStatus && item.confirmationStatus !== 'unconfirmed') {
+            result.confirmationStatus = item.confirmationStatus;
+        }
+        if (item?.confirmation) {
+            result.confirmation = compactMigrationConfirmation(item.confirmation, dataRoot, workspaceRoot);
+        }
         if (item?.ambiguous || !currentCandidate) {
             result.score = item?.score ?? 0;
             result.reason = item?.reason || '';
@@ -1010,7 +1056,15 @@ function compactAgentBrief(brief = {}) {
         ? { criticalFiles: currentFacts.criticalFiles || [] }
         : currentFacts;
     const projectedHistoricalExperience = hasPathMigrationCandidates
-        ? { resume: historicalExperience.resume }
+        ? {
+            resume: historicalExperience.resume ? {
+                status: historicalExperience.resume.status,
+                completed: historicalExperience.resume.completed,
+                validation: historicalExperience.resume.validation,
+                remainingRisks: historicalExperience.resume.remainingRisks,
+                nextAction: historicalExperience.resume.nextAction,
+            } : null,
+        }
         : (blocked
             ? {
                 resume: historicalExperience.resume ? {
