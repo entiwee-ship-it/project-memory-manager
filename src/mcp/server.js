@@ -55,6 +55,7 @@ const MAX_PROJECT_QUERY_CACHE_ENTRIES = 100;
 const DEFAULT_FRESHNESS_POLICY = 'auto_rebuild';
 const FRESHNESS_POLICIES = new Set(['auto_rebuild', 'require_fresh', 'allow_stale']);
 const projectQueryCache = new Map();
+let projectGlobalFreshnessObserver = null;
 
 const TOOL_DEFINITIONS = [
     {
@@ -761,6 +762,7 @@ function projectGlobalConfigPath(context) {
 }
 
 function buildProjectGlobalFreshness(context) {
+    projectGlobalFreshnessObserver?.(context);
     const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
     const graph = readJsonSafe(graphPath, null);
@@ -906,7 +908,7 @@ function statSignature(filePath) {
     }
 }
 
-function buildProjectArtifactState(args) {
+function buildProjectArtifactState(args, projectGlobalFreshness = null) {
     const context = createWorkspaceContext({
         workspaceRoot: args.workspaceRoot,
         dataRoot: args.dataRoot,
@@ -917,7 +919,7 @@ function buildProjectArtifactState(args) {
         statSignature(path.join(context.paths.projectGlobalDir, 'chain.lookup.json')),
         statSignature(context.paths.projectProtocols),
     ];
-    const projectGlobalFreshness = buildProjectGlobalFreshness(context);
+    const resolvedProjectGlobalFreshness = projectGlobalFreshness ?? buildProjectGlobalFreshness(context);
     const artifactSignature = JSON.stringify(artifacts.map(artifact => ({
         file: artifact.file,
         exists: artifact.exists,
@@ -925,19 +927,26 @@ function buildProjectArtifactState(args) {
         size: artifact.size,
     })));
     const sourceSignature = JSON.stringify({
-        status: projectGlobalFreshness.status,
-        currentFingerprint: projectGlobalFreshness.currentSnapshot?.fingerprint || '',
-        storedFingerprint: projectGlobalFreshness.sourceSnapshot?.fingerprint || '',
-        reasonCodes: projectGlobalFreshness.reasonCodes || [],
+        status: resolvedProjectGlobalFreshness.status,
+        currentFingerprint: resolvedProjectGlobalFreshness.currentSnapshot?.fingerprint || '',
+        storedFingerprint: resolvedProjectGlobalFreshness.sourceSnapshot?.fingerprint || '',
+        reasonCodes: resolvedProjectGlobalFreshness.reasonCodes || [],
     });
     return {
         context,
         artifacts,
-        projectGlobalFreshness,
+        projectGlobalFreshness: resolvedProjectGlobalFreshness,
         artifactSignature,
         sourceSignature,
         signature: JSON.stringify({ artifactSignature, sourceSignature }),
     };
+}
+
+function setProjectGlobalFreshnessObserver(observer = null) {
+    if (observer != null && typeof observer !== 'function') {
+        throw new TypeError('projectGlobalFreshnessObserver must be a function or null');
+    }
+    projectGlobalFreshnessObserver = observer;
 }
 
 function evictOldestProjectQueryCacheEntry() {
@@ -1992,7 +2001,7 @@ function queryProjectChain(args) {
     const argv = [...layoutArgv(args), '--json'];
     appendQuerySelectorArgs(argv, args, options);
 
-    const artifactState = buildProjectArtifactState(args);
+    const artifactState = buildProjectArtifactState(args, freshnessGate.finalFreshness);
     const queryMeta = {
         limit: hasQuerySelector(args) ? options.limit : null,
         depth: options.depth,
@@ -2243,7 +2252,14 @@ function startStdioServer() {
     });
 }
 
-module.exports = { handleMcpRequest, run: startStdioServer, startStdioServer };
+module.exports = {
+    handleMcpRequest,
+    run: startStdioServer,
+    startStdioServer,
+    __testing: {
+        setProjectGlobalFreshnessObserver,
+    },
+};
 
 if (require.main === module) {
     startStdioServer();

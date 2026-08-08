@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { handleMcpRequest } = require('../src/mcp/server');
+const { handleMcpRequest, __testing: mcpServerTesting } = require('../src/mcp/server');
 const { buildLookup } = require('../src/graph/build-chain-kb');
 const { loadSkillVersion } = require('../src/maintenance/show-version');
 const { buildSourceSnapshot } = require('../src/shared/source-snapshot');
@@ -768,6 +768,40 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     assert.equal(third._mcpCache.invalidatedByMtime, true);
 }
 
+async function testQueryProjectChainBuildsFreshnessOncePerRequest() {
+    const { workspaceRoot, dataRoot } = makeWorkspace();
+    writeWebsiteWorkspace(workspaceRoot);
+    await callTool('build_project_index', { workspaceRoot, dataRoot, dryRun: false });
+
+    const expectedRoot = path.resolve(workspaceRoot);
+    let freshnessBuilds = 0;
+    mcpServerTesting.setProjectGlobalFreshnessObserver(context => {
+        if (path.resolve(context.workspaceRoot) === expectedRoot) {
+            freshnessBuilds++;
+        }
+    });
+
+    const args = {
+        workspaceRoot,
+        dataRoot,
+        type: 'method',
+        name: 'mountApp',
+        freshnessPolicy: 'allow_stale',
+    };
+
+    try {
+        const first = parseTextResult(await callTool('query_project_chain', args));
+        assert.equal(first._mcpCache.hit, false);
+        assert.equal(freshnessBuilds, 1);
+
+        const second = parseTextResult(await callTool('query_project_chain', args));
+        assert.equal(second._mcpCache.hit, true);
+        assert.equal(freshnessBuilds, 2);
+    } finally {
+        mcpServerTesting.setProjectGlobalFreshnessObserver(null);
+    }
+}
+
 async function testQueryProjectChainCompactAndFullProjection() {
     const { workspaceRoot, dataRoot } = makeWorkspace();
     writeWebsiteWorkspace(workspaceRoot);
@@ -1029,6 +1063,7 @@ Promise.all([
     testProjectFreshnessDetectsSourceChanges(),
     testProjectFreshnessUnknownWithoutSourceSnapshot(),
     testQueryProjectChainCacheInvalidatesOnKbMtime(),
+    testQueryProjectChainBuildsFreshnessOncePerRequest(),
     testQueryProjectChainCompactAndFullProjection(),
     testQueryProjectChainAutoRebuildsStaleKb(),
     testQueryProjectChainRequireFreshBlocksStaleKb(),

@@ -8,6 +8,7 @@
 ## [未发布]
 
 ### 改进
+- `query_project_chain` 复用 freshness gate 已生成的 project-global 状态，避免 cache lookup 前重复执行完整 source snapshot 扫描。
 - Experience harness 的 `--skip-path-check` 现在同时作用于合同检查和完整 12 任务运行，并新增独立参数合同测试，避免评分阶段意外恢复真实路径校验。
 - 新增只读大型 KB benchmark，输出 CLI/MCP 冷热查询、JSON 读取解析、Node/V8 版本和内存快照，不会初始化、登记或重建目标 workspace。
 - qy-server Pinus 真实集成与可移植 fixture 兼容当前 `app/application`、`app/servers/pkweb`、`app/infrastructure` 目录，并继续兼容旧目录候选；`registerMany` 只从真实调用参数提取消息绑定，避免普通二元数组误报。
