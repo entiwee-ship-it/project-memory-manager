@@ -138,31 +138,31 @@ const ALIAS_RULES = [
     {
         pattern: /新版大厅|new.?lobby/,
         semanticTerms: ['新版大厅', 'newlobby'],
-        terms: ['newlobby', 'newlobbyview'],
+        terms: ['lobby-view', 'lobbyview', 'lobbyviewcomp'],
     },
     {
         pattern: /新版大厅|new.?lobby/,
         weight: 6,
-        terms: ['newlobby.prefab', 'newlobbyview.ts'],
+        terms: ['lobbyview.prefab', 'lobbyviewcomp.ts'],
     },
     {
         pattern: /新版大厅.*(?:入场动画|首帧)|(?:入场动画|首帧).*新版大厅/,
-        terms: ['uinodeanimation', 'gameuiconfig', 'lobbyview', 'lobbyview.ts'],
+        terms: ['viewenteranimator', 'onadded', 'gameuiconfig', 'lobbyviewcomp', 'lobbyview'],
     },
     {
         pattern: /新版大厅.*(?:入场动画|首帧)|(?:入场动画|首帧).*新版大厅/,
         weight: 6,
-        terms: ['uinodeanimation.ts', 'gameuiconfig.ts', 'lobbyview.ts'],
+        terms: ['viewenteranimator.onadded', 'viewenteranimator.ts', 'lobbyviewcomp.ts', 'lobbyview.prefab', 'gameuiconfig.ts', 'lobbyview.ts'],
     },
     {
         pattern: /head.?frame|头像框/,
         weight: 6,
-        terms: ['headframe.prefab', 'headframecomp.ts', 'newlobbyview.ts'],
+        terms: ['headframe.prefab', 'headframecomp.ts', 'lobbyviewcomp.ts', 'lobbyview.prefab'],
     },
     {
         pattern: /bottomactionmodule|bottom.?action|底部操作/,
         weight: 6,
-        terms: ['bottomactionmodule', 'newlobby', 'newlobbyview'],
+        terms: ['bottomactionmodule', 'lobbyviewcomp.ts', 'lobbyview.prefab'],
     },
     {
         pattern: /游戏配置.*(?:规则|默认)|(?:规则|默认).*游戏配置/,

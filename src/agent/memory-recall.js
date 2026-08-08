@@ -687,9 +687,35 @@ function blockedExecutionPlan(preflight) {
     };
 }
 
-function resumeExecutionPlan(historicalExperience) {
+function currentWorkspaceFile(workspaceRoot, file) {
+    if (!String(workspaceRoot || '').trim() || !String(file || '').trim()) {
+        return null;
+    }
+    const root = path.resolve(String(workspaceRoot || ''));
+    const candidate = path.isAbsolute(file) ? path.resolve(file) : path.resolve(root, file);
+    const relative = path.relative(root, candidate);
+    if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        return null;
+    }
+    try {
+        return fs.statSync(candidate).isFile() ? toPosix(relative) : null;
+    } catch {
+        return null;
+    }
+}
+
+function resumeExecutionPlan(historicalExperience, workspaceRoot) {
     const resume = historicalExperience.resume;
-    const targetFiles = (historicalExperience.relatedFiles || []).map(item => item.value).filter(Boolean);
+    const historicalFiles = (historicalExperience.relatedFiles || []).map(item => item.value).filter(Boolean);
+    const resolvedFiles = historicalFiles.map(file => ({
+        historicalFile: file,
+        currentFile: currentWorkspaceFile(workspaceRoot, file),
+    }));
+    const targetFiles = uniq(resolvedFiles.map(item => item.currentFile).filter(Boolean));
+    const staleFiles = resolvedFiles.filter(item => !item.currentFile).map(item => item.historicalFile);
+    const staleFileNote = staleFiles.length > 0
+        ? `历史 outcome 中有 ${staleFiles.length} 个文件在当前 workspace 不存在或已迁移：${staleFiles.join(', ')}`
+        : '';
     return {
         contextStatus: resume ? 'resume-memory-ready' : 'resume-memory-missing',
         targetFiles,
@@ -705,11 +731,14 @@ function resumeExecutionPlan(historicalExperience) {
         validation: {
             recommendedCommands: (historicalExperience.validationCommands || []).map(item => item.value).filter(Boolean),
         },
-        uncertainties: resume ? ['历史状态尚未与当前源码进行精确确认。'] : ['没有召回可证明的历史任务状态。'],
+        uncertainties: resume
+            ? ['历史状态尚未与当前源码进行精确确认。', staleFileNote].filter(Boolean)
+            : ['没有召回可证明的历史任务状态。'],
         currentFacts: emptyCurrentFacts(),
         sourceConfirmation: resume ? [{
-            reason: '历史 outcome 需要与当前源码和提交状态确认。',
+            reason: staleFileNote || '历史 outcome 需要与当前源码和提交状态确认。',
             files: targetFiles,
+            staleFiles,
         }] : [],
         evidence: [],
     };
@@ -762,7 +791,7 @@ function prepareAgentBrief(options = {}) {
     }
 
     const executionPlan = intent.intent === 'resume'
-        ? resumeExecutionPlan(historicalExperience)
+        ? resumeExecutionPlan(historicalExperience, memory.workspaceRoot)
         : planTaskExecution({ ...options, intent: intent.intent });
     const currentFacts = executionPlan.currentFacts || {
         ...emptyCurrentFacts(options.changedFiles || options.changedFile),

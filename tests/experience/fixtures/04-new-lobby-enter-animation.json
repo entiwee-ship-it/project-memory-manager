@@ -6,17 +6,17 @@
   "knownFiles": [],
   "changedFiles": [],
   "requiredFiles": [
-    "xy-client/assets/script/game/common/ui/UINodeAnimation.ts",
+    "xy-client/assets/script/game/common/anim/ViewEnterAnimator.ts",
     "xy-client/assets/script/game/lobby/LobbyView.ts",
-    "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts",
+    "xy-client/assets/script/game/lobby-view/LobbyViewComp.ts",
     "xy-client/assets/script/game/common/config/GameUIConfig.ts",
-    "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"
+    "xy-client/assets/bundle/gui/lobby-view/LobbyView.prefab"
   ],
   "acceptedFiles": [],
   "forbiddenDomains": ["cms-server", "mall", "mahjong"],
-  "requiredEvidence": {"methods": ["playEnterAnimations"], "endpoints": [], "requests": [], "messages": [], "tables": []},
-  "expectedValidation": ["验证首帧前移动节点保持透明", "验证缓存界面 onEnable 可重新触发入场"],
+  "requiredEvidence": {"methods": ["onAdded"], "endpoints": [], "requests": [], "messages": [], "tables": []},
+  "expectedValidation": ["验证首帧前移动节点保持透明", "验证缓存界面再次 onAdded 可重新触发入场"],
   "expectedMemory": {"taskFragments": ["新版大厅"]},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
-  "directSourceBaseline": {"searchRounds": ["playEnterAnimations 首帧 闪现", "NewLobbyView GameUIConfig"], "readFiles": ["xy-client/assets/script/game/common/ui/UINodeAnimation.ts", "xy-client/assets/script/game/lobby/LobbyView.ts", "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts", "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"], "correctionRounds": 1}
+  "directSourceBaseline": {"searchRounds": ["ViewEnterAnimator onAdded prepareEnter replayEnter 首帧 闪现", "LobbyViewComp GameUIConfig"], "readFiles": ["xy-client/assets/script/game/common/anim/ViewEnterAnimator.ts", "xy-client/assets/script/game/lobby/LobbyView.ts", "xy-client/assets/script/game/lobby-view/LobbyViewComp.ts", "xy-client/assets/bundle/gui/lobby-view/LobbyView.prefab"], "correctionRounds": 1}
 }

@@ -15,7 +15,7 @@
     "test:experience": "node tests/experience/pmm-experience-harness.test.js",
     "test:experience:options": "node tests/experience/harness-options.test.js",
     "test:experience:contracts": "node tests/experience/pmm-experience-harness.test.js --fixtures-only --skip-path-check",
-    "test:experience:baseline": "node tests/experience/pmm-experience-harness.test.js --write-baseline tests/experience/baselines/2026-07-11-current.json",
+    "test:experience:baseline": "node tests/experience/pmm-experience-harness.test.js --write-baseline tests/experience/baselines/2026-08-08-current.json",
     "test:feature": "node tests/feature-discovery.test.js",
     "test:path": "node tests/path-resolution.test.js",
     "test:summary": "node tests/structured-summary.test.js",

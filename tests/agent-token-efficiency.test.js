@@ -170,9 +170,17 @@ function testTaskTermPrecision() {
     assert.equal(captcha.has('loginview'), false);
 
     const lobby = values('排查新版大厅入场动画首帧闪现');
-    for (const term of ['newlobby', 'newlobbyview', 'lobbyview', 'gameuiconfig', 'uinodeanimation']) {
+    for (const term of ['lobby-view', 'lobbyviewcomp', 'viewenteranimator', 'viewenteranimator.onadded', 'onadded', 'gameuiconfig']) {
         assert.ok(lobby.has(term), `new lobby terms missing ${term}`);
     }
+    assert.equal(lobby.has('uinodeanimation'), false);
+    assert.equal(lobby.has('newlobbyview'), false);
+
+    const bottomAction = values('调整新版大厅 BottomActionModule 节点结构并避免 prefab 引用损坏');
+    for (const term of ['bottomactionmodule', 'lobbyviewcomp.ts', 'lobbyview.prefab']) {
+        assert.ok(bottomAction.has(term), `bottom action terms missing ${term}`);
+    }
+    assert.equal(bottomAction.has('viewenteranimator'), false);
 
     const gameConfig = values('同步后台游戏配置规则默认值并检查前后端存储契约');
     for (const term of ['gameedit', 'gameschemaeditor', 'rulecanvas', 'gameschema']) {

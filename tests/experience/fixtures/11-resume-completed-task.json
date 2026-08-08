@@ -7,12 +7,12 @@
   "changedFiles": [],
   "requiredFiles": [],
   "acceptedFiles": [
-    "qy-server/game-server/app/modules/commodity.ts",
-    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
-    "qy-server/game-server/app/modules/mallConfig/mallRechargeProductSnapshot.ts",
-    "qy-server/game-server/app/payment/services/orderService.ts"
+    "qy-server/game-server/app/application/modules/commodity.ts",
+    "qy-server/game-server/app/application/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/app/application/modules/mallConfig/mallRechargeProductSnapshot.ts",
+    "qy-server/game-server/app/application/payment/services/orderService.ts"
   ],
-  "forbiddenDomains": ["mahjong", "captcha", "lobby/newLobby"],
+  "forbiddenDomains": ["mahjong", "captcha", "lobby-view"],
   "requiredEvidence": {"methods": [], "endpoints": [], "requests": [], "messages": [], "tables": []},
   "expectedValidation": [],
   "expectedMemory": {"taskFragments": ["统一钻石充值交易商品快照来源"]},

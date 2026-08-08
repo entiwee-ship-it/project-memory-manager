@@ -9,7 +9,7 @@
     "cms-client/src/views/mall/recharge/RechargeLadderList.vue",
     "cms-server/src/models/mallManagement/rechargeLadderModel.ts",
     "cms-server/src/common/schema/mall/rechargeLadderSchema.ts",
-    "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts",
+    "qy-server/game-server/app/application/modules/mallConfig/mallRuntimeConfig.ts",
     "qy-server/game-server/schema.sql"
   ],
   "acceptedFiles": ["cms-server/src/controllers/mallManagement/rechargeLadderController.ts"],
@@ -18,5 +18,5 @@
   "expectedValidation": ["运行商城充值配置三端 contract", "构建 cms-client/cms-server/qy-server"],
   "expectedMemory": {"taskFragments": ["商城相关", "商城数据一致性", "商品快照", "充值配置"]},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
-  "directSourceBaseline": {"searchRounds": ["recharge ladder", "mallRuntimeConfig tb_recharge_ladder"], "readFiles": ["cms-client/src/views/mall/recharge/RechargeLadderList.vue", "cms-server/src/models/mallManagement/rechargeLadderModel.ts", "qy-server/game-server/app/modules/mallConfig/mallRuntimeConfig.ts", "qy-server/game-server/schema.sql"], "correctionRounds": 1}
+  "directSourceBaseline": {"searchRounds": ["recharge ladder", "mallRuntimeConfig tb_recharge_ladder"], "readFiles": ["cms-client/src/views/mall/recharge/RechargeLadderList.vue", "cms-server/src/models/mallManagement/rechargeLadderModel.ts", "qy-server/game-server/app/application/modules/mallConfig/mallRuntimeConfig.ts", "qy-server/game-server/schema.sql"], "correctionRounds": 1}
 }

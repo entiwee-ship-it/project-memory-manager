@@ -191,6 +191,10 @@ function testResumeBriefCompleteness(fixture) {
     assert.ok(serialized.includes('typeOfExpenditure'));
     assert.ok(serialized.includes('确认 e61e81d6'));
     assert.equal(result.historicalExperience.recalledTasks.length, 1);
+    assert.ok(result.historicalExperience.relatedFiles.some(item => item.value === 'app/modules/commodity.ts'));
+    assert.deepEqual(result.executionPlan.targetFiles, []);
+    assert.deepEqual(result.recommendedFiles, []);
+    assert.ok(result.risksAndNotes.some(note => note.includes('app/modules/commodity.ts')));
 }
 
 function testResumeBriefIgnoresGenericTaskSuffix(fixture) {

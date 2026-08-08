@@ -3,12 +3,12 @@
   "task": "在新版大厅 prefab 接入通用 HeadFrame 组件并复核绑定范围",
   "intent": "implement",
   "risk": "medium",
-  "knownFiles": ["xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab"],
+  "knownFiles": ["xy-client/assets/bundle/gui/lobby-view/LobbyView.prefab"],
   "changedFiles": [],
   "requiredFiles": [
     "xy-client/assets/script/game/common/HeadFrameComp.ts",
-    "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts",
-    "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab",
+    "xy-client/assets/script/game/lobby-view/LobbyViewComp.ts",
+    "xy-client/assets/bundle/gui/lobby-view/LobbyView.prefab",
     "xy-client/assets/bundle/game/common/prefabs/headFrame.prefab"
   ],
   "acceptedFiles": [],
@@ -17,5 +17,5 @@
   "expectedValidation": ["运行 lobby prefab contract", "运行 prefab parent/children 双向引用完整性检查"],
   "expectedMemory": {"taskFragments": ["新版大厅"]},
   "resumeExpectation": {"completed": [], "validation": [], "remainingRisks": [], "nextAction": ""},
-  "directSourceBaseline": {"searchRounds": ["HeadFrameComp", "headFrame prefab NewLobbyView"], "readFiles": ["xy-client/assets/script/game/common/HeadFrameComp.ts", "xy-client/assets/script/game/lobby/newLobby/NewLobbyView.ts", "xy-client/assets/bundle/gui/lobby/newLobby/newLobby.prefab", "xy-client/assets/bundle/game/common/prefabs/headFrame.prefab"], "correctionRounds": 0}
+  "directSourceBaseline": {"searchRounds": ["HeadFrameComp", "headFrame prefab LobbyViewComp"], "readFiles": ["xy-client/assets/script/game/common/HeadFrameComp.ts", "xy-client/assets/script/game/lobby-view/LobbyViewComp.ts", "xy-client/assets/bundle/gui/lobby-view/LobbyView.prefab", "xy-client/assets/bundle/game/common/prefabs/headFrame.prefab"], "correctionRounds": 0}
 }
