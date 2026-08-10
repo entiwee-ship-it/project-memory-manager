@@ -112,11 +112,60 @@ function createMemoryFixture() {
         source: 'test',
         changedFiles: ['app/api/facebook/oauth/callback/route.ts'],
     });
-    return { workspaceRoot, dataRoot };
+    return { workspaceRoot, dataRoot, projectConfigPath };
 }
 
 function assertIncludes(values, expected, message = '') {
     assert.ok(values.includes(expected), message || `expected ${JSON.stringify(values)} to include ${expected}`);
+}
+
+function gitCommand(repoRoot, args) {
+    const result = spawnSync('git', ['-C', repoRoot, ...args], {
+        encoding: 'utf8',
+        windowsHide: true,
+    });
+    assert.equal(result.status, 0, result.stderr || ('git ' + args.join(' ') + ' failed'));
+    return String(result.stdout || '').trim();
+}
+
+function createPathMigrationGitHistory(fixture) {
+    const migrations = [
+        ['app/modules/commodity.ts', 'app/application/modules/commodity.ts'],
+        ['app/modules/mallConfig/mallRuntimeConfig.ts', 'app/application/modules/mallConfig/mallRuntimeConfig.ts'],
+        ['app/modules/mallConfig/mallRechargeProductSnapshot.ts', 'app/application/modules/mallConfig/mallRechargeProductSnapshot.ts'],
+        ['app/payment/services/orderService.ts', 'app/application/payment/services/orderService.ts'],
+    ];
+    gitCommand(fixture.workspaceRoot, ['init', '--quiet']);
+    gitCommand(fixture.workspaceRoot, ['config', 'user.email', 'pmm-tests@example.invalid']);
+    gitCommand(fixture.workspaceRoot, ['config', 'user.name', 'PMM Tests']);
+    for (const [historicalFile, currentFile] of migrations) {
+        fs.mkdirSync(path.dirname(path.join(fixture.workspaceRoot, historicalFile)), { recursive: true });
+        fs.renameSync(
+            path.join(fixture.workspaceRoot, currentFile),
+            path.join(fixture.workspaceRoot, historicalFile)
+        );
+    }
+    gitCommand(fixture.workspaceRoot, ['add', '--all']);
+    gitCommand(fixture.workspaceRoot, ['commit', '--quiet', '-m', 'legacy paths']);
+    const historicalCommit = gitCommand(fixture.workspaceRoot, ['rev-parse', 'HEAD']);
+
+    for (const [historicalFile, currentFile] of migrations) {
+        fs.mkdirSync(path.dirname(path.join(fixture.workspaceRoot, currentFile)), { recursive: true });
+        fs.renameSync(
+            path.join(fixture.workspaceRoot, historicalFile),
+            path.join(fixture.workspaceRoot, currentFile)
+        );
+    }
+    gitCommand(fixture.workspaceRoot, ['add', '--all']);
+    gitCommand(fixture.workspaceRoot, ['commit', '--quiet', '-m', 'current paths']);
+    const currentCommit = gitCommand(fixture.workspaceRoot, ['rev-parse', 'HEAD']);
+    buildChainKb([
+        '--workspace-root', fixture.workspaceRoot,
+        '--data-root', fixture.dataRoot,
+        '--layout', 'external-data',
+        '--config', fixture.projectConfigPath,
+    ]);
+    return { historicalCommit, currentCommit };
 }
 
 function parseToolResult(response) {
@@ -265,6 +314,71 @@ function testResumeBriefAppliesExplicitPathConfirmation(fixture) {
     assert.deepEqual(compact.executionPlan.targetFiles, ['app/application/modules/commodity.ts']);
     assert.deepEqual(compact.recommendedFiles, ['app/application/modules/commodity.ts']);
     assert.ok(JSON.stringify(compact.sourceConfirmation).includes('source-confirmed'));
+}
+
+function testResumeBriefUsesInternalEquivalenceVerifier(fixture) {
+    const history = createPathMigrationGitHistory(fixture);
+    const confirmation = {
+        historicalFile: 'app/modules/commodity.ts',
+        currentCandidate: 'app/application/modules/commodity.ts',
+        confirmationStatus: 'equivalence-proven',
+        evidence: [
+            {
+                kind: 'source-read',
+                file: 'app/application/modules/commodity.ts',
+                line: 1,
+                contains: 'purchaseGoldenBeans',
+            },
+            {
+                kind: 'content-hash-match',
+                historicalCommit: history.historicalCommit,
+                historicalFile: 'app/modules/commodity.ts',
+            },
+        ],
+    };
+    const result = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一钻石充值交易商品快照来源',
+        pathMigrationConfirmations: [confirmation],
+    });
+    const proven = result.pathMigrationCandidates.find(item => item.historicalFile === confirmation.historicalFile);
+    assert.equal(proven.sourceConfirmed, true);
+    assert.equal(proven.confirmationStatus, 'equivalence-proven');
+    assert.equal(proven.equivalenceProven, true);
+    assert.deepEqual(result.executionPlan.targetFiles, [confirmation.currentCandidate]);
+    assert.deepEqual(result.recommendedFiles, [confirmation.currentCandidate]);
+    assert.deepEqual(result.currentFacts.criticalFiles, []);
+
+    const rejectedResult = prepareAgentBrief({
+        workspaceRoot: fixture.workspaceRoot,
+        dataRoot: fixture.dataRoot,
+        task: '继续统一钻石充值交易商品快照来源',
+        pathMigrationConfirmations: [{
+            ...confirmation,
+            evidence: [
+                confirmation.evidence[0],
+                {
+                    ...confirmation.evidence[1],
+                    historicalCommit: 'invalid commit value',
+                },
+            ],
+        }],
+    });
+    const downgraded = rejectedResult.pathMigrationCandidates.find(item => (
+        item.historicalFile === confirmation.historicalFile
+    ));
+    assert.equal(downgraded.sourceConfirmed, true);
+    assert.equal(downgraded.confirmationStatus, 'source-confirmed');
+    assert.equal(downgraded.equivalenceProven, false);
+    assert.ok(downgraded.confirmation.reason.includes('historicalCommit'));
+    assert.deepEqual(rejectedResult.executionPlan.targetFiles, [confirmation.currentCandidate]);
+
+    const compact = projectAgentOutput(rejectedResult, {}, 'prepare_agent_brief');
+    const compactDowngraded = compact.pathMigrationCandidates.find(item => (
+        item.historicalFile === confirmation.historicalFile
+    ));
+    assert.ok(compactDowngraded.confirmation.reason.includes('historicalCommit'));
 }
 
 function testResumeBriefIgnoresGenericTaskSuffix(fixture) {
@@ -609,6 +723,7 @@ async function testMcpTools(fixture) {
     testSimpleBriefSkipsHistory(fixture);
     testResumeBriefCompleteness(fixture);
     testResumeBriefAppliesExplicitPathConfirmation(fixture);
+    testResumeBriefUsesInternalEquivalenceVerifier(fixture);
     testReviewRecallPrioritizesChangedFiles(fixture);
     testPrepareAgentBriefPreflightBlocked();
     testAgentBriefCompactFiltersExternalDataRootFiles(fixture);

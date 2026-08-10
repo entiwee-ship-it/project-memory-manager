@@ -150,6 +150,41 @@ preflight ready 后的首选任务入口。它聚合 Usage Gate、任务意图�
 
 默认 `detail=compact` 时返回 `preflightSummary`，不会嵌入完整 `preflight`。传 `detail=full` 时返回完整 `preflight`、完整 `memory` 和完整 MCP freshness 元数据，适合调试 PMM 自身问题。
 
+resume brief 在 fresh KB 中发现历史失效路径的当前候选后，可以通过 `pathMigrationConfirmations` 显式确认：
+
+```json
+{
+  "workspaceRoot": "E:/xile-workspace/project",
+  "dataRoot": "E:/xile-workspace/codex-tools/project-memory-data",
+  "task": "继续历史任务",
+  "pathMigrationConfirmations": [
+    {
+      "historicalFile": "src/legacy/Service.ts",
+      "currentCandidate": "src/current/Service.ts",
+      "confirmationStatus": "equivalence-proven",
+      "evidence": [
+        {
+          "kind": "source-read",
+          "file": "src/current/Service.ts",
+          "line": 1,
+          "contains": "Service"
+        },
+        {
+          "kind": "content-hash-match",
+          "historicalCommit": "<git-commit>",
+          "historicalFile": "src/legacy/Service.ts"
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `source-confirmed` 需要通过当前源码行、当前符号或带原因的人工确认；只有确认后的候选才能进入编辑目标和推荐文件。
+- `equivalence-proven` 还必须由 PMM 内部验证，且所用提交必须在当前 `HEAD` 的可达历史中：`content-hash-match` 比较历史 Git blob 与当前磁盘文件的 SHA-256；`git-rename-content-match` 要求指定 `fromCommit` / `toCommit` 间存在明确 `R100`，且当前磁盘内容仍与目标提交一致；`ast-equivalence` 要求两端使用兼容的 TypeScript/JavaScript 语言种类，并比较解析后忽略注释和空白的 token signature。
+- PMM 不读取调用方声明的 hash 作为证明。Git commit、路径、解析或内容验证失败时，如果 source evidence 仍有效，会保留 `source-confirmed` 和目标文件，但 `equivalenceProven` 保持 `false` 并在 confirmation reason 中说明降级原因。
+- 路径评分、普通 `source-read` 或手工状态标签本身都不能证明内容等价；未确认候选也不会进入 `currentFacts`。
+
 ### `prepare_cocos_edit_brief`
 
 面向 Cocos Creator 3.8.x 的实时只读编辑上下文入口。`workspaceRoot` 必须是包含目标 `assets/` 的 Creator 工程根，不是其上级多项目目录。工具读取当前磁盘上的 Prefab/Scene，合并经过新鲜度门禁的 project-global KB 脚本映射和历史记录，但不会修改 Creator 序列化资源，也不会自动重建整个 KB。

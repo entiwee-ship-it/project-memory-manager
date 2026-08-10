@@ -11,6 +11,7 @@ const {
     applyPathMigrationConfirmations,
     currentFileExists,
     resolvePathMigrationCandidates,
+    verifyPathMigrationEquivalenceEvidence,
     verifyPathMigrationSourceEvidence,
 } = require('./path-migration');
 
@@ -746,6 +747,11 @@ function resumeExecutionPlan(historicalExperience, options = {}) {
         {
             fileExists: file => currentFileExists(workspaceRoot, file),
             verifySourceEvidence: (evidence, candidate) => verifyPathMigrationSourceEvidence(
+                workspaceRoot,
+                candidate,
+                evidence
+            ),
+            verifyEquivalenceEvidence: (evidence, candidate) => verifyPathMigrationEquivalenceEvidence(
                 workspaceRoot,
                 candidate,
                 evidence
