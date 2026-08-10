@@ -775,7 +775,7 @@ async function testQueryProjectChainBuildsFreshnessOncePerRequest() {
 
     const expectedRoot = path.resolve(workspaceRoot);
     let freshnessBuilds = 0;
-    mcpServerTesting.setProjectGlobalFreshnessObserver(context => {
+    mcpServerTesting.setFreshnessObserver(context => {
         if (path.resolve(context.workspaceRoot) === expectedRoot) {
             freshnessBuilds++;
         }
@@ -798,7 +798,7 @@ async function testQueryProjectChainBuildsFreshnessOncePerRequest() {
         assert.equal(second._mcpCache.hit, true);
         assert.equal(freshnessBuilds, 2);
     } finally {
-        mcpServerTesting.setProjectGlobalFreshnessObserver(null);
+        mcpServerTesting.setFreshnessObserver(null);
     }
 }
 

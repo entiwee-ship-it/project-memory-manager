@@ -51,11 +51,11 @@ const DEFAULT_MCP_QUERY_TIMEOUT_MS = 8000;
 const MAX_MCP_QUERY_TIMEOUT_MS = 30000;
 const DEFAULT_BUILD_WAIT_TIMEOUT_MS = 120000;
 const MAX_BUILD_WAIT_TIMEOUT_MS = 600000;
-const MAX_PROJECT_QUERY_CACHE_ENTRIES = 100;
+const MAX_QUERY_CACHE_ENTRIES = 100;
 const DEFAULT_FRESHNESS_POLICY = 'auto_rebuild';
 const FRESHNESS_POLICIES = new Set(['auto_rebuild', 'require_fresh', 'allow_stale']);
 const projectQueryCache = new Map();
-let projectGlobalFreshnessObserver = null;
+let freshnessObserver = null;
 
 const TOOL_DEFINITIONS = [
     {
@@ -811,7 +811,7 @@ function projectGlobalConfigPath(context) {
 }
 
 function buildProjectGlobalFreshness(context) {
-    projectGlobalFreshnessObserver?.(context);
+    freshnessObserver?.(context);
     const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
     const graph = readJsonSafe(graphPath, null);
@@ -991,14 +991,14 @@ function buildProjectArtifactState(args, projectGlobalFreshness = null) {
     };
 }
 
-function setProjectGlobalFreshnessObserver(observer = null) {
+function setFreshnessObserver(observer = null) {
     if (observer != null && typeof observer !== 'function') {
-        throw new TypeError('projectGlobalFreshnessObserver must be a function or null');
+        throw new TypeError('freshnessObserver must be a function or null');
     }
-    projectGlobalFreshnessObserver = observer;
+    freshnessObserver = observer;
 }
 
-function evictOldestProjectQueryCacheEntry() {
+function evictOldestQueryCacheEntry() {
     const oldestKey = projectQueryCache.keys().next().value;
     if (oldestKey) {
         projectQueryCache.delete(oldestKey);
@@ -2117,8 +2117,8 @@ function queryProjectChain(args) {
     }
 
     const payload = parseJsonOutput(result.stdout);
-    while (projectQueryCache.size >= MAX_PROJECT_QUERY_CACHE_ENTRIES) {
-        evictOldestProjectQueryCacheEntry();
+    while (projectQueryCache.size >= MAX_QUERY_CACHE_ENTRIES) {
+        evictOldestQueryCacheEntry();
     }
     const cachedAt = new Date().toISOString();
     projectQueryCache.set(cacheKey, {
@@ -2306,7 +2306,7 @@ module.exports = {
     run: startStdioServer,
     startStdioServer,
     __testing: {
-        setProjectGlobalFreshnessObserver,
+        setFreshnessObserver,
     },
 };
 

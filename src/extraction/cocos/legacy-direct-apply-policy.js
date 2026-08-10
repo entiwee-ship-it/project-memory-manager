@@ -1,11 +1,11 @@
 const LEGACY_DIRECT_APPLY_ENV = 'PMM_ENABLE_LEGACY_DIRECT_COCOS_APPLY';
 
-function legacyDirectCocosApplyEnabled() {
+function isLegacyApplyEnabled() {
     return process.env[LEGACY_DIRECT_APPLY_ENV] === '1';
 }
 
-function assertLegacyDirectCocosApplyEnabled() {
-    if (legacyDirectCocosApplyEnabled()) {
+function assertLegacyApplyEnabled() {
+    if (isLegacyApplyEnabled()) {
         return;
     }
     const error = new Error(
@@ -17,6 +17,6 @@ function assertLegacyDirectCocosApplyEnabled() {
 
 module.exports = {
     LEGACY_DIRECT_APPLY_ENV,
-    assertLegacyDirectCocosApplyEnabled,
-    legacyDirectCocosApplyEnabled,
+    assertLegacyApplyEnabled,
+    isLegacyApplyEnabled,
 };

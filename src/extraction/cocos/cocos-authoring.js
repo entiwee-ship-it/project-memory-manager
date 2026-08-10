@@ -281,7 +281,7 @@ function inferNodeRole(nodePath = '', nestedPrefabPath = '') {
     return 'child';
 }
 
-function inferPreferredComponentNodePath(prefab, componentName, authoringFeatureProfile = null) {
+function inferComponentNodePath(prefab, componentName, authoringFeatureProfile = null) {
     const existing = findPrefabComponent(prefab, componentName);
     if (existing?.nodePath) {
         return existing.nodePath;
@@ -341,7 +341,7 @@ function findAssetCandidates(graph, query = '', limit = 8) {
         }));
 }
 
-function getRelevantFieldBindingPatterns(authoringFeatureProfile = null, componentName = '', fieldName = '') {
+function findRelevantFieldPatterns(authoringFeatureProfile = null, componentName = '', fieldName = '') {
     return (authoringFeatureProfile?.fieldBindingPatterns || [])
         .filter(item => item.componentName === componentName && item.field === fieldName)
         .sort((left, right) => right.count - left.count || right.confidence - left.confidence);
@@ -484,7 +484,7 @@ function buildFieldBindingPlan({ prefab, componentNodePath, componentName, field
     };
 }
 
-function summarizeFieldBindingConvention(componentName, fieldName, fieldPatterns = [], assetPatterns = []) {
+function summarizeFieldConvention(componentName, fieldName, fieldPatterns = [], assetPatterns = []) {
     const bestFieldPattern = fieldPatterns[0] || null;
     const bestAssetPattern = assetPatterns[0] || null;
     if (!bestFieldPattern && bestAssetPattern) {
@@ -700,7 +700,7 @@ function summarizeExistingBindingEntry(entry, structure) {
     };
 }
 
-function buildExistingBindingsForComponent(prefabComponent, structure) {
+function buildComponentBindings(prefabComponent, structure) {
     const serialized = (prefabComponent.serializedFields || []).map(field => summarizeExistingBindingEntry(field, structure));
     const overrides = (prefabComponent.fieldOverrides || []).map(field => summarizeExistingBindingEntry({
         ...field,
@@ -831,7 +831,7 @@ function buildProfileBundle(artifacts, prefab) {
             rawType: ownerComponent?.rawType || component.rawType || component.componentName,
             scriptPath: component.scriptPath || null,
             bindableFields: (scriptRecord?.fieldTypes || []).map(fieldDef => summarizeFieldDef(fieldDef)),
-            existingBindings: buildExistingBindingsForComponent(component, structure),
+            existingBindings: buildComponentBindings(component, structure),
         };
     }).filter(component => component.componentKind === 'script' || Boolean(component.scriptPath));
     const eventBindings = (prefab.events || []).map(item => {
@@ -967,7 +967,7 @@ function planClickEvent(artifacts, options) {
     const targetNodePath = options.targetNode
         || findPrefabComponent(prefab, options.component)?.nodePath
         || conventions.recommendedTargetNodePath
-        || inferPreferredComponentNodePath(prefab, scriptRecord.componentNames?.[0] || options.component, authoringFeatureProfile)
+        || inferComponentNodePath(prefab, scriptRecord.componentNames?.[0] || options.component, authoringFeatureProfile)
         || findRootNodePath(prefab);
     const componentName = scriptRecord.componentNames?.[0] || options.component;
     const existingComponent = findPrefabComponent(prefab, componentName, targetNodePath);
@@ -1066,7 +1066,7 @@ function planFieldBinding(artifacts, options) {
     const componentName = existingComponent?.componentName || scriptRecord.componentNames?.[0] || options.component;
     const componentNodePath = options.node
         || existingComponent?.nodePath
-        || inferPreferredComponentNodePath(prefab, componentName, authoringFeatureProfile)
+        || inferComponentNodePath(prefab, componentName, authoringFeatureProfile)
         || findRootNodePath(prefab);
     const fieldDef = findFieldDefinition(scriptRecord, options.field);
     if (!fieldDef) {
@@ -1075,7 +1075,7 @@ function planFieldBinding(artifacts, options) {
             suggestions: findFieldCandidates(scriptRecord, options.field),
         });
     }
-    const fieldPatterns = getRelevantFieldBindingPatterns(authoringFeatureProfile, componentName, fieldDef.fieldName);
+    const fieldPatterns = findRelevantFieldPatterns(authoringFeatureProfile, componentName, fieldDef.fieldName);
     const assetPatterns = inferBindableFieldKind(fieldDef) === 'asset'
         ? getRelevantAssetPatterns(authoringFeatureProfile, fieldDef.baseType)
         : [];
@@ -1111,7 +1111,7 @@ function planFieldBinding(artifacts, options) {
     ];
     const bindingChange = changes.find(item => item.kind === 'bind-field');
     if (bindingChange) {
-        bindingChange.learnedFromProject = summarizeFieldBindingConvention(componentName, fieldDef.fieldName, fieldPatterns, assetPatterns);
+        bindingChange.learnedFromProject = summarizeFieldConvention(componentName, fieldDef.fieldName, fieldPatterns, assetPatterns);
     }
 
     return {
@@ -1290,7 +1290,7 @@ function learnEventPatterns(prefabs = []) {
         .sort((left, right) => right.count - left.count || left.sourceKind.localeCompare(right.sourceKind));
 }
 
-function learnComponentPlacementPatterns(prefabs = []) {
+function learnPlacementPatterns(prefabs = []) {
     const totalsByComponent = new Map();
     const grouped = new Map();
 
@@ -1425,7 +1425,7 @@ function buildFeatureAuthoringProfile(artifacts) {
         sourceKbVersion: artifacts.graph?.builtWithSkill?.version || '',
         prefabProfiles: prefabs.map(prefab => buildPrefabAuthoringProfile(artifacts, prefab)),
         eventPatterns: learnEventPatterns(prefabs),
-        componentPlacementPatterns: learnComponentPlacementPatterns(prefabs),
+        componentPlacementPatterns: learnPlacementPatterns(prefabs),
         fieldBindingPatterns: learnFieldBindingPatterns(prefabs),
         assetPatterns: learnAssetPatterns(prefabs),
     };

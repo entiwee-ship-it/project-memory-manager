@@ -149,7 +149,7 @@ function hasRuntimeCompletenessSignal(gate, changedFiles = []) {
     return changedFiles.some(file => /(?:^|\/)app\/api\/|route\.(ts|js)$|(?:^|\/)api\/|(?:^|\/)prisma\/|schema\.prisma|(?:^|\/)db\/|lib\/api-client|settings|chat/i.test(file));
 }
 
-function shouldRequireExpectedRuntimeFiles({ gate, changedFiles }) {
+function shouldRequireRuntimeFiles({ gate, changedFiles }) {
     if (!changedFiles.length) {
         return false;
     }
@@ -401,7 +401,7 @@ function validateEditScope(options = {}) {
         return signalKeys.some(key => hardRiskKeys.has(key))
             || (gate.decision !== 'optional_skip_allowed' && signalKeys.includes('commerce'));
     });
-    const missingExpectedFiles = context && !context.unavailable && shouldRequireExpectedRuntimeFiles({ gate, changedFiles })
+    const missingExpectedFiles = context && !context.unavailable && shouldRequireRuntimeFiles({ gate, changedFiles })
         ? (context.criticalFiles || [])
             .filter(file => /(?:api|route|prisma|lib\/api-client|settings|chat)/i.test(file))
             .filter(file => !changedFiles.some(changed => normalizeText(changed) === normalizeText(file)))

@@ -8,11 +8,11 @@ const { ensureDir, readJsonSafe, writeJsonAtomic } = require('../shared/common')
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 const { parseTaskTerms, termValues } = require('./task-terms');
 const {
-    applyPathMigrationConfirmations,
+    applyMigrationConfirmations,
     currentFileExists,
-    resolvePathMigrationCandidates,
-    verifyPathMigrationEquivalenceEvidence,
-    verifyPathMigrationSourceEvidence,
+    resolveMigrationCandidates,
+    verifyMigrationEquivalence,
+    verifyMigrationSource,
 } = require('./path-migration');
 
 const DEFAULT_RECALL_LIMIT = 3;
@@ -730,7 +730,7 @@ function resumeExecutionPlan(historicalExperience, options = {}) {
         ? `历史 outcome 中有 ${staleFiles.length} 个文件在当前 workspace 不存在或已迁移：${staleFiles.join(', ')}`
         : '';
     const migrationResult = staleFiles.length > 0
-        ? resolvePathMigrationCandidates({
+        ? resolveMigrationCandidates({
             workspaceRoot,
             dataRoot,
             freshnessStatus,
@@ -741,17 +741,17 @@ function resumeExecutionPlan(historicalExperience, options = {}) {
             }),
         })
         : { candidates: [], warnings: [] };
-    const confirmedMigrations = applyPathMigrationConfirmations(
+    const confirmedMigrations = applyMigrationConfirmations(
         migrationResult.candidates,
         pathMigrationConfirmations,
         {
             fileExists: file => currentFileExists(workspaceRoot, file),
-            verifySourceEvidence: (evidence, candidate) => verifyPathMigrationSourceEvidence(
+            verifySourceEvidence: (evidence, candidate) => verifyMigrationSource(
                 workspaceRoot,
                 candidate,
                 evidence
             ),
-            verifyEquivalenceEvidence: (evidence, candidate) => verifyPathMigrationEquivalenceEvidence(
+            verifyEquivalenceEvidence: (evidence, candidate) => verifyMigrationEquivalence(
                 workspaceRoot,
                 candidate,
                 evidence

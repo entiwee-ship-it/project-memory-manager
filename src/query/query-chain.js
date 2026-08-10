@@ -1894,7 +1894,7 @@ function selectorUsageHint(selectorType, query) {
     };
 }
 
-function buildNaturalLanguageSelectorSuggestions(base) {
+function buildSelectorSuggestions(base) {
     return [
         {
             query: `${base} --name "<关键词>" --grouped --json`,
@@ -1932,7 +1932,7 @@ function buildTypeAwareNotFoundResult(graph, featureKey, selectorType, query, op
             selectorType,
             query,
             ...usageHint,
-            suggestions: buildNaturalLanguageSelectorSuggestions(base),
+            suggestions: buildSelectorSuggestions(base),
         };
     }
     const suggestions = [];

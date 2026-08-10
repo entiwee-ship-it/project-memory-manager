@@ -340,7 +340,7 @@ function evaluateEquivalenceEvidence(evidenceItems = [], candidate = {}, options
     };
 }
 
-function confirmPathMigrationCandidate(candidate = {}, confirmation = {}, options = {}) {
+function confirmMigrationCandidate(candidate = {}, confirmation = {}, options = {}) {
     const base = {
         ...candidate,
         sourceConfirmed: false,
@@ -413,13 +413,13 @@ function confirmPathMigrationCandidate(candidate = {}, confirmation = {}, option
     };
 }
 
-function applyPathMigrationConfirmations(candidates = [], confirmations = [], options = {}) {
+function applyMigrationConfirmations(candidates = [], confirmations = [], options = {}) {
     const confirmationMap = new Map();
     for (const item of asArray(confirmations).filter(value => value && typeof value === 'object')) {
         const key = confirmationKey(item.historicalFile, item.currentCandidate);
         confirmationMap.set(key, confirmationMap.has(key) ? { ...item, duplicate: true } : item);
     }
-    return asArray(candidates).map(candidate => confirmPathMigrationCandidate(
+    return asArray(candidates).map(candidate => confirmMigrationCandidate(
         candidate,
         confirmationMap.get(confirmationKey(candidate.historicalFile, candidate.currentCandidate)),
         options
@@ -442,7 +442,7 @@ function normalizeCatalogItems(currentFiles = []) {
     return [...byFile.values()];
 }
 
-function rankPathMigrationCandidates({ historicalFiles = [], currentFiles = [], historicalText = '', fileExists = () => true } = {}) {
+function rankMigrationCandidates({ historicalFiles = [], currentFiles = [], historicalText = '', fileExists = () => true } = {}) {
     const catalog = normalizeCatalogItems(currentFiles);
     return uniq(historicalFiles.map(file => toPosix(file).trim()).filter(Boolean)).map(historicalFile => {
         if (isAbsolutePath(historicalFile) || pathParts(historicalFile).includes('..')) {
@@ -540,7 +540,7 @@ function currentFileExists(workspaceRoot, relativeFile) {
     }
 }
 
-function normalizeRelativeEvidencePath(filePath = '') {
+function normalizeEvidencePath(filePath = '') {
     const value = toPosix(String(filePath || '').trim()).replace(/^\.\//, '');
     if (!value || isAbsolutePath(value) || pathParts(value).includes('..')) {
         return '';
@@ -587,7 +587,7 @@ function resolveGitContext(workspaceRoot) {
 }
 
 function repoRelativePath(gitRoot, workspaceRoot, relativeFile) {
-    const safeRelative = normalizeRelativeEvidencePath(relativeFile);
+    const safeRelative = normalizeEvidencePath(relativeFile);
     if (!safeRelative) {
         return '';
     }
@@ -605,7 +605,7 @@ function repoRelativePath(gitRoot, workspaceRoot, relativeFile) {
 
 function readGitBlob(gitRoot, commit, repoRelativeFile) {
     const safeCommit = safeGitRef(commit);
-    const safeFile = normalizeRelativeEvidencePath(repoRelativeFile);
+    const safeFile = normalizeEvidencePath(repoRelativeFile);
     if (!safeCommit || !safeFile) {
         return null;
     }
@@ -634,12 +634,12 @@ function sha256(buffer) {
     return createHash('sha256').update(buffer).digest('hex');
 }
 
-function currentCandidatePath(workspaceRoot, candidate = {}, evidence = {}) {
-    const candidateFile = normalizeRelativeEvidencePath(candidate.currentCandidate);
+function currentEvidencePath(workspaceRoot, candidate = {}, evidence = {}) {
+    const candidateFile = normalizeEvidencePath(candidate.currentCandidate);
     if (!candidateFile || !currentFileExists(workspaceRoot, candidateFile)) {
         return '';
     }
-    const providedFile = normalizeRelativeEvidencePath(
+    const providedFile = normalizeEvidencePath(
         evidence.currentCandidate || evidence.currentFile || evidence.file || ''
     );
     if (providedFile && normalizeText(providedFile) !== normalizeText(candidateFile)) {
@@ -649,7 +649,7 @@ function currentCandidatePath(workspaceRoot, candidate = {}, evidence = {}) {
 }
 
 function historicalEvidenceFile(candidate = {}, evidence = {}) {
-    const file = normalizeRelativeEvidencePath(
+    const file = normalizeEvidencePath(
         evidence.historicalFile || evidence.oldPath || evidence.oldFile || candidate.historicalFile
     );
     if (!file) {
@@ -671,7 +671,7 @@ function evidenceCommit(evidence = {}, names = []) {
     return '';
 }
 
-function scriptLanguageForPath(filePath = '') {
+function scriptLangForPath(filePath = '') {
     const ext = extension(filePath);
     if (ext === '.tsx') {
         return { family: 'tsx', scriptKind: ts.ScriptKind.TSX };
@@ -689,7 +689,7 @@ function scriptLanguageForPath(filePath = '') {
 }
 
 function tokenSignature(sourceText, filePath) {
-    const language = scriptLanguageForPath(filePath);
+    const language = scriptLangForPath(filePath);
     if (!language) {
         return null;
     }
@@ -709,7 +709,7 @@ function tokenSignature(sourceText, filePath) {
     return tokens.join('\n');
 }
 
-function verifyPathMigrationEquivalenceEvidence(workspaceRoot, candidate = {}, evidence = {}) {
+function verifyMigrationEquivalence(workspaceRoot, candidate = {}, evidence = {}) {
     const kind = String(evidence.kind || '').trim().toLowerCase();
     if (!EQUIVALENCE_EVIDENCE_KINDS.has(kind)) {
         return { verified: false, reason: '不支持的等价证据类型。' };
@@ -718,7 +718,7 @@ function verifyPathMigrationEquivalenceEvidence(workspaceRoot, candidate = {}, e
     if (!gitContext) {
         return { verified: false, reason: '当前 workspace 不在可验证的 Git 仓库内。' };
     }
-    const currentPath = currentCandidatePath(gitContext.workspaceRoot, candidate, evidence);
+    const currentPath = currentEvidencePath(gitContext.workspaceRoot, candidate, evidence);
     if (!currentPath) {
         return { verified: false, reason: '当前候选文件不存在、越界或与等价证据不匹配。' };
     }
@@ -796,8 +796,8 @@ function verifyPathMigrationEquivalenceEvidence(workspaceRoot, candidate = {}, e
             ? { verified: true }
             : { verified: false, reason: '历史文件与当前候选文件 SHA-256 不一致。' };
     }
-    const historicalLanguage = scriptLanguageForPath(historicalFile);
-    const currentLanguage = scriptLanguageForPath(candidate.currentCandidate);
+    const historicalLanguage = scriptLangForPath(historicalFile);
+    const currentLanguage = scriptLangForPath(candidate.currentCandidate);
     if (!historicalLanguage || !currentLanguage || historicalLanguage.family !== currentLanguage.family) {
         return { verified: false, reason: 'AST 等价验证要求两端使用兼容的 TypeScript/JavaScript 语言种类。' };
     }
@@ -811,7 +811,7 @@ function verifyPathMigrationEquivalenceEvidence(workspaceRoot, candidate = {}, e
         : { verified: false, reason: '历史文件与当前候选文件的 token signature 不一致。' };
 }
 
-function verifyPathMigrationSourceEvidence(workspaceRoot, candidate = {}, evidence = {}) {
+function verifyMigrationSource(workspaceRoot, candidate = {}, evidence = {}) {
     const kind = String(evidence.kind || '').trim().toLowerCase();
     if (kind === 'manual-confirmation') {
         return Boolean(String(evidence.reason || '').trim());
@@ -838,7 +838,7 @@ function verifyPathMigrationSourceEvidence(workspaceRoot, candidate = {}, eviden
     }
 }
 
-function resolvePathMigrationCandidates(options = {}) {
+function resolveMigrationCandidates(options = {}) {
     if (options.freshnessStatus !== 'fresh') {
         return {
             candidates: [],
@@ -853,7 +853,7 @@ function resolvePathMigrationCandidates(options = {}) {
     try {
         const catalog = loadCurrentCatalog(context);
         return {
-            candidates: rankPathMigrationCandidates({
+            candidates: rankMigrationCandidates({
                 historicalFiles: options.historicalFiles,
                 currentFiles: catalog,
                 historicalText: options.historicalText,
@@ -870,13 +870,13 @@ function resolvePathMigrationCandidates(options = {}) {
 }
 
 module.exports = {
-    applyPathMigrationConfirmations,
+    applyMigrationConfirmations,
     buildCatalogFromScan,
-    confirmPathMigrationCandidate,
+    confirmMigrationCandidate,
     currentFileExists,
-    rankPathMigrationCandidates,
-    resolvePathMigrationCandidates,
-    verifyPathMigrationEquivalenceEvidence,
-    verifyPathMigrationSourceEvidence,
+    rankMigrationCandidates,
+    resolveMigrationCandidates,
+    verifyMigrationEquivalence,
+    verifyMigrationSource,
     workspaceRelativePath,
 };

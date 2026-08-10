@@ -260,7 +260,7 @@ function mapCallbackInvocation(invocationName, argMap) {
     return { localCalls: [], callbackInvocations: [mappedArg] };
 }
 
-function collectEffectiveNetworkRequests(methodInfo, methodMap, stack = new Set()) {
+function collectResolvedRequests(methodInfo, methodMap, stack = new Set()) {
     const currentKey = methodKey(methodInfo.scriptPath, methodInfo.name);
     if (stack.has(currentKey)) {
         return [];
@@ -293,7 +293,7 @@ function collectEffectiveNetworkRequests(methodInfo, methodMap, stack = new Set(
             argMap.set(paramName, (callSite.args || [])[index] || '');
         });
 
-        for (const nested of collectEffectiveNetworkRequests(callee, methodMap, nextStack)) {
+        for (const nested of collectResolvedRequests(callee, methodMap, nextStack)) {
             const callbackLocalCalls = [...(nested.callbackLocalCalls || [])];
             const callbackInvocations = [];
 
@@ -1827,7 +1827,7 @@ function buildGraph(raw, config, projectProfile, root) {
             }
 
             const methodInfo = methodMap.get(methodKey(script.scriptPath, method.name));
-            const effectiveRequests = collectEffectiveNetworkRequests(methodInfo, methodMap);
+            const effectiveRequests = collectResolvedRequests(methodInfo, methodMap);
             for (const request of effectiveRequests) {
                 const requestName = formatRequestNodeName(request);
                 const requestId = makeNodeId(

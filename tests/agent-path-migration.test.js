@@ -4,13 +4,13 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const {
-    applyPathMigrationConfirmations,
+    applyMigrationConfirmations,
     currentFileExists,
-    confirmPathMigrationCandidate,
-    rankPathMigrationCandidates,
-    resolvePathMigrationCandidates,
-    verifyPathMigrationEquivalenceEvidence,
-    verifyPathMigrationSourceEvidence,
+    confirmMigrationCandidate,
+    rankMigrationCandidates,
+    resolveMigrationCandidates,
+    verifyMigrationEquivalence,
+    verifyMigrationSource,
 } = require('../src/agent/path-migration');
 
 function findResult(results, historicalFile) {
@@ -65,7 +65,7 @@ function createGitMigrationFixture({ modifiedRename = false } = {}) {
 
 function testUniqueDirectoryMigration() {
     const historicalFile = 'app/modules/commodity.ts';
-    const results = rankPathMigrationCandidates({
+    const results = rankMigrationCandidates({
         historicalFiles: [historicalFile],
         currentFiles: ['app/application/modules/commodity.ts'],
     });
@@ -81,7 +81,7 @@ function testUniqueDirectoryMigration() {
 
 function testDirectorySeparatorMigration() {
     const historicalFile = 'xy-client/assets/script/game/lobby_view/LobbyViewComp.ts';
-    const results = rankPathMigrationCandidates({
+    const results = rankMigrationCandidates({
         historicalFiles: [historicalFile],
         currentFiles: ['xy-client/assets/script/game/lobby-view/LobbyViewComp.ts'],
     });
@@ -94,7 +94,7 @@ function testDirectorySeparatorMigration() {
 
 function testAmbiguousBasenameStaysUnconfirmed() {
     const historicalFile = 'src/legacy/LobbyViewComp.ts';
-    const results = rankPathMigrationCandidates({
+    const results = rankMigrationCandidates({
         historicalFiles: [historicalFile],
         currentFiles: [
             'src/new/LobbyViewComp.ts',
@@ -111,7 +111,7 @@ function testAmbiguousBasenameStaysUnconfirmed() {
 
 function testRenameUsesHistoricalSymbolEvidence() {
     const historicalFile = 'src/legacy/NewLobbyViewComp.ts';
-    const results = rankPathMigrationCandidates({
+    const results = rankMigrationCandidates({
         historicalFiles: [historicalFile],
         currentFiles: [{
             file: 'src/new/LobbyViewComp.ts',
@@ -127,7 +127,7 @@ function testRenameUsesHistoricalSymbolEvidence() {
 }
 
 function testExtensionAndWorkspaceAreaChangesRemainCandidates() {
-    const results = rankPathMigrationCandidates({
+    const results = rankMigrationCandidates({
         historicalFiles: [
             'legacy/services/orderService.js',
             'src/modules/commodity.ts',
@@ -145,7 +145,7 @@ function testExtensionAndWorkspaceAreaChangesRemainCandidates() {
 }
 
 function testDeletedAndOutsidePathsDoNotGuess() {
-    const results = rankPathMigrationCandidates({
+    const results = rankMigrationCandidates({
         historicalFiles: [
             'src/deleted/UnusedService.ts',
             '../codex-work/tests/external.test.cjs',
@@ -160,7 +160,7 @@ function testDeletedAndOutsidePathsDoNotGuess() {
 }
 
 function testNonFreshKbCannotProduceCandidates() {
-    const result = resolvePathMigrationCandidates({
+    const result = resolveMigrationCandidates({
         freshnessStatus: 'stale',
         historicalFiles: ['app/modules/commodity.ts'],
     });
@@ -172,7 +172,7 @@ function testNonFreshKbCannotProduceCandidates() {
 function testMissingScanArtifactReturnsWarning() {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-migration-workspace-'));
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pmm-migration-data-'));
-    const result = resolvePathMigrationCandidates({
+    const result = resolveMigrationCandidates({
         workspaceRoot,
         dataRoot,
         freshnessStatus: 'fresh',
@@ -202,11 +202,11 @@ function testSymlinkOutsideWorkspaceIsRejected() {
 }
 
 function testSourceConfirmationPromotesOnlyExplicitCandidate() {
-    const candidate = findResult(rankPathMigrationCandidates({
+    const candidate = findResult(rankMigrationCandidates({
         historicalFiles: ['app/modules/commodity.ts'],
         currentFiles: ['app/application/modules/commodity.ts'],
     }), 'app/modules/commodity.ts');
-    const confirmed = confirmPathMigrationCandidate(candidate, {
+    const confirmed = confirmMigrationCandidate(candidate, {
         historicalFile: candidate.historicalFile,
         currentCandidate: candidate.currentCandidate,
         confirmationStatus: 'source-confirmed',
@@ -225,11 +225,11 @@ function testSourceConfirmationPromotesOnlyExplicitCandidate() {
 }
 
 function testEquivalenceRequiresDedicatedEvidence() {
-    const candidate = findResult(rankPathMigrationCandidates({
+    const candidate = findResult(rankMigrationCandidates({
         historicalFiles: ['app/modules/commodity.ts'],
         currentFiles: ['app/application/modules/commodity.ts'],
     }), 'app/modules/commodity.ts');
-    const weak = confirmPathMigrationCandidate(candidate, {
+    const weak = confirmMigrationCandidate(candidate, {
         historicalFile: candidate.historicalFile,
         currentCandidate: candidate.currentCandidate,
         confirmationStatus: 'equivalence-proven',
@@ -238,7 +238,7 @@ function testEquivalenceRequiresDedicatedEvidence() {
         fileExists: () => true,
         verifySourceEvidence: () => true,
     });
-    const strong = confirmPathMigrationCandidate(candidate, {
+    const strong = confirmMigrationCandidate(candidate, {
         historicalFile: candidate.historicalFile,
         currentCandidate: candidate.currentCandidate,
         confirmationStatus: 'equivalence-proven',
@@ -256,11 +256,11 @@ function testEquivalenceRequiresDedicatedEvidence() {
 }
 
 function testInvalidConfirmationCannotPromoteCandidate() {
-    const candidate = findResult(rankPathMigrationCandidates({
+    const candidate = findResult(rankMigrationCandidates({
         historicalFiles: ['app/modules/commodity.ts'],
         currentFiles: ['app/application/modules/commodity.ts'],
     }), 'app/modules/commodity.ts');
-    const rejected = confirmPathMigrationCandidate(candidate, {
+    const rejected = confirmMigrationCandidate(candidate, {
         historicalFile: candidate.historicalFile,
         currentCandidate: candidate.currentCandidate,
         confirmationStatus: 'source-confirmed',
@@ -274,7 +274,7 @@ function testInvalidConfirmationCannotPromoteCandidate() {
 }
 
 function testDuplicateConfirmationsAreRejected() {
-    const candidate = findResult(rankPathMigrationCandidates({
+    const candidate = findResult(rankMigrationCandidates({
         historicalFiles: ['app/modules/commodity.ts'],
         currentFiles: ['app/application/modules/commodity.ts'],
     }), 'app/modules/commodity.ts');
@@ -284,7 +284,7 @@ function testDuplicateConfirmationsAreRejected() {
         confirmationStatus: 'source-confirmed',
         evidence: [{ kind: 'source-read', file: candidate.currentCandidate, line }],
     }));
-    const [rejected] = applyPathMigrationConfirmations(
+    const [rejected] = applyMigrationConfirmations(
         [candidate],
         confirmations,
         { fileExists: () => true }
@@ -302,23 +302,23 @@ function testSourceEvidenceIsVerifiedAgainstCurrentFile() {
     fs.writeFileSync(path.join(workspaceRoot, relativeFile), 'export const currentSymbol = true;\n', 'utf8');
     const candidate = { currentCandidate: relativeFile };
 
-    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+    assert.equal(verifyMigrationSource(workspaceRoot, candidate, {
         kind: 'source-read',
         file: relativeFile,
         line: 1,
         contains: 'currentSymbol',
     }), true);
-    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+    assert.equal(verifyMigrationSource(workspaceRoot, candidate, {
         kind: 'current-symbol-match',
         file: relativeFile,
         symbol: 'currentSymbol',
     }), true);
-    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+    assert.equal(verifyMigrationSource(workspaceRoot, candidate, {
         kind: 'source-read',
         file: relativeFile,
         line: 99,
     }), false);
-    assert.equal(verifyPathMigrationSourceEvidence(workspaceRoot, candidate, {
+    assert.equal(verifyMigrationSource(workspaceRoot, candidate, {
         kind: 'manual-confirmation',
         reason: '人工核对当前文件职责与历史任务一致',
     }), true);
@@ -336,7 +336,7 @@ function testInternalContentHashVerifier() {
         historicalFile: fixture.historicalFile,
         historicalHash: 'caller-supplied-value-must-not-be-trusted',
     };
-    const verified = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, evidence);
+    const verified = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, evidence);
     assert.equal(verified.verified, true);
 
     fs.writeFileSync(
@@ -344,7 +344,7 @@ function testInternalContentHashVerifier() {
         fixture.historicalContent.replace('value + 1', 'value + 2'),
         'utf8'
     );
-    const changed = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, evidence);
+    const changed = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, evidence);
     assert.equal(changed.verified, false);
     assert.ok(changed.reason.includes('SHA-256'));
 }
@@ -362,7 +362,7 @@ function testGitRenameVerifierRequiresR100() {
         historicalFile: exact.historicalFile,
         currentFile: exact.currentCandidate,
     };
-    assert.equal(verifyPathMigrationEquivalenceEvidence(exact.workspaceRoot, candidate, evidence).verified, true);
+    assert.equal(verifyMigrationEquivalence(exact.workspaceRoot, candidate, evidence).verified, true);
 
     const changed = createGitMigrationFixture({ modifiedRename: true });
     const changedCandidate = {
@@ -374,7 +374,7 @@ function testGitRenameVerifierRequiresR100() {
         fromCommit: changed.historicalCommit,
         toCommit: changed.currentCommit,
     };
-    const result = verifyPathMigrationEquivalenceEvidence(changed.workspaceRoot, changedCandidate, changedEvidence);
+    const result = verifyMigrationEquivalence(changed.workspaceRoot, changedCandidate, changedEvidence);
     assert.equal(result.verified, false);
     assert.ok(result.reason.includes('R100'));
 }
@@ -395,7 +395,7 @@ function testAstVerifierIgnoresCommentsAndFormatting() {
         'export function calculateTotal( value : number ) { return value + 1; }',
         '',
     ].join('\n'), 'utf8');
-    assert.equal(verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, evidence).verified, true);
+    assert.equal(verifyMigrationEquivalence(fixture.workspaceRoot, candidate, evidence).verified, true);
 
     fs.writeFileSync(path.join(fixture.workspaceRoot, fixture.currentCandidate), [
         'export function calculateTotal(value: number) {',
@@ -403,7 +403,7 @@ function testAstVerifierIgnoresCommentsAndFormatting() {
         '}',
         '',
     ].join('\n'), 'utf8');
-    const changed = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, evidence);
+    const changed = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, evidence);
     assert.equal(changed.verified, false);
     assert.ok(changed.reason.includes('token signature'));
 
@@ -413,7 +413,7 @@ function testAstVerifierIgnoresCommentsAndFormatting() {
         fixture.historicalContent,
         'utf8'
     );
-    const crossLanguage = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, {
+    const crossLanguage = verifyMigrationEquivalence(fixture.workspaceRoot, {
         ...candidate,
         currentCandidate: javascriptCandidate,
     }, evidence);
@@ -427,19 +427,19 @@ function testEquivalenceVerifierRejectsInvalidGitInputs() {
         historicalFile: fixture.historicalFile,
         currentCandidate: fixture.currentCandidate,
     };
-    const invalidCommit = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, {
+    const invalidCommit = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, {
         kind: 'content-hash-match',
         historicalCommit: 'not a git ref',
         historicalFile: fixture.historicalFile,
     });
     assert.equal(invalidCommit.verified, false);
-    const invalidPath = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, {
+    const invalidPath = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, {
         kind: 'content-hash-match',
         historicalCommit: fixture.historicalCommit,
         historicalFile: '../outside.ts',
     });
     assert.equal(invalidPath.verified, false);
-    const optionLikeRef = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, {
+    const optionLikeRef = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, {
         kind: 'content-hash-match',
         historicalCommit: '--stat',
         historicalFile: fixture.historicalFile,
@@ -453,7 +453,7 @@ function testEquivalenceVerifierRejectsInvalidGitInputs() {
         '-m',
         'unreachable evidence',
     ]);
-    const unreachable = verifyPathMigrationEquivalenceEvidence(fixture.workspaceRoot, candidate, {
+    const unreachable = verifyMigrationEquivalence(fixture.workspaceRoot, candidate, {
         kind: 'content-hash-match',
         historicalCommit: unreachableCommit,
         historicalFile: fixture.historicalFile,
@@ -488,18 +488,18 @@ function testInternalFailureKeepsSourceConfirmation() {
     };
     const options = {
         fileExists: file => currentFileExists(fixture.workspaceRoot, file),
-        verifySourceEvidence: (evidence, migrationCandidate) => verifyPathMigrationSourceEvidence(
+        verifySourceEvidence: (evidence, migrationCandidate) => verifyMigrationSource(
             fixture.workspaceRoot,
             migrationCandidate,
             evidence
         ),
-        verifyEquivalenceEvidence: (evidence, migrationCandidate) => verifyPathMigrationEquivalenceEvidence(
+        verifyEquivalenceEvidence: (evidence, migrationCandidate) => verifyMigrationEquivalence(
             fixture.workspaceRoot,
             migrationCandidate,
             evidence
         ),
     };
-    const proven = confirmPathMigrationCandidate(candidate, confirmation, options);
+    const proven = confirmMigrationCandidate(candidate, confirmation, options);
     assert.equal(proven.confirmationStatus, 'equivalence-proven');
     assert.equal(proven.equivalenceProven, true);
 
@@ -508,7 +508,7 @@ function testInternalFailureKeepsSourceConfirmation() {
         fixture.historicalContent.replace('value + 1', 'value + 2'),
         'utf8'
     );
-    const downgraded = confirmPathMigrationCandidate(candidate, confirmation, options);
+    const downgraded = confirmMigrationCandidate(candidate, confirmation, options);
     assert.equal(downgraded.sourceConfirmed, true);
     assert.equal(downgraded.confirmationStatus, 'source-confirmed');
     assert.equal(downgraded.equivalenceProven, false);

@@ -658,7 +658,7 @@ function buildImportedCall(importInfo, identifier, method, extra = {}) {
     };
 }
 
-function findImportedCallFromExpressionPath(expressionPath, importMap) {
+function findImportedCall(expressionPath, importMap) {
     const parts = String(expressionPath || '').split('.').filter(Boolean);
     if (parts.length < 2) {
         return null;
@@ -1651,7 +1651,7 @@ function extractFunctionDefinitions(source) {
     return definitions;
 }
 
-function extractVariableCallableDefinitions(source) {
+function extractVariableCallables(source) {
     const definitions = [];
     const variablePattern = /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(async\s+)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/gm;
     let match = null;
@@ -1698,7 +1698,7 @@ function extractVariableCallableDefinitions(source) {
     return definitions;
 }
 
-function extractMethodDefinitionsFromAst(source, scriptFile) {
+function extractAstMethods(source, scriptFile) {
     const ts = TYPESCRIPT_RUNTIME;
     if (!ts) {
         return null;
@@ -2225,7 +2225,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                     }
                 }
 
-                const importedCall = findImportedCallFromExpressionPath(calleePath, importMap);
+                const importedCall = findImportedCall(calleePath, importMap);
                 if (importedCall) {
                     importedCalls.push(importedCall);
                 }
@@ -2477,7 +2477,7 @@ function dedupeBy(values, keySelector) {
     return result;
 }
 
-function extractDirectEventSubscriptions(methodBody) {
+function extractDirectSubscriptions(methodBody) {
     const subscriptions = [];
     const subscriptionPattern = /\b(eventBus|oops\.message|director)\.(on|once)\(\s*([^,\n]+?)\s*,\s*this\.([A-Za-z_$][\w$]*)/g;
     let match = null;
@@ -2495,7 +2495,7 @@ function extractDirectEventSubscriptions(methodBody) {
     return subscriptions.filter(subscription => subscription.event && subscription.handler);
 }
 
-function extractMappedEventSubscriptions(methodBody, handlerMaps) {
+function extractMappedSubscriptions(methodBody, handlerMaps) {
     const subscriptions = [];
     const mapPattern = /Object\.entries\(this\.([A-Za-z_$][\w$]*)\)\.forEach\(\(\[\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\]\)\s*=>\s*\{([\s\S]*?)\}\s*\)/g;
     let match = null;
@@ -2895,7 +2895,7 @@ function buildNextRouteEndpointPath(scriptFile) {
     return joinHttpRoutePath('/api', routePath);
 }
 
-function enrichMethodRecordsWithNextRouteEndpoints(methods, scriptFile) {
+function attachNextRouteEndpoints(methods, scriptFile) {
     const endpointPath = buildNextRouteEndpointPath(scriptFile);
     if (!endpointPath) {
         return;
@@ -2924,7 +2924,7 @@ function enrichMethodRecordsWithNextRouteEndpoints(methods, scriptFile) {
     }
 }
 
-function enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source) {
+function attachMessageRoutes(methods, scriptFile, source) {
     const tableBindings = extractTableMessageBindings(source);
     const dispatchMethod = methods.find(method => method.name === 'handleMsg') || null;
 
@@ -2966,7 +2966,7 @@ function enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source) {
     }
 }
 
-function extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames = []) {
+function extractInlineSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames = []) {
     const subscriptions = [];
     const pattern = /\b(eventBus|oops\.message|director)\.(on|once)\s*\(/g;
     let match = null;
@@ -3578,9 +3578,9 @@ function extractMethodCalls(methodBody, methodName, imports, fieldTypes, handler
 
     const eventSubscriptions = dedupeBy(
         [
-            ...extractDirectEventSubscriptions(directBody),
-            ...extractInlineEventSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames),
-            ...extractMappedEventSubscriptions(directBody, handlerMaps),
+            ...extractDirectSubscriptions(directBody),
+            ...extractInlineSubscriptions(methodBody, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames),
+            ...extractMappedSubscriptions(directBody, handlerMaps),
             ...extractVmEventSubscriptions(directBody),
         ],
         subscription => `${subscription.bus}::${subscription.mode}::${subscription.event}::${subscription.handler || '(inline)'}::${subscription.via}`
@@ -4033,7 +4033,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                 continue;
             }
             const parseScriptFile = isVueFile ? `${scriptFile}.ts` : scriptFile;
-            const astContext = extractMethodDefinitionsFromAst(source, parseScriptFile);
+            const astContext = extractAstMethods(source, parseScriptFile);
             const imports = extractImports(source, scriptFile, context);
             const fieldTypes = extractFieldTypes(source, parseScriptFile, imports);
             const handlerMaps = extractHandlerMaps(source);
@@ -4043,7 +4043,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
             const regexDefinitions = [
                 ...extractMethodDefinitions(source),
                 ...extractFunctionDefinitions(source),
-                ...extractVariableCallableDefinitions(source),
+                ...extractVariableCallables(source),
             ];
             const methodDefinitions = astContext?.methods?.length ? astContext.methods : regexDefinitions;
             const knownMethodNames = methodDefinitions.map(item => item.name);
@@ -4135,8 +4135,8 @@ function extractScriptInsights(methodRoots, context, options = {}) {
             methods.push(
                 ...extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames)
             );
-            enrichMethodRecordsWithNextRouteEndpoints(methods, scriptFile);
-            enrichMethodRecordsWithMessageRoutes(methods, scriptFile, source);
+            attachNextRouteEndpoints(methods, scriptFile);
+            attachMessageRoutes(methods, scriptFile, source);
 
             result.push({
                 scriptPath: normalizedScript,
