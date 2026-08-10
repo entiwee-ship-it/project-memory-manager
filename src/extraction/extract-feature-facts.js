@@ -207,7 +207,7 @@ function isPropertyAccessLike(node, ts = TYPESCRIPT_RUNTIME) {
     return ts.isPropertyAccessExpression(node) || (typeof ts.isPropertyAccessChain === 'function' && ts.isPropertyAccessChain(node));
 }
 
-function extractBindingNamesFromAst(nameNode, acc = [], ts = TYPESCRIPT_RUNTIME) {
+function extractBindingNames(nameNode, acc = [], ts = TYPESCRIPT_RUNTIME) {
     if (!ts || !nameNode) {
         return acc;
     }
@@ -220,7 +220,7 @@ function extractBindingNamesFromAst(nameNode, acc = [], ts = TYPESCRIPT_RUNTIME)
             if (!element) {
                 continue;
             }
-            extractBindingNamesFromAst(element.name, acc, ts);
+            extractBindingNames(element.name, acc, ts);
         }
     }
     return acc;
@@ -232,11 +232,11 @@ function extractAstParamNames(params = [], ts = TYPESCRIPT_RUNTIME) {
     }
 
     return uniqueSorted(
-        params.flatMap(param => extractBindingNamesFromAst(param.name, [], ts))
+        params.flatMap(param => extractBindingNames(param.name, [], ts))
     );
 }
 
-function extractMethodBodyTextFromAst(bodyNode, sourceFile, ts = TYPESCRIPT_RUNTIME) {
+function extractMethodBodyText(bodyNode, sourceFile, ts = TYPESCRIPT_RUNTIME) {
     if (!ts || !bodyNode) {
         return '';
     }
@@ -265,13 +265,13 @@ function maskTextRanges(source, ranges = []) {
     return chars.join('');
 }
 
-function extractDirectBodyTextFromAst(functionNode, sourceFile, ts = TYPESCRIPT_RUNTIME) {
+function extractDirectBodyText(functionNode, sourceFile, ts = TYPESCRIPT_RUNTIME) {
     if (!ts || !functionNode?.body) {
         return '';
     }
 
     const bodyNode = functionNode.body;
-    const fullBodyText = extractMethodBodyTextFromAst(bodyNode, sourceFile, ts);
+    const fullBodyText = extractMethodBodyText(bodyNode, sourceFile, ts);
     if (!fullBodyText) {
         return fullBodyText;
     }
@@ -731,7 +731,7 @@ function getDecorators(node, ts = TYPESCRIPT_RUNTIME) {
     return node.decorators || [];
 }
 
-function inferFieldTypeFromDecorators(member, sourceFile, ts = TYPESCRIPT_RUNTIME) {
+function inferFieldType(member, sourceFile, ts = TYPESCRIPT_RUNTIME) {
     if (!ts || !member) {
         return '';
     }
@@ -780,7 +780,7 @@ function inferFieldTypeFromDecorators(member, sourceFile, ts = TYPESCRIPT_RUNTIM
     return '';
 }
 
-function extractFieldTypesFromAst(source, scriptFile, imports) {
+function extractAstFieldTypes(source, scriptFile, imports) {
     const ts = TYPESCRIPT_RUNTIME;
     if (!ts) {
         return new Map();
@@ -809,7 +809,7 @@ function extractFieldTypesFromAst(source, scriptFile, imports) {
                 }
 
                 const explicitType = member.type ? member.type.getText(sourceFile) : '';
-                const decoratorType = inferFieldTypeFromDecorators(member, sourceFile, ts);
+                const decoratorType = inferFieldType(member, sourceFile, ts);
                 const rawType = explicitType || decoratorType;
                 if (!rawType) {
                     continue;
@@ -836,7 +836,7 @@ function extractFieldTypesFromAst(source, scriptFile, imports) {
 }
 
 function extractFieldTypes(source, scriptFile, imports) {
-    const fieldTypes = extractFieldTypesFromAst(source, scriptFile, imports);
+    const fieldTypes = extractAstFieldTypes(source, scriptFile, imports);
     const importMap = new Map();
 
     for (const importInfo of imports) {
@@ -936,7 +936,7 @@ function normalizeInlineExpression(expression) {
     return quotedMatch ? quotedMatch[2] : normalized;
 }
 
-function normalizeHttpTargetExpression(expression, options = {}) {
+function normalizeHttpTarget(expression, options = {}) {
     let target = normalizeInlineExpression(expression || '');
     if (!target) {
         return '';
@@ -1017,7 +1017,7 @@ function buildExternalService(name, options = {}) {
     if (!normalizedName) {
         return null;
     }
-    const target = normalizeHttpTargetExpression(options.target || '');
+    const target = normalizeHttpTarget(options.target || '');
     return {
         name: normalizedName,
         serviceKind: options.serviceKind || 'external-service',
@@ -1028,8 +1028,8 @@ function buildExternalService(name, options = {}) {
     };
 }
 
-function inferExternalServiceFromTarget(target, source = 'http') {
-    const normalizedTarget = normalizeHttpTargetExpression(target || '');
+function inferExternalService(target, source = 'http') {
+    const normalizedTarget = normalizeHttpTarget(target || '');
     const text = normalizedTarget.toLowerCase();
     if (!text) {
         return null;
@@ -1125,7 +1125,7 @@ function extractExternalServices(methodBody, imports = [], networkRequests = [])
         pushService(inferExternalServiceFromImport(importInfo, body));
     }
     for (const request of networkRequests || []) {
-        pushService(inferExternalServiceFromTarget(request.target || request.route || '', request.transport || request.protocol || 'network'));
+        pushService(inferExternalService(request.target || request.route || '', request.transport || request.protocol || 'network'));
     }
 
     return dedupeBy(
@@ -1192,7 +1192,7 @@ function extractBlockContent(source, openBraceIndex) {
  * - 保留关键逻辑（条件、循环、赋值、调用）
  * - 限制长度避免输出过大
  */
-function extractMethodBodySnippet(bodyText, maxLength = 500) {
+function buildBodySnippet(bodyText, maxLength = 500) {
     if (!bodyText) {
         return '';
     }
@@ -1436,7 +1436,7 @@ function toSyntheticMethodName(prefix, routeLabel) {
     return `${prefix}_${normalized || 'root'}`;
 }
 
-function inferPinusMessageRouteEntries(scriptFile, methodName) {
+function inferPinusRoutes(scriptFile, methodName) {
     const normalizedPath = normalize(scriptFile);
     const pinusMatch = normalizedPath.match(/(?:^|\/)app\/servers\/([^/]+)\/(handler|remote)\/([^/]+)\.[^.]+$/);
     if (!pinusMatch) {
@@ -1460,7 +1460,7 @@ function inferPinusMessageRouteEntries(scriptFile, methodName) {
     }));
 }
 
-function extractTableMessageBindings(source) {
+function extractTableBindings(source) {
     const bindings = [];
     const ts = TYPESCRIPT_RUNTIME;
     if (!ts) {
@@ -1595,7 +1595,7 @@ function extractMethodDefinitions(source) {
     return definitions;
 }
 
-function extractFunctionDefinitions(source) {
+function extractFunctions(source) {
     const definitions = [];
     const functionPattern = /^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/gm;
     let match = null;
@@ -1789,8 +1789,8 @@ function extractAstMethods(source, scriptFile) {
                         returnType: member.type ? member.type.getText(sourceFile) : '',
                         paramNames: extractAstParamNames(member.parameters || [], ts),
                         openBraceIndex: member.body ? member.body.pos - 1 : -1,
-                        bodyText: extractMethodBodyTextFromAst(member.body, sourceFile, ts),
-                        directBodyText: extractDirectBodyTextFromAst(member, sourceFile, ts),
+                        bodyText: extractMethodBodyText(member.body, sourceFile, ts),
+                        directBodyText: extractDirectBodyText(member, sourceFile, ts),
                         astKind: 'method',
                         ownerName,
                         ownerBasePath,
@@ -1817,8 +1817,8 @@ function extractAstMethods(source, scriptFile) {
                         returnType: initializer.type ? initializer.type.getText(sourceFile) : '',
                         paramNames: extractAstParamNames(initializer.parameters || [], ts),
                         openBraceIndex: ts.isBlock(initializer.body) ? initializer.body.pos - 1 : -1,
-                        bodyText: extractMethodBodyTextFromAst(initializer.body, sourceFile, ts),
-                        directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
+                        bodyText: extractMethodBodyText(initializer.body, sourceFile, ts),
+                        directBodyText: extractDirectBodyText(initializer, sourceFile, ts),
                         astKind: ts.isArrowFunction(initializer) ? 'arrow-property' : 'function-property',
                         astNode: initializer,
                         ownerName,
@@ -1838,8 +1838,8 @@ function extractAstMethods(source, scriptFile) {
                 returnType: node.type ? node.type.getText(sourceFile) : '',
                 paramNames: extractAstParamNames(node.parameters || [], ts),
                 openBraceIndex: node.body ? node.body.pos - 1 : -1,
-                bodyText: extractMethodBodyTextFromAst(node.body, sourceFile, ts),
-                directBodyText: extractDirectBodyTextFromAst(node, sourceFile, ts),
+                bodyText: extractMethodBodyText(node.body, sourceFile, ts),
+                directBodyText: extractDirectBodyText(node, sourceFile, ts),
                 astKind: 'function',
             });
         }
@@ -1862,8 +1862,8 @@ function extractAstMethods(source, scriptFile) {
                                 returnType: property.type ? property.type.getText(sourceFile) : '',
                                 paramNames: extractAstParamNames(property.parameters || [], ts),
                                 openBraceIndex: property.body ? property.body.pos - 1 : -1,
-                                bodyText: extractMethodBodyTextFromAst(property.body, sourceFile, ts),
-                                directBodyText: extractDirectBodyTextFromAst(property, sourceFile, ts),
+                                bodyText: extractMethodBodyText(property.body, sourceFile, ts),
+                                directBodyText: extractDirectBodyText(property, sourceFile, ts),
                                 astKind: 'object-method',
                                 ownerName,
                             });
@@ -1884,8 +1884,8 @@ function extractAstMethods(source, scriptFile) {
                                 returnType: initializer.type ? initializer.type.getText(sourceFile) : '',
                                 paramNames: extractAstParamNames(initializer.parameters || [], ts),
                                 openBraceIndex: ts.isBlock(initializer.body) ? initializer.body.pos - 1 : -1,
-                                bodyText: extractMethodBodyTextFromAst(initializer.body, sourceFile, ts),
-                                directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
+                                bodyText: extractMethodBodyText(initializer.body, sourceFile, ts),
+                                directBodyText: extractDirectBodyText(initializer, sourceFile, ts),
                                 astKind: ts.isArrowFunction(initializer) ? 'object-arrow-property' : 'object-function-property',
                                 astNode: initializer,
                                 ownerName,
@@ -1907,8 +1907,8 @@ function extractAstMethods(source, scriptFile) {
                     returnType: initializer.type ? initializer.type.getText(sourceFile) : '',
                     paramNames: extractAstParamNames(initializer.parameters || [], ts),
                     openBraceIndex: ts.isBlock(initializer.body) ? initializer.body.pos - 1 : -1,
-                    bodyText: extractMethodBodyTextFromAst(initializer.body, sourceFile, ts),
-                    directBodyText: extractDirectBodyTextFromAst(initializer, sourceFile, ts),
+                    bodyText: extractMethodBodyText(initializer.body, sourceFile, ts),
+                    directBodyText: extractDirectBodyText(initializer, sourceFile, ts),
                     astKind: ts.isArrowFunction(initializer) ? 'arrow-variable' : 'function-variable',
                     astNode: initializer,
                 });
@@ -2090,7 +2090,7 @@ function buildHttpWrapperRequest(methodDef, httpMethod, targetPath, callee) {
     };
 }
 
-function analyzeInlineCallableFromAst(callbackNode, imports, fieldTypes, handlerMaps, parentParamNames = [], methodName = '__inline__', knownMethodNames = []) {
+function analyzeInlineCallable(callbackNode, imports, fieldTypes, handlerMaps, parentParamNames = [], methodName = '__inline__', knownMethodNames = []) {
     const ts = TYPESCRIPT_RUNTIME;
     if (!ts || !callbackNode) {
         return createEmptyCallInfo();
@@ -2099,13 +2099,13 @@ function analyzeInlineCallableFromAst(callbackNode, imports, fieldTypes, handler
     const sourceFile = callbackNode.getSourceFile?.();
     const inlineParamNames = extractAstParamNames(callbackNode.parameters || [], ts);
     const combinedParamNames = [...(parentParamNames || []), ...inlineParamNames];
-    const bodyText = extractMethodBodyTextFromAst(callbackNode.body, sourceFile, ts);
+    const bodyText = extractMethodBodyText(callbackNode.body, sourceFile, ts);
     if (!bodyText) {
         return createEmptyCallInfo();
     }
 
     const regexInfo = extractMethodCalls(bodyText, methodName, imports, fieldTypes, handlerMaps, combinedParamNames, knownMethodNames, bodyText);
-    const astInfo = extractMethodCallsFromAst(
+    const astInfo = extractAstMethodCalls(
         {
             name: methodName,
             astNode: callbackNode,
@@ -2121,7 +2121,7 @@ function analyzeInlineCallableFromAst(callbackNode, imports, fieldTypes, handler
     return mergeCallInfo(regexInfo, astInfo);
 }
 
-function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, paramNames = [], knownMethodNames = []) {
+function extractAstMethodCalls(methodDef, imports, fieldTypes, handlerMaps, paramNames = [], knownMethodNames = []) {
     const ts = TYPESCRIPT_RUNTIME;
     const sourceFile = methodDef?.astSourceFile;
     const astNode = methodDef?.astNode;
@@ -2251,7 +2251,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                 const lastArgText = lastArg ? lastArg.getText(sourceFile).trim() : '';
                 const callbackMethodRef = stripThisPrefix(readThisAccessPathFromAst(lastArg, ts) || '');
                 const callbackCallInfo = callbackArg
-                    ? analyzeInlineCallableFromAst(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__pinus_rpc_callback__', knownMethodNames)
+                    ? analyzeInlineCallable(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__pinus_rpc_callback__', knownMethodNames)
                     : createEmptyCallInfo();
 
                 networkRequests.push(buildPinusRpcRequest(
@@ -2293,7 +2293,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                         via: 'direct-ast',
                     });
                 } else if (eventName && handlerArg && (ts.isArrowFunction(handlerArg) || ts.isFunctionExpression(handlerArg))) {
-                    const inlineCallInfo = analyzeInlineCallableFromAst(handlerArg, imports, fieldTypes, handlerMaps, paramNames, '__inline_event__', knownMethodNames);
+                    const inlineCallInfo = analyzeInlineCallable(handlerArg, imports, fieldTypes, handlerMaps, paramNames, '__inline_event__', knownMethodNames);
                     eventSubscriptions.push({
                         bus: normalizedPath.split('.').slice(0, -1).join('.'),
                         mode: normalizedPath.split('.').slice(-1)[0],
@@ -2318,7 +2318,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                         via: 'direct-ast',
                     });
                 } else if (eventName && handlerArg && (ts.isArrowFunction(handlerArg) || ts.isFunctionExpression(handlerArg))) {
-                    const inlineCallInfo = analyzeInlineCallableFromAst(handlerArg, imports, fieldTypes, handlerMaps, paramNames, '__inline_vm_event__', knownMethodNames);
+                    const inlineCallInfo = analyzeInlineCallable(handlerArg, imports, fieldTypes, handlerMaps, paramNames, '__inline_vm_event__', knownMethodNames);
                     eventSubscriptions.push({
                         bus: 'VM',
                         mode: 'bindPath',
@@ -2347,7 +2347,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                 const lastArgText = lastArg ? lastArg.getText(sourceFile).trim() : '';
                 const callbackMethodRef = stripThisPrefix(readThisAccessPathFromAst(lastArg, ts) || '');
                 const callbackCallInfo = callbackArg
-                    ? analyzeInlineCallableFromAst(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__network_callback__', knownMethodNames)
+                    ? analyzeInlineCallable(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__network_callback__', knownMethodNames)
                     : createEmptyCallInfo();
 
                 networkRequests.push({
@@ -2378,7 +2378,7 @@ function extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, 
                 const delayArg = node.arguments?.[1] || null;
                 const callbackMethodRef = stripThisPrefix(readThisAccessPathFromAst(callbackArg, ts) || '');
                 const callbackCallInfo = callbackArg && (ts.isArrowFunction(callbackArg) || ts.isFunctionExpression(callbackArg))
-                    ? analyzeInlineCallableFromAst(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__timing_callback__', knownMethodNames)
+                    ? analyzeInlineCallable(callbackArg, imports, fieldTypes, handlerMaps, paramNames, '__timing_callback__', knownMethodNames)
                     : createEmptyCallInfo();
                 timingSignals.push(buildTimingSignal(
                     normalizedPath === 'scheduleOnce' ? 'scheduled-delay' : 'timer-delay',
@@ -2881,7 +2881,7 @@ function normalizeNextRouteSegment(segment) {
     return value;
 }
 
-function buildNextRouteEndpointPath(scriptFile) {
+function buildRouteEndpointPath(scriptFile) {
     const normalizedScriptFile = normalize(scriptFile);
     const match = normalizedScriptFile.match(/(?:^|\/)app\/api\/(.+)\/route\.(?:ts|tsx|js|jsx)$/i);
     if (!match) {
@@ -2895,8 +2895,8 @@ function buildNextRouteEndpointPath(scriptFile) {
     return joinHttpRoutePath('/api', routePath);
 }
 
-function attachNextRouteEndpoints(methods, scriptFile) {
-    const endpointPath = buildNextRouteEndpointPath(scriptFile);
+function attachRouteEndpoints(methods, scriptFile) {
+    const endpointPath = buildRouteEndpointPath(scriptFile);
     if (!endpointPath) {
         return;
     }
@@ -2925,7 +2925,7 @@ function attachNextRouteEndpoints(methods, scriptFile) {
 }
 
 function attachMessageRoutes(methods, scriptFile, source) {
-    const tableBindings = extractTableMessageBindings(source);
+    const tableBindings = extractTableBindings(source);
     const dispatchMethod = methods.find(method => method.name === 'handleMsg') || null;
 
     for (const method of methods) {
@@ -2936,7 +2936,7 @@ function attachMessageRoutes(methods, scriptFile, source) {
         method.dbWrites = Array.isArray(method.dbWrites) ? method.dbWrites : [];
         method.externalServices = Array.isArray(method.externalServices) ? method.externalServices : [];
 
-        method.messageRoutes.push(...inferPinusMessageRouteEntries(scriptFile, method.name));
+        method.messageRoutes.push(...inferPinusRoutes(scriptFile, method.name));
 
         for (const binding of tableBindings) {
             if (binding.handler !== method.name) {
@@ -3123,7 +3123,7 @@ function normalizeHttpMethodValue(rawMethod, fallback = 'GET') {
 }
 
 function buildHttpRequest(callee, target, httpMethod, transport) {
-    const normalizedTarget = normalizeHttpTargetExpression(target || '');
+    const normalizedTarget = normalizeHttpTarget(target || '');
     return {
         callee,
         target: normalizedTarget || callee,
@@ -3175,7 +3175,7 @@ function buildHttpRequestFromArgs(callee, args = [], transport, explicitMethod =
 }
 
 function buildApiClientRequestFromArgs(callee, args = []) {
-    const target = normalizeHttpTargetExpression(args[0] || '', { assumeApiBase: true });
+    const target = normalizeHttpTarget(args[0] || '', { assumeApiBase: true });
     if (!target || isLikelyDynamicHttpTarget(target)) {
         return null;
     }
@@ -3417,7 +3417,7 @@ function extractNetworkRequests(methodBody, imports, fieldTypes, handlerMaps, pa
         const openParenIndex = eventSourcePattern.lastIndex - 1;
         const content = extractWrappedContent(methodBody, openParenIndex, '(', ')');
         const args = splitTopLevelArgs(content);
-        const target = normalizeHttpTargetExpression(args[0] || '');
+        const target = normalizeHttpTarget(args[0] || '');
         if (target && !isLikelyDynamicHttpTarget(target) && !isLikelyDynamicHttpExpression(args[0] || '', target)) {
             requests.push(buildHttpRequest('EventSource', target, 'GET', 'eventsource'));
         }
@@ -4042,7 +4042,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
             const methods = [];
             const regexDefinitions = [
                 ...extractMethodDefinitions(source),
-                ...extractFunctionDefinitions(source),
+                ...extractFunctions(source),
                 ...extractVariableCallables(source),
             ];
             const methodDefinitions = astContext?.methods?.length ? astContext.methods : regexDefinitions;
@@ -4054,12 +4054,12 @@ function extractScriptInsights(methodRoots, context, options = {}) {
                 const directMethodBody = methodDef.directBodyText || methodBody;
                 const paramNames = methodDef.paramNames || extractParamNames(methodDef.params);
                 const regexCallInfo = extractMethodCalls(methodBody, methodDef.name, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames, directMethodBody);
-                const astCallInfo = extractMethodCallsFromAst(methodDef, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
+                const astCallInfo = extractAstMethodCalls(methodDef, imports, fieldTypes, handlerMaps, paramNames, knownMethodNames);
                 const callInfo = normalizeFinalCallInfo(mergeCallInfo(regexCallInfo, astCallInfo), knownMethodNames);
 
                 // 提取方法体关键逻辑（截断以避免过大）
                 const maxLength = extractFullBody ? methodBody.length : bodySnippetMaxLength;
-                const bodySnippet = extractMethodBodySnippet(methodBody, maxLength);
+                const bodySnippet = buildBodySnippet(methodBody, maxLength);
                 
                 // 提取结构化语义摘要
                 let bodySummary = null;
@@ -4135,7 +4135,7 @@ function extractScriptInsights(methodRoots, context, options = {}) {
             methods.push(
                 ...extractHttpEndpointMethods(source, scriptFile, imports, fieldTypes, handlerMaps, knownMethodNames)
             );
-            attachNextRouteEndpoints(methods, scriptFile);
+            attachRouteEndpoints(methods, scriptFile);
             attachMessageRoutes(methods, scriptFile, source);
 
             result.push({
