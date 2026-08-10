@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { hydrateLookup } = require('../../shared/kb-lookup');
 
 function parseArgs(argv) {
     const args = { feature: '', field: '', method: '' };
@@ -41,6 +42,9 @@ function loadFeatureData(featureKey) {
     }
     if (fs.existsSync(lookupPath)) {
         result.lookup = JSON.parse(fs.readFileSync(lookupPath, 'utf8'));
+    }
+    if (result.graph && result.lookup) {
+        result.lookup = hydrateLookup(result.graph, result.lookup);
     }
     return result;
 }

@@ -1,5 +1,32 @@
+const fs = require('fs');
 const path = require('path');
 const { pathExists, readJson, readJsonSafe, slugify } = require('../shared/common');
+const { hydrateLookup } = require('../shared/kb-lookup');
+
+const MAX_ARTIFACT_CACHE_ENTRIES = 4;
+const artifactCache = new Map();
+
+function artifactSignature(filePath) {
+    const stat = fs.statSync(filePath);
+    return `${filePath}:${stat.size}:${stat.mtimeMs}`;
+}
+
+function artifactCacheKey(graphPath, lookupPath, feature) {
+    const featureSignature = JSON.stringify({
+        featureKey: feature.featureKey || '',
+        featureName: feature.featureName || '',
+        configPath: feature.configPath || '',
+        kbDir: feature.kbDir || '',
+    });
+    return `${artifactSignature(graphPath)}|${artifactSignature(lookupPath)}|${featureSignature}`;
+}
+
+function cacheArtifacts(key, artifacts) {
+    while (artifactCache.size >= MAX_ARTIFACT_CACHE_ENTRIES) {
+        artifactCache.delete(artifactCache.keys().next().value);
+    }
+    artifactCache.set(key, artifacts);
+}
 
 function toPosixPath(value = '') {
     return String(value || '').replace(/\\/g, '/');
@@ -226,28 +253,43 @@ function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
         throw error;
     }
     
+    const cacheKey = artifactCacheKey(graphPath, lookupPath, normalized);
+    const cached = artifactCache.get(cacheKey);
+    if (cached) {
+        artifactCache.delete(cacheKey);
+        artifactCache.set(cacheKey, cached);
+        return cached;
+    }
+
     // 使用安全读取
     const graph = readJsonSafe(graphPath, { 
         suggestRebuild: true, 
         featureKey: normalized.featureKey 
     });
     
-    const lookup = readJsonSafe(lookupPath, { 
+    const lookup = hydrateLookup(graph, readJsonSafe(lookupPath, {
         suggestRebuild: true, 
         featureKey: normalized.featureKey 
-    });
+    }));
     
-    return {
+    const artifacts = {
         feature: normalized,
         graphPath,
         lookupPath,
         graph,
         lookup,
     };
+    cacheArtifacts(cacheKey, artifacts);
+    return artifacts;
+}
+
+function clearArtifactCache() {
+    artifactCache.clear();
 }
 
 module.exports = {
     buildOutputsFromDir,
+    clearArtifactCache,
     deriveFeatureKey,
     deriveFeatureName,
     deriveKbDir,

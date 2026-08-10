@@ -2,6 +2,7 @@
 
 const path = require('path');
 const { readJson, readJsonSafe, resolveProjectRoot } = require('../../shared/common');
+const { loadFeatureLookupArtifacts } = require('../../graph/feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 const { run: runFeatureQuery } = require('../../query/query-chain');
 const { loadSkillVersion } = require('../../maintenance/show-version');
@@ -122,10 +123,21 @@ function matchContains(value, needle) {
 }
 
 function loadProjectArtifacts(context) {
-    const graph = readJson(path.join(context.paths.projectGlobalDir, 'chain.graph.json'));
-    const lookup = readJson(path.join(context.paths.projectGlobalDir, 'chain.lookup.json'));
-    const protocols = readJson(context.paths.projectProtocols);
+    const { graph, lookup } = loadFeatureLookupArtifacts(context.workspaceRoot, {
+        featureKey: 'project-global',
+        featureName: 'Project Global',
+        kbDir: context.paths.projectGlobalDir,
+        outputs: {
+            graph: path.join(context.paths.projectGlobalDir, 'chain.graph.json'),
+            lookup: path.join(context.paths.projectGlobalDir, 'chain.lookup.json'),
+        },
+    });
+    const protocols = loadProjectProtocols(context);
     return { graph, lookup, protocols };
+}
+
+function loadProjectProtocols(context) {
+    return readJson(context.paths.projectProtocols);
 }
 
 function loadProjectSummary(context) {
@@ -269,9 +281,8 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
 
-    const { protocols } = loadProjectArtifacts(context);
-
     if (args.timing) {
+        const protocols = loadProjectProtocols(context);
         const results = searchProtocolEntries(
             protocols.timingPatterns || [],
             args.timing,
@@ -282,6 +293,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     if (args.phase) {
+        const protocols = loadProjectProtocols(context);
         const results = searchProtocolEntries(
             protocols.phasePatterns || [],
             args.phase,
@@ -292,6 +304,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     if (args.transition) {
+        const protocols = loadProjectProtocols(context);
         const results = searchProtocolEntries(
             protocols.transitionPatterns || [],
             args.transition,

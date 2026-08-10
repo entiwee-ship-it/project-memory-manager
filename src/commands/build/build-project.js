@@ -3,6 +3,7 @@
 const path = require('path');
 const { buildLookup, run: buildChainKb } = require('../../graph/build-chain-kb');
 const { ensureDir, hasDefaultIgnoredPathSegment, loadProjectProfile, normalize, pathExists, readJson, readJsonSafe, repoRelative, resolveProjectRoot, slugify, validateProjectRoot, writeJson, writeJsonAtomic } = require('../../shared/common');
+const { hydrateLookup, toPersistedLookup } = require('../../shared/kb-lookup');
 const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
 const { learnProjectProtocols } = require('../../lifecycle/learn-project-protocols');
 
@@ -388,7 +389,7 @@ function run(argv = process.argv.slice(2)) {
     // 使用安全读取
     const raw = readJsonSafe(scanPath, { required: true });
     const graph = readJsonSafe(graphPath, { required: true });
-    const lookup = readJsonSafe(lookupPath, { required: true });
+    const lookup = hydrateLookup(graph, readJsonSafe(lookupPath, { required: true }));
     const report = readJsonSafe(reportPath, { required: true });
     const protocols = learnProjectProtocols(raw, graph, lookup, root);
     writeJsonAtomic(protocolsPath, protocols);
@@ -399,7 +400,7 @@ function run(argv = process.argv.slice(2)) {
 
     // 使用原子写入
     writeJsonAtomic(graphPath, augmentedGraph);
-    writeJsonAtomic(lookupPath, augmentedLookup);
+    writeJsonAtomic(lookupPath, toPersistedLookup(augmentedLookup));
     writeJsonAtomic(reportPath, augmentedReport);
 
     const result = {

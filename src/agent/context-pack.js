@@ -3,6 +3,7 @@ const path = require('path');
 const { buildLookup } = require('../graph/build-chain-kb');
 const { loadFeatureLookupArtifacts, normalizeFeatureRecord, titleizeSlug } = require('../graph/feature-kb');
 const { pathExists, readJsonSafe } = require('../shared/common');
+const { hydrateLookup } = require('../shared/kb-lookup');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 const { buildCoverage } = require('./brief-readiness');
 const { classifyTaskIntent } = require('./task-intent');
@@ -246,7 +247,9 @@ function loadProjectArtifacts(context) {
     }
     const graph = readJsonSafe(graphPath);
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
-    const lookup = pathExists(lookupPath) ? readJsonSafe(lookupPath) : buildLookup(graph);
+    const lookup = pathExists(lookupPath)
+        ? hydrateLookup(graph, readJsonSafe(lookupPath))
+        : buildLookup(graph);
     return { graph, lookup, graphPath, lookupPath };
 }
 

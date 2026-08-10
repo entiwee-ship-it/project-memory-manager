@@ -193,6 +193,7 @@ function resolveArtifacts(args) {
     const artifacts = {
         graph: path.join(context.paths.projectGlobalDir, 'chain.graph.json'),
         lookup: path.join(context.paths.projectGlobalDir, 'chain.lookup.json'),
+        report: path.join(context.paths.projectGlobalDir, 'build.report.json'),
         protocols: context.paths.projectProtocols,
     };
     for (const [name, filePath] of Object.entries(artifacts)) {
@@ -222,6 +223,13 @@ function readAndParseJson(filePath) {
         parseMs: round(parseMs),
         elapsedMs: round(readMs + parseMs),
         topLevelKeys: value && typeof value === 'object' ? Object.keys(value).slice(0, 12) : [],
+        artifactShape: value && typeof value === 'object' ? {
+            lookupSchemaVersion: value.lookupSchemaVersion || null,
+            storage: value.storage || '',
+            hasNodes: Array.isArray(value.nodes),
+            hasEdges: Array.isArray(value.edges),
+            hasSourceSnapshot: Boolean(value.sourceSnapshot),
+        } : null,
         memoryBefore,
         memoryAfter,
     };
@@ -413,6 +421,8 @@ function runParseBenchmarks(args, artifacts) {
         }
         result[name] = {
             samples,
+            bytes: samples[0]?.bytes || 0,
+            bytesStable: samples.every(sample => sample.bytes === samples[0]?.bytes),
             summary: summarizeSamples(samples),
             readSummary: summarizeSamples(samples, 'readMs'),
             parseSummary: summarizeSamples(samples, 'parseMs'),

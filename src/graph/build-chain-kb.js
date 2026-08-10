@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { runExtract } = require('../extraction/extract-feature-facts');
 const { hasOwn, inferArea, inferStacks, normalize, pathExists, readJson, readJsonSafe, repoRelative, slugify, timestamp, writeJson, writeJsonAtomic } = require('../shared/common');
+const { toPersistedLookup } = require('../shared/kb-lookup');
 const { buildSourceSnapshot } = require('../shared/source-snapshot');
 const { normalizeConfig, normalizeFeatureRecord } = require('./feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../shared/workspace-layout');
@@ -2451,7 +2452,7 @@ function run(argv = process.argv.slice(2)) {
 
         // 写入所有文件（原子写入已在 writeJsonWithCompat 中实现）
         writeJsonWithCompat(root, 'graph', graph, outputs);
-        writeJsonWithCompat(root, 'lookup', lookup, outputs);
+        writeJsonWithCompat(root, 'lookup', toPersistedLookup(lookup), outputs);
         writeJsonWithCompat(root, 'report', report, outputs);
         
         // 提交事务

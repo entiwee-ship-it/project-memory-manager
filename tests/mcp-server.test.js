@@ -690,6 +690,10 @@ async function testProjectFreshnessUnknownWithoutSourceSnapshot() {
     const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
     delete graph.sourceSnapshot;
     fs.writeFileSync(graphPath, `${JSON.stringify(graph, null, 2)}\n`);
+    const reportPath = path.join(context.paths.projectGlobalDir, 'build.report.json');
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    delete report.sourceSnapshot;
+    fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
     const response = await callTool('check_kb_freshness', { workspaceRoot, dataRoot, detail: 'full' });
     const result = parseTextResult(response);

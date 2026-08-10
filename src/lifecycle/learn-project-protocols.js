@@ -2,6 +2,7 @@
 
 const path = require('path');
 const { normalize, readJson, resolveProjectRoot, timestamp, writeJson } = require('../shared/common');
+const { hydrateLookup } = require('../shared/kb-lookup');
 const { loadSkillVersion } = require('../maintenance/show-version');
 
 function parseArgs(argv) {
@@ -726,7 +727,7 @@ function run(argv = process.argv.slice(2)) {
     const { scanPath, graphPath, lookupPath, outputPath } = resolveArtifactPaths(root, args);
     const raw = readJson(scanPath);
     const graph = readJson(graphPath);
-    const lookup = readJson(lookupPath);
+    const lookup = hydrateLookup(graph, readJson(lookupPath));
     const protocols = learnProjectProtocols(raw, graph, lookup, root);
     writeJson(outputPath, protocols);
     if (args.json) {

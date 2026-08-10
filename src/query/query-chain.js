@@ -658,31 +658,40 @@ function printSemanticResults(results, args) {
     }
 }
 
-function findMatchingNodes(graph, query) {
-    const exactMatches = graph.nodes.filter(node => node.name === query || node.id === query || node.meta?.statePath === query);
-    if (exactMatches.length > 0) {
-        return exactMatches;
-    }
+function nodeFuzzyMatches(node, query) {
+    return (
+        matchContains(node.name, query) ||
+        matchContains(node.file, query) ||
+        matchContains(node.meta?.methodName, query) ||
+        matchContains(node.meta?.statePath, query) ||
+        matchContains(node.meta?.route, query) ||
+        matchContains(node.meta?.path, query) ||
+        matchContains(node.meta?.importPath, query) ||
+        matchContains(node.meta?.kind, query) ||
+        matchContains(node.meta?.protocol, query) ||
+        matchContains(node.meta?.serviceKind, query) ||
+        matchContains(node.meta?.target, query) ||
+        matchContains(node.meta?.host, query) ||
+        matchContains(node.meta?.packageName, query) ||
+        (node.meta?.tags || []).some(tag => matchContains(tag, query))
+    );
+}
 
-    const fuzzy = graph.nodes.filter(node => {
-        return (
-            matchContains(node.name, query) ||
-            matchContains(node.file, query) ||
-            matchContains(node.meta?.methodName, query) ||
-            matchContains(node.meta?.statePath, query) ||
-            matchContains(node.meta?.route, query) ||
-            matchContains(node.meta?.path, query) ||
-            matchContains(node.meta?.importPath, query) ||
-            matchContains(node.meta?.kind, query) ||
-            matchContains(node.meta?.protocol, query) ||
-            matchContains(node.meta?.serviceKind, query) ||
-            matchContains(node.meta?.target, query) ||
-            matchContains(node.meta?.host, query) ||
-            matchContains(node.meta?.packageName, query) ||
-            (node.meta?.tags || []).some(tag => matchContains(tag, query))
-        );
-    });
-    return fuzzy;
+function findFuzzyMatchingNodes(graph, query) {
+    return graph.nodes.filter(node => nodeFuzzyMatches(node, query));
+}
+
+function findMatchingNodes(graph, query) {
+    const exactMatches = [];
+    const fuzzyMatches = [];
+    for (const node of graph.nodes) {
+        if (node.name === query || node.id === query || node.meta?.statePath === query) {
+            exactMatches.push(node);
+        } else if (nodeFuzzyMatches(node, query)) {
+            fuzzyMatches.push(node);
+        }
+    }
+    return exactMatches.length > 0 ? exactMatches : fuzzyMatches;
 }
 
 function resolveNodeId(graph, lookup, query) {
@@ -738,7 +747,7 @@ function resolveNodeId(graph, lookup, query) {
         return state.id;
     }
 
-    const matches = findMatchingNodes(graph, query);
+    const matches = findFuzzyMatchingNodes(graph, query);
     if (matches.length === 1) {
         return matches[0].id;
     }
@@ -1472,6 +1481,10 @@ function buildPrefabUsageSummary(graph, args) {
         return row;
     });
     const limitedScripts = limitGroups(scriptRows, args);
+    const scriptUsageCounts = scriptRows.reduce((counts, item) => {
+        counts[item.usedOnlyInThisPrefab ? 'onlyHere' : 'alsoElsewhere'] += 1;
+        return counts;
+    }, { onlyHere: 0, alsoElsewhere: 0 });
     const base = {
         kind: 'prefab-script-usage-summary',
         detail,
@@ -1479,8 +1492,8 @@ function buildPrefabUsageSummary(graph, args) {
         excludedPrefabPath: args.excludePrefab || prefabPath,
         counts: {
             customScripts: scripts.length,
-            scriptsWithOtherPrefabUsage: scriptRows.filter(item => !item.usedOnlyInThisPrefab).length,
-            scriptsUsedOnlyInThisPrefab: scriptRows.filter(item => item.usedOnlyInThisPrefab).length,
+            scriptsWithOtherPrefabUsage: scriptUsageCounts.alsoElsewhere,
+            scriptsUsedOnlyInThisPrefab: scriptUsageCounts.onlyHere,
         },
         limits: buildLimitMetadata(args, {
             groupsReturned: limitedScripts.length,
@@ -1497,62 +1510,71 @@ function buildPrefabUsageSummary(graph, args) {
     };
 }
 
+function nodeMatchesName(node, query) {
+    return [
+        node.name,
+        node.meta?.methodName,
+        node.meta?.statePath,
+        node.meta?.route,
+        node.meta?.path,
+        node.meta?.importPath,
+        node.meta?.protocol,
+        node.meta?.serviceKind,
+        node.meta?.target,
+        node.meta?.host,
+        node.meta?.packageName,
+        node.meta?.httpMethod,
+        node.meta?.transport,
+        node.meta?.callee,
+        node.meta?.nodePath,
+        node.meta?.prefabPath,
+        node.meta?.field,
+        node.meta?.bindingKind,
+        node.meta?.editTarget,
+        node.meta?.assetPath,
+        node.meta?.assetKind,
+        node.meta?.targetNodePath,
+        node.meta?.targetComponentName,
+    ].some(value => matchContains(value, query))
+        || (node.meta?.tags || []).some(tag => matchContains(tag, query));
+}
+
+function nodeHasHandler(node, lookup, query) {
+    return (lookup.adjacency.outgoing[node.id] || []).some(edge => {
+        if (edge.type !== 'binds') {
+            return false;
+        }
+        return matchContains(edge.meta?.sourceEventKind, query) || matchContains(edge.meta?.handler, query);
+    });
+}
+
 function searchNodes(graph, lookup, args) {
-    let nodes = [...graph.nodes];
-
-    if (args.type) {
-        nodes = nodes.filter(node => node.type === args.type);
+    const results = [];
+    for (const node of graph.nodes) {
+        if (args.type && node.type !== args.type) {
+            continue;
+        }
+        if (!nodeMatchesQueryFilters(node, args)) {
+            continue;
+        }
+        if (args.name && !nodeMatchesName(node, args.name)) {
+            continue;
+        }
+        if (args.tag && !(node.meta?.tags || []).some(tag => matchContains(tag, args.tag))) {
+            continue;
+        }
+        if (args.file && !matchContains(node.file, args.file)) {
+            continue;
+        }
+        if (args.hasHandler && !nodeHasHandler(node, lookup, args.hasHandler)) {
+            continue;
+        }
+        results.push(summarizeNode(node, lookup));
+        if (results.length >= args.limit) {
+            break;
+        }
     }
-    nodes = nodes.filter(node => nodeMatchesQueryFilters(node, args));
-    if (args.name) {
-        nodes = nodes.filter(node => {
-            return (
-                matchContains(node.name, args.name) ||
-                matchContains(node.meta?.methodName, args.name) ||
-                matchContains(node.meta?.statePath, args.name) ||
-                matchContains(node.meta?.route, args.name) ||
-                matchContains(node.meta?.path, args.name) ||
-                matchContains(node.meta?.importPath, args.name) ||
-                matchContains(node.meta?.protocol, args.name) ||
-                matchContains(node.meta?.serviceKind, args.name) ||
-                matchContains(node.meta?.target, args.name) ||
-                matchContains(node.meta?.host, args.name) ||
-                matchContains(node.meta?.packageName, args.name) ||
-                matchContains(node.meta?.httpMethod, args.name) ||
-                matchContains(node.meta?.transport, args.name) ||
-                matchContains(node.meta?.callee, args.name) ||
-                matchContains(node.meta?.nodePath, args.name) ||
-                matchContains(node.meta?.prefabPath, args.name) ||
-                matchContains(node.meta?.field, args.name) ||
-                matchContains(node.meta?.bindingKind, args.name) ||
-                matchContains(node.meta?.editTarget, args.name) ||
-                matchContains(node.meta?.assetPath, args.name) ||
-                matchContains(node.meta?.assetKind, args.name) ||
-                matchContains(node.meta?.targetNodePath, args.name) ||
-                matchContains(node.meta?.targetComponentName, args.name) ||
-                (node.meta?.tags || []).some(tag => matchContains(tag, args.name))
-            );
-        });
-    }
-    if (args.tag) {
-        nodes = nodes.filter(node => (node.meta?.tags || []).some(tag => matchContains(tag, args.tag)));
-    }
-    if (args.file) {
-        nodes = nodes.filter(node => matchContains(node.file, args.file));
-    }
-    if (args.hasHandler) {
-        nodes = nodes.filter(node => {
-            const outgoing = lookup.adjacency.outgoing[node.id] || [];
-            return outgoing.some(edge => {
-                if (edge.type !== 'binds') {
-                    return false;
-                }
-                return matchContains(edge.meta?.sourceEventKind, args.hasHandler) || matchContains(edge.meta?.handler, args.hasHandler);
-            });
-        });
-    }
-
-    return nodes.slice(0, args.limit).map(node => summarizeNode(node, lookup));
+    return results;
 }
 
 function inferBusinessGroup(result) {

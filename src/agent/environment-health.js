@@ -518,9 +518,24 @@ function checkWorkspaceRegistry({ context, dataRootExists, diagnostics, findings
 function buildGlobalFreshness(context, sourceVersion, diagnostics) {
     const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
-    const graph = readJsonDiagnostic(graphPath, null, diagnostics, 'project_global_graph_unreadable');
+    const reportPath = path.join(context.paths.projectGlobalDir, 'build.report.json');
     const lookupExists = fs.existsSync(lookupPath);
-    if (!graph || !lookupExists) {
+    if (!fs.existsSync(graphPath) || !lookupExists) {
+        return buildKbFreshnessStatus({
+            root: context.workspaceRoot,
+            graph: null,
+            config: null,
+            currentSkill: compactVersion(sourceVersion),
+            recommendedAction: 'build_project_index',
+        });
+    }
+    const report = fs.existsSync(reportPath)
+        ? readJsonDiagnostic(reportPath, null, diagnostics, 'project_global_report_unreadable')
+        : null;
+    const graph = report?.sourceSnapshot
+        ? report
+        : readJsonDiagnostic(graphPath, null, diagnostics, 'project_global_graph_unreadable');
+    if (!graph) {
         return buildKbFreshnessStatus({
             root: context.workspaceRoot,
             graph: null,

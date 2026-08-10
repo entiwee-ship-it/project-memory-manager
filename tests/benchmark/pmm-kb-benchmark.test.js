@@ -172,6 +172,7 @@ async function main() {
     fs.mkdirSync(path.dirname(context.paths.projectProtocols), { recursive: true });
     fs.writeFileSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'), '{"nodes":[],"edges":[]}\n');
     fs.writeFileSync(path.join(context.paths.projectGlobalDir, 'chain.lookup.json'), '{"nodesByType":{}}\n');
+    fs.writeFileSync(path.join(context.paths.projectGlobalDir, 'build.report.json'), '{"sourceSnapshot":{}}\n');
     fs.writeFileSync(context.paths.projectProtocols, '{"summary":{}}\n');
 
     const parseOnlyArgs = parseArgs([
@@ -191,6 +192,10 @@ async function main() {
     assert.equal(benchmark.artifactParse.graph.readSummary.count, 1);
     assert.equal(benchmark.artifactParse.graph.parseSummary.count, 1);
     assert.equal(benchmark.artifactParse.graph.processSummary.count, 1);
+    assert.equal(benchmark.artifactParse.graph.bytes, fs.statSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json')).size);
+    assert.equal(benchmark.artifactParse.graph.bytesStable, true);
+    assert.equal(benchmark.artifactParse.graph.samples[0].artifactShape.hasNodes, true);
+    assert.equal(benchmark.artifactParse.report.samples[0].artifactShape.hasSourceSnapshot, true);
     assert.ok(benchmark.artifactParse.graph.samples[0].processElapsedMs >= benchmark.artifactParse.graph.samples[0].elapsedMs);
 
     const help = spawnSync(process.execPath, [benchmarkBin, '--help'], {

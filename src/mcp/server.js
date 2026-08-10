@@ -11,7 +11,7 @@ const { run: buildProjectKb } = require('../commands/build/build-project');
 const { run: discoverFeaturesCli } = require('../commands/build/discover-features');
 const { run: buildFeatureIndexCli } = require('../commands/build/build-feature');
 const { loadSkillVersion } = require('../maintenance/show-version');
-const { loadFeatureLookupArtifacts, normalizeFeatureRecord } = require('../graph/feature-kb');
+const { normalizeFeatureRecord, resolveExistingKbArtifacts } = require('../graph/feature-kb');
 const { buildKbFreshnessStatus } = require('../shared/source-snapshot');
 const {
     analyzeChangeImpact,
@@ -55,6 +55,7 @@ const MAX_QUERY_CACHE_ENTRIES = 100;
 const DEFAULT_FRESHNESS_POLICY = 'auto_rebuild';
 const FRESHNESS_POLICIES = new Set(['auto_rebuild', 'require_fresh', 'allow_stale']);
 const projectQueryCache = new Map();
+const projectQueryKeyByBase = new Map();
 let freshnessObserver = null;
 
 const TOOL_DEFINITIONS = [
@@ -814,9 +815,20 @@ function buildGlobalFreshness(context) {
     freshnessObserver?.(context);
     const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
-    const graph = readJsonSafe(graphPath, null);
+    const reportPath = path.join(context.paths.projectGlobalDir, 'build.report.json');
     const hasLookup = fs.existsSync(lookupPath);
-    if (!graph || !hasLookup) {
+    if (!fs.existsSync(graphPath) || !hasLookup) {
+        return buildKbFreshnessStatus({
+            root: context.workspaceRoot,
+            graph: null,
+            config: null,
+            currentSkill: currentSkillSummary(),
+            recommendedAction: 'build_project_index',
+        });
+    }
+    const report = fs.existsSync(reportPath) ? readJsonSafe(reportPath, null) : null;
+    const graph = report?.sourceSnapshot ? report : readJsonSafe(graphPath, null);
+    if (!graph) {
         return buildKbFreshnessStatus({
             root: context.workspaceRoot,
             graph: null,
@@ -863,14 +875,23 @@ function buildFeatureFreshness(context, featureKey) {
             recommendedAction: 'discover_features',
         };
     }
-    const { graph } = loadFeatureLookupArtifacts(context.workspaceRoot, feature);
+    const { graphPath, lookupPath } = resolveExistingKbArtifacts(context.workspaceRoot, feature);
+    const reportPath = path.resolve(
+        context.workspaceRoot,
+        feature.outputs?.report || path.join(feature.kbDir || path.dirname(graphPath), 'build.report.json')
+    );
+    const hasArtifacts = fs.existsSync(graphPath) && fs.existsSync(lookupPath);
+    const report = hasArtifacts && fs.existsSync(reportPath) ? readJsonSafe(reportPath, null) : null;
+    const graph = hasArtifacts
+        ? (report?.sourceSnapshot ? report : readJsonSafe(graphPath, null))
+        : null;
     const configPath = path.isAbsolute(feature.configPath)
         ? feature.configPath
         : path.resolve(context.workspaceRoot, feature.configPath || '');
     return buildKbFreshnessStatus({
         root: context.workspaceRoot,
         graph,
-        config: readJsonSafe(configPath, null),
+        config: graph ? readJsonSafe(configPath, null) : null,
         currentSkill: currentSkillSummary(),
         recommendedAction: `build_feature_index:${feature.featureKey}`,
     });
@@ -1001,7 +1022,11 @@ function setFreshnessObserver(observer = null) {
 function evictOldestQueryEntry() {
     const oldestKey = projectQueryCache.keys().next().value;
     if (oldestKey) {
+        const entry = projectQueryCache.get(oldestKey);
         projectQueryCache.delete(oldestKey);
+        if (entry && projectQueryKeyByBase.get(entry.baseKey) === oldestKey) {
+            projectQueryKeyByBase.delete(entry.baseKey);
+        }
     }
 }
 
@@ -2068,15 +2093,16 @@ function queryProjectChain(args) {
     const cacheKey = JSON.stringify({ baseKey, signature: artifactState.signature });
     let invalidatedByMtime = false;
     let invalidatedBySource = false;
-    for (const [key, entry] of projectQueryCache.entries()) {
-        if (entry.baseKey === baseKey && entry.signature !== artifactState.signature) {
-            projectQueryCache.delete(key);
-            if (entry.artifactSignature !== artifactState.artifactSignature) {
-                invalidatedByMtime = true;
-            }
-            if (entry.sourceSignature !== artifactState.sourceSignature) {
-                invalidatedBySource = true;
-            }
+    const previousKey = projectQueryKeyByBase.get(baseKey);
+    if (previousKey && previousKey !== cacheKey) {
+        const entry = projectQueryCache.get(previousKey);
+        projectQueryCache.delete(previousKey);
+        projectQueryKeyByBase.delete(baseKey);
+        if (entry?.artifactSignature !== artifactState.artifactSignature) {
+            invalidatedByMtime = true;
+        }
+        if (entry?.sourceSignature !== artifactState.sourceSignature) {
+            invalidatedBySource = true;
         }
     }
 
@@ -2129,6 +2155,7 @@ function queryProjectChain(args) {
         payload,
         cachedAt,
     });
+    projectQueryKeyByBase.set(baseKey, cacheKey);
     const enriched = withMcpQueryMetadata(payload, {
         hit: false,
         invalidatedByMtime,
@@ -2306,6 +2333,7 @@ module.exports = {
     run: startStdioServer,
     startStdioServer,
     __testing: {
+        buildGlobalFreshness,
         setFreshnessObserver,
     },
 };
