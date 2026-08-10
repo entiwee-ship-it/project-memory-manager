@@ -1578,9 +1578,18 @@ function attachProjectedMetadata(projected, source, detail) {
             : {
                 hit: Boolean(source._mcpCache.hit),
                 elapsedMs: source._mcpCache.elapsedMs ?? null,
+                queryElapsedMs: source._mcpCache.queryElapsedMs ?? null,
                 cachedAt: source._mcpCache.cachedAt || '',
                 invalidatedByMtime: Boolean(source._mcpCache.invalidatedByMtime),
                 invalidatedBySource: Boolean(source._mcpCache.invalidatedBySource),
+                worker: source._mcpCache.worker
+                    ? {
+                        used: Boolean(source._mcpCache.worker.used),
+                        threadId: source._mcpCache.worker.threadId ?? null,
+                        reused: Boolean(source._mcpCache.worker.reused),
+                        generation: source._mcpCache.worker.generation ?? null,
+                    }
+                    : null,
             };
     }
     if (source?._mcpQuery) {

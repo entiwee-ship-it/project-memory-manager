@@ -2292,7 +2292,7 @@ function buildArtifactGuide(feature) {
     ];
 }
 
-function buildFeatureSummary(feature, graph, lookup, context = null) {
+function buildFeatureSummary(feature, graph, lookup, context = null, freshnessOverride = undefined) {
     const nodeCount = Array.isArray(graph.nodes) ? graph.nodes.length : 0;
     const edgeCount = Array.isArray(graph.edges) ? graph.edges.length : 0;
     const nodesByType = Object.fromEntries(
@@ -2300,11 +2300,13 @@ function buildFeatureSummary(feature, graph, lookup, context = null) {
     );
     const examples = recommendCommands(feature.featureKey, lookup);
     const artifacts = buildArtifactGuide(feature);
-    const kbVersionStatus = buildKbVersionStatus(graph, {
-        root: context?.workspaceRoot || process.cwd(),
-        config: context ? loadFreshnessConfig(context.workspaceRoot, feature) : null,
-        recommendedAction: buildQueryRecommendedAction(feature.featureKey),
-    });
+    const kbVersionStatus = freshnessOverride === undefined
+        ? buildKbVersionStatus(graph, {
+            root: context?.workspaceRoot || process.cwd(),
+            config: context ? loadFreshnessConfig(context.workspaceRoot, feature) : null,
+            recommendedAction: buildQueryRecommendedAction(feature.featureKey),
+        })
+        : freshnessOverride;
 
     return {
         kind: 'feature-summary',
@@ -2505,7 +2507,28 @@ function resolveTraversalSpec(args, graph, lookup) {
     return null;
 }
 
-function run(argv = process.argv.slice(2)) {
+const queryRenderers = {
+    semantic: (payload, args) => printSemanticResults(payload, args),
+    notFound: (payload, args) => printNotFoundResult(payload, args.json),
+    summary: (payload, args) => printSummary(payload, args.json),
+    detailed: (payload, args) => printDetailedResult(payload, args.json),
+    search: (payload, args) => printSearchResults(payload, args.json),
+    traversal: (payload, args) => printTraversal(payload, args.json),
+    feature: (payload, args) => printFeatureSummary(payload, args.json),
+};
+
+function queryExecution(payload, args, kbVersionStatus, renderer) {
+    return {
+        payload,
+        args,
+        kbVersionStatus,
+        render() {
+            renderer(payload, args);
+        },
+    };
+}
+
+function executeQuery(argv = process.argv.slice(2), options = {}) {
     const args = parseArgs(argv);
     const context = createWorkspaceContext({
         workspaceRoot: args.root || process.cwd(),
@@ -2513,31 +2536,26 @@ function run(argv = process.argv.slice(2)) {
         layout: args.layout,
     });
     const { feature, graph, lookup } = loadFeatureLookup(context, args.feature);
-    const kbVersionStatus = buildKbVersionStatus(graph, {
-        root: context.workspaceRoot,
-        config: loadFreshnessConfig(context.workspaceRoot, feature),
-        recommendedAction: buildQueryRecommendedAction(feature.featureKey),
-    });
-    if (!args.json) {
-        warnIfKbStale(kbVersionStatus);
-    }
-
+    const kbVersionStatus = Object.prototype.hasOwnProperty.call(options, 'kbVersionStatus')
+        ? options.kbVersionStatus
+        : buildKbVersionStatus(graph, {
+            root: context.workspaceRoot,
+            config: loadFreshnessConfig(context.workspaceRoot, feature),
+            recommendedAction: buildQueryRecommendedAction(feature.featureKey),
+        });
     const traversalSpec = resolveTraversalSpec(args, graph, lookup);
     if (traversalSpec) {
         const resolved = resolveTypedStart(graph, lookup, traversalSpec.selectorType, traversalSpec.inputQuery, args);
         if (resolved?.ambiguous) {
-            printTraversal(
-                withAmbiguousRecommendations(resolved, graph, lookup, {
-                    featureKey: feature.featureKey,
-                    query: traversalSpec.inputQuery,
-                    direction: traversalSpec.direction,
-                    workspaceRoot: context.workspaceRoot,
-                    dataRoot: context.dataRoot,
-                    layout: context.layout,
-                }),
-                args.json
-            );
-            return;
+            const payload = withAmbiguousRecommendations(resolved, graph, lookup, {
+                featureKey: feature.featureKey,
+                query: traversalSpec.inputQuery,
+                direction: traversalSpec.direction,
+                workspaceRoot: context.workspaceRoot,
+                dataRoot: context.dataRoot,
+                layout: context.layout,
+            });
+            return queryExecution(payload, args, kbVersionStatus, queryRenderers.traversal);
         }
 
         const startId = typeof resolved === 'string' ? resolved : resolved.id;
@@ -2565,15 +2583,13 @@ function run(argv = process.argv.slice(2)) {
         if (isDataAccessSummaryMode(args)) {
             result.dataAccessSummary = buildDataAccessSummary(shapedTraversal.dataTraversal, lookup);
         }
-        printTraversal(result, args.json);
-        return;
+        return queryExecution(result, args, kbVersionStatus, queryRenderers.traversal);
     }
 
     // 语义查询处理
     if (args.hasOperation || args.operationType || args.dataFlowFrom || args.dataFlowTo || args.minComplexity) {
         const results = performSemanticQuery(graph, lookup, args);
-        printSemanticResults(results, args);
-        return;
+        return queryExecution(results, args, kbVersionStatus, queryRenderers.semantic);
     }
 
     if (args.event) {
@@ -2581,50 +2597,41 @@ function run(argv = process.argv.slice(2)) {
         if (!event) {
             throw new Error(`未找到事件: ${args.event}`);
         }
-        printDetailedResult(
-            {
-                type: 'event',
-                name: args.event,
-                bus: event.bus || '',
-                kbVersionStatus,
-                kbFreshness: kbVersionStatus,
-                subscribers: event.subscribers || [],
-                emitters: event.emitters || [],
-                node: summarizeNode(getOwnEntry(lookup.nodesById, event.id), lookup),
-            },
-            args.json
-        );
-        return;
+        const payload = {
+            type: 'event',
+            name: args.event,
+            bus: event.bus || '',
+            kbVersionStatus,
+            kbFreshness: kbVersionStatus,
+            subscribers: event.subscribers || [],
+            emitters: event.emitters || [],
+            node: summarizeNode(getOwnEntry(lookup.nodesById, event.id), lookup),
+        };
+        return queryExecution(payload, args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.message) {
         const message = getOwnEntry(lookup.messages, args.message);
         if (!message) {
-            printNotFoundResult(
-                buildTypeAwareNotFoundResult(graph, feature.featureKey, 'message', args.message, {
-                    workspaceRoot: context.workspaceRoot,
-                    dataRoot: context.dataRoot,
-                    layout: context.layout,
-                }),
-                args.json
-            );
-            return;
+            const payload = buildTypeAwareNotFoundResult(graph, feature.featureKey, 'message', args.message, {
+                workspaceRoot: context.workspaceRoot,
+                dataRoot: context.dataRoot,
+                layout: context.layout,
+            });
+            return queryExecution(payload, args, kbVersionStatus, queryRenderers.notFound);
         }
-        printDetailedResult(
-            {
-                type: 'message',
-                name: args.message,
-                protocol: message.protocol || '',
-                confidence: message.confidence ?? null,
-                kbVersionStatus,
-                kbFreshness: kbVersionStatus,
-                dispatchers: message.dispatchers || [],
-                emitters: message.emitters || [],
-                handlers: message.handlers || [],
-                node: summarizeNode(getOwnEntry(lookup.nodesById, message.id), lookup),
-            },
-            args.json
-        );
-        return;
+        const payload = {
+            type: 'message',
+            name: args.message,
+            protocol: message.protocol || '',
+            confidence: message.confidence ?? null,
+            kbVersionStatus,
+            kbFreshness: kbVersionStatus,
+            dispatchers: message.dispatchers || [],
+            emitters: message.emitters || [],
+            handlers: message.handlers || [],
+            node: summarizeNode(getOwnEntry(lookup.nodesById, message.id), lookup),
+        };
+        return queryExecution(payload, args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.method) {
         const method = resolveMethod(lookup, args.method);
@@ -2632,135 +2639,127 @@ function run(argv = process.argv.slice(2)) {
             throw new Error(`未找到方法: ${args.method}`);
         }
         if (method.ambiguous) {
-            printSummary(
-                withAmbiguousRecommendations(method, graph, lookup, {
-                    featureKey: feature.featureKey,
-                    query: args.method,
-                    direction: 'downstream',
-                    workspaceRoot: context.workspaceRoot,
-                    dataRoot: context.dataRoot,
-                    layout: context.layout,
-                }),
-                args.json
-            );
-            return;
+            const payload = withAmbiguousRecommendations(method, graph, lookup, {
+                featureKey: feature.featureKey,
+                query: args.method,
+                direction: 'downstream',
+                workspaceRoot: context.workspaceRoot,
+                dataRoot: context.dataRoot,
+                layout: context.layout,
+            });
+            return queryExecution(payload, args, kbVersionStatus, queryRenderers.summary);
         }
-        printSummary(summarizeNode(getOwnEntry(lookup.nodesById, method.id), lookup), args.json);
-        return;
+        const payload = summarizeNode(getOwnEntry(lookup.nodesById, method.id), lookup);
+        return queryExecution(payload, args, kbVersionStatus, queryRenderers.summary);
     }
     if (args.request) {
         const request = resolveTypedStart(graph, lookup, 'request', args.request, args);
         if (request?.ambiguous) {
-            printSummary(
-                withAmbiguousRecommendations(request, graph, lookup, {
-                    featureKey: feature.featureKey,
-                    query: args.request,
-                    direction: 'downstream',
-                    workspaceRoot: context.workspaceRoot,
-                    dataRoot: context.dataRoot,
-                    layout: context.layout,
-                }),
-                args.json
-            );
-            return;
+            const payload = withAmbiguousRecommendations(request, graph, lookup, {
+                featureKey: feature.featureKey,
+                query: args.request,
+                direction: 'downstream',
+                workspaceRoot: context.workspaceRoot,
+                dataRoot: context.dataRoot,
+                layout: context.layout,
+            });
+            return queryExecution(payload, args, kbVersionStatus, queryRenderers.summary);
         }
         const requestNode = getOwnEntry(lookup.nodesById, request.id);
         const requestInfo = getOwnEntry(lookup.requests, requestNode?.name) || request;
-        printDetailedResult(
-            {
-                type: 'request',
-                name: requestNode?.name || args.request,
-                callee: requestInfo.callee || '',
-                kbVersionStatus,
-                kbFreshness: kbVersionStatus,
-                callers: requestInfo.callers || [],
-                protocol: requestInfo.protocol || '',
-                httpMethod: requestInfo.httpMethod || '',
-                transport: requestInfo.transport || '',
-                node: summarizeNode(requestNode, lookup),
-            },
-            args.json
-        );
-        return;
+        const payload = {
+            type: 'request',
+            name: requestNode?.name || args.request,
+            callee: requestInfo.callee || '',
+            kbVersionStatus,
+            kbFreshness: kbVersionStatus,
+            callers: requestInfo.callers || [],
+            protocol: requestInfo.protocol || '',
+            httpMethod: requestInfo.httpMethod || '',
+            transport: requestInfo.transport || '',
+            node: summarizeNode(requestNode, lookup),
+        };
+        return queryExecution(payload, args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.endpoint) {
         const endpoint = resolveTypedStart(graph, lookup, 'endpoint', args.endpoint, args);
         if (endpoint?.ambiguous) {
-            printSummary(
-                withAmbiguousRecommendations(endpoint, graph, lookup, {
-                    featureKey: feature.featureKey,
-                    query: args.endpoint,
-                    direction: 'downstream',
-                    workspaceRoot: context.workspaceRoot,
-                    dataRoot: context.dataRoot,
-                    layout: context.layout,
-                }),
-                args.json
-            );
-            return;
+            const payload = withAmbiguousRecommendations(endpoint, graph, lookup, {
+                featureKey: feature.featureKey,
+                query: args.endpoint,
+                direction: 'downstream',
+                workspaceRoot: context.workspaceRoot,
+                dataRoot: context.dataRoot,
+                layout: context.layout,
+            });
+            return queryExecution(payload, args, kbVersionStatus, queryRenderers.summary);
         }
         const endpointNode = getOwnEntry(lookup.nodesById, endpoint.id);
         const endpointInfo = getOwnEntry(lookup.endpoints, endpointNode?.name) || endpoint;
-        printDetailedResult(
-            {
-                type: 'endpoint',
-                name: endpointNode?.name || args.endpoint,
-                httpMethod: endpointInfo.method || endpointNode?.meta?.method || '',
-                httpPath: endpointInfo.path || endpointNode?.meta?.path || '',
-                handlers: endpointInfo.handlers || [],
-                kbVersionStatus,
-                kbFreshness: kbVersionStatus,
-                node: summarizeNode(endpointNode, lookup),
-            },
-            args.json
-        );
-        return;
+        const payload = {
+            type: 'endpoint',
+            name: endpointNode?.name || args.endpoint,
+            httpMethod: endpointInfo.method || endpointNode?.meta?.method || '',
+            httpPath: endpointInfo.path || endpointNode?.meta?.path || '',
+            handlers: endpointInfo.handlers || [],
+            kbVersionStatus,
+            kbFreshness: kbVersionStatus,
+            node: summarizeNode(endpointNode, lookup),
+        };
+        return queryExecution(payload, args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.state) {
         const state = resolveState(lookup, args.state);
         if (!state) {
             throw new Error(`未找到 state: ${args.state}`);
         }
-        printDetailedResult(
-            {
-                type: 'state',
-                name: args.state,
-                kbVersionStatus,
-                kbFreshness: kbVersionStatus,
-                readers: state.readers || [],
-                writers: state.writers || [],
-                node: summarizeNode(getOwnEntry(lookup.nodesById, state.id), lookup),
-            },
-            args.json
-        );
-        return;
+        const payload = {
+            type: 'state',
+            name: args.state,
+            kbVersionStatus,
+            kbFreshness: kbVersionStatus,
+            readers: state.readers || [],
+            writers: state.writers || [],
+            node: summarizeNode(getOwnEntry(lookup.nodesById, state.id), lookup),
+        };
+        return queryExecution(payload, args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.type === 'prefab-component') {
-        printDetailedResult(buildComponentSummary(graph, args), args.json);
-        return;
+        return queryExecution(buildComponentSummary(graph, args), args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.type === 'script-usage') {
-        printDetailedResult(buildScriptUsageSummary(graph, args), args.json);
-        return;
+        return queryExecution(buildScriptUsageSummary(graph, args), args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.type === 'prefab-script-usage') {
-        printDetailedResult(buildPrefabUsageSummary(graph, args), args.json);
-        return;
+        return queryExecution(buildPrefabUsageSummary(graph, args), args, kbVersionStatus, queryRenderers.detailed);
     }
     if (args.type || args.name || args.tag || args.file || args.hasHandler) {
         const results = searchNodes(graph, lookup, args);
         if (args.grouped) {
-            printDetailedResult(buildSearchGroups(results, args), args.json);
-            return;
+            return queryExecution(buildSearchGroups(results, args), args, kbVersionStatus, queryRenderers.detailed);
         }
-        printSearchResults(results, args.json);
-        return;
+        return queryExecution(results, args, kbVersionStatus, queryRenderers.search);
     }
 
-    printFeatureSummary(buildFeatureSummary(feature, graph, lookup, context), args.json);
+    return queryExecution(
+        buildFeatureSummary(feature, graph, lookup, context, kbVersionStatus),
+        args,
+        kbVersionStatus,
+        queryRenderers.feature
+    );
+}
+
+function run(argv = process.argv.slice(2)) {
+    const execution = executeQuery(argv);
+    if (!execution.args.json) {
+        warnIfKbStale(execution.kbVersionStatus);
+    }
+    execution.render();
+    return execution.payload;
 }
 
 module.exports = {
+    executeQuery,
     run,
 };
 

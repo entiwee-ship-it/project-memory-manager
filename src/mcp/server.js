@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { spawn, spawnSync } = require('child_process');
+const { spawn } = require('child_process');
 const { createWorkspaceContext } = require('../shared/workspace-layout');
 const { run: initProjectMemory } = require('../commands/lifecycle/init-workspace');
 const { run: detectProjectTopology } = require('../commands/lifecycle/detect-topology');
@@ -34,6 +34,7 @@ const {
 } = require('../agent/memory-recall');
 const { agentPreflight } = require('../agent/environment-health');
 const { projectAgentOutput, resolveOutputDetail } = require('../agent/output-projection');
+const { runQueryWorker } = require('./query-worker-client');
 const {
     buildWorkspaceIdentity,
     diagnoseDataRoot,
@@ -1030,10 +1031,6 @@ function evictOldestQueryEntry() {
     }
 }
 
-function parseJsonOutput(output) {
-    return JSON.parse(String(output || '').trim() || '{}');
-}
-
 function cloneJson(value) {
     return JSON.parse(JSON.stringify(value));
 }
@@ -1969,55 +1966,6 @@ function updatePlaybookTool(args) {
     });
 }
 
-function runQueryScript(scriptName, argv, timeoutMs) {
-    const startedAt = Date.now();
-    const child = spawnSync(process.execPath, [path.resolve(__dirname, '..', 'bin', scriptName), ...argv], {
-        cwd: path.resolve(__dirname, '..', '..'),
-        encoding: 'utf8',
-        windowsHide: true,
-        timeout: timeoutMs,
-        maxBuffer: 20 * 1024 * 1024,
-    });
-    const elapsedMs = Date.now() - startedAt;
-    if (child.error?.code === 'ETIMEDOUT') {
-        return {
-            ok: false,
-            timedOut: true,
-            elapsedMs,
-            stdout: child.stdout || '',
-            stderr: child.stderr || '',
-            error: `Query timed out after ${timeoutMs}ms`,
-        };
-    }
-    if (child.error) {
-        return {
-            ok: false,
-            timedOut: false,
-            elapsedMs,
-            stdout: child.stdout || '',
-            stderr: child.stderr || '',
-            error: child.error.message,
-        };
-    }
-    if (child.status !== 0) {
-        return {
-            ok: false,
-            timedOut: false,
-            elapsedMs,
-            stdout: child.stdout || '',
-            stderr: child.stderr || '',
-            error: (child.stderr || child.stdout || `Query exited with code ${child.status}`).trim(),
-        };
-    }
-    return {
-        ok: true,
-        timedOut: false,
-        elapsedMs,
-        stdout: child.stdout || '',
-        stderr: child.stderr || '',
-    };
-}
-
 function appendQuerySelectorArgs(argv, args, options) {
     for (const key of ['message', 'timing', 'phase', 'transition', 'event', 'method', 'request', 'endpoint', 'state', 'type', 'name', 'tag', 'file', 'area', 'module', 'protocol', 'path', 'detail', 'mode', 'focus', 'from', 'direction']) {
         if (args[key]) {
@@ -2065,7 +2013,19 @@ function appendQuerySelectorArgs(argv, args, options) {
     }
 }
 
-function queryProjectChain(args) {
+function queryWorkerMetadata(result = null) {
+    if (!result) {
+        return { used: false };
+    }
+    return {
+        used: true,
+        threadId: result.workerThreadId || null,
+        reused: Boolean(result.workerReused),
+        generation: result.workerGeneration || null,
+    };
+}
+
+async function queryProjectChain(args) {
     const options = resolveMcpQueryOptions(args);
     const freshnessPolicy = resolveFreshnessPolicy(args);
     const freshnessGate = ensureProjectQueryFresh(args, freshnessPolicy);
@@ -2114,13 +2074,16 @@ function queryProjectChain(args) {
             invalidatedBySource: false,
             cachedAt: cached.cachedAt,
             elapsedMs: 0,
+            worker: queryWorkerMetadata(),
             artifacts: artifactState.artifacts,
             projectGlobalFreshness: artifactState.projectGlobalFreshness,
         }, queryMeta, freshnessGate.freshnessMeta);
         return textResult(projectAgentOutput(enriched, args, 'query_project_chain'));
     }
 
-    const result = runQueryScript('query-project.js', argv, options.timeoutMs);
+    const result = await runQueryWorker('query-project.js', argv, options.timeoutMs, {
+        kbVersionStatus: freshnessGate.finalFreshness,
+    });
     if (!result.ok) {
         const failure = {
             ok: false,
@@ -2133,6 +2096,8 @@ function queryProjectChain(args) {
                 invalidatedByMtime,
                 invalidatedBySource,
                 elapsedMs: result.elapsedMs,
+                queryElapsedMs: Number.isFinite(result.queryElapsedMs) ? result.queryElapsedMs : null,
+                worker: queryWorkerMetadata(result),
                 artifacts: artifactState.artifacts,
                 projectGlobalFreshness: artifactState.projectGlobalFreshness,
             },
@@ -2142,7 +2107,7 @@ function queryProjectChain(args) {
         return textResult(projectAgentOutput(failure, args, 'query_project_chain'));
     }
 
-    const payload = parseJsonOutput(result.stdout);
+    const payload = result.payload;
     while (projectQueryCache.size >= MAX_QUERY_CACHE_ENTRIES) {
         evictOldestQueryEntry();
     }
@@ -2162,13 +2127,15 @@ function queryProjectChain(args) {
         invalidatedBySource,
         cachedAt,
         elapsedMs: result.elapsedMs,
+        queryElapsedMs: result.queryElapsedMs,
+        worker: queryWorkerMetadata(result),
         artifacts: artifactState.artifacts,
         projectGlobalFreshness: artifactState.projectGlobalFreshness,
     }, queryMeta, freshnessGate.freshnessMeta);
     return textResult(projectAgentOutput(enriched, args, 'query_project_chain'));
 }
 
-function queryFeatureChain(args) {
+async function queryFeatureChain(args) {
     const options = resolveMcpQueryOptions(args);
     const freshnessPolicy = resolveFreshnessPolicy(args);
     const freshnessGate = ensureFeatureQueryFresh(args, freshnessPolicy);
@@ -2177,7 +2144,9 @@ function queryFeatureChain(args) {
     }
     const argv = [...layoutArgv(args), '--feature', args.feature, '--json'];
     appendQuerySelectorArgs(argv, args, options);
-    const result = runQueryScript('query-feature.js', argv, options.timeoutMs);
+    const result = await runQueryWorker('query-feature.js', argv, options.timeoutMs, {
+        kbVersionStatus: freshnessGate.finalFreshness,
+    });
     if (!result.ok) {
         const failure = {
             ok: false,
@@ -2185,6 +2154,13 @@ function queryFeatureChain(args) {
             timedOut: result.timedOut,
             stdout: result.stdout,
             stderr: result.stderr,
+            _mcpCache: {
+                hit: false,
+                supported: false,
+                elapsedMs: result.elapsedMs,
+                queryElapsedMs: Number.isFinite(result.queryElapsedMs) ? result.queryElapsedMs : null,
+                worker: queryWorkerMetadata(result),
+            },
             _mcpQuery: {
                 limit: hasQuerySelector(args) ? options.limit : null,
                 depth: options.depth,
@@ -2195,11 +2171,13 @@ function queryFeatureChain(args) {
         };
         return textResult(projectAgentOutput(failure, args, 'query_feature_chain'));
     }
-    const payload = parseJsonOutput(result.stdout);
+    const payload = result.payload;
     const enriched = withMcpQueryMetadata(payload, {
         hit: false,
         supported: false,
         elapsedMs: result.elapsedMs,
+        queryElapsedMs: result.queryElapsedMs,
+        worker: queryWorkerMetadata(result),
         featureFreshness: freshnessGate.finalFreshness,
     }, {
         limit: hasQuerySelector(args) ? options.limit : null,

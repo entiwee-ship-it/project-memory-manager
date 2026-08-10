@@ -4,7 +4,7 @@ const path = require('path');
 const { readJson, readJsonSafe, resolveProjectRoot } = require('../../shared/common');
 const { loadFeatureLookupArtifacts } = require('../../graph/feature-kb');
 const { createWorkspaceContext, parseLayoutArgs } = require('../../shared/workspace-layout');
-const { run: runFeatureQuery } = require('../../query/query-chain');
+const { executeQuery: executeFeatureQuery } = require('../../query/query-chain');
 const { loadSkillVersion } = require('../../maintenance/show-version');
 const { buildKbFreshnessStatus } = require('../../shared/source-snapshot');
 
@@ -140,21 +140,23 @@ function loadProjectProtocols(context) {
     return readJson(context.paths.projectProtocols);
 }
 
-function loadProjectSummary(context) {
+function loadProjectSummary(context, options = {}) {
     const { graph, lookup, protocols } = loadProjectArtifacts(context);
     const config = readJsonSafe(path.join(context.paths.configsDir, 'project-global.json'), { required: false, defaultValue: null });
     const currentSkill = loadSkillVersion(path.resolve(__dirname, '..', '..', '..'));
-    const kbFreshness = buildKbFreshnessStatus({
-        root: context.workspaceRoot,
-        graph,
-        config,
-        currentSkill: {
-            name: currentSkill.name || '',
-            version: currentSkill.version || '',
-            repo: currentSkill.repo || '',
-        },
-        recommendedAction: 'build_project_index',
-    });
+    const kbFreshness = Object.prototype.hasOwnProperty.call(options, 'kbVersionStatus')
+        ? options.kbVersionStatus
+        : buildKbFreshnessStatus({
+            root: context.workspaceRoot,
+            graph,
+            config,
+            currentSkill: {
+                name: currentSkill.name || '',
+                version: currentSkill.version || '',
+                repo: currentSkill.repo || '',
+            },
+            recommendedAction: 'build_project_index',
+        });
 
     return {
         kind: 'project-summary',
@@ -267,7 +269,11 @@ function printProtocolResults(kind, results, asJson) {
     }
 }
 
-function run(argv = process.argv.slice(2)) {
+function projectExecution(payload, render) {
+    return { payload, render };
+}
+
+function executeQuery(argv = process.argv.slice(2), options = {}) {
     const args = parseArgs(argv);
     const context = createWorkspaceContext({
         workspaceRoot: args.root || process.cwd(),
@@ -277,8 +283,8 @@ function run(argv = process.argv.slice(2)) {
     const root = context.workspaceRoot;
 
     if (!args.hasQuery) {
-        printProjectSummary(loadProjectSummary(context), args.json);
-        return;
+        const payload = loadProjectSummary(context, options);
+        return projectExecution(payload, () => printProjectSummary(payload, args.json));
     }
 
     if (args.timing) {
@@ -288,8 +294,7 @@ function run(argv = process.argv.slice(2)) {
             args.timing,
             ['ownerMethod', 'kind', 'trigger', 'callee', 'event', 'nextMethods', 'stateWrites']
         );
-        printProtocolResults('timing', results, args.json);
-        return;
+        return projectExecution(results, () => printProtocolResults('timing', results, args.json));
     }
 
     if (args.phase) {
@@ -299,8 +304,7 @@ function run(argv = process.argv.slice(2)) {
             args.phase,
             ['name', 'entryMethod', 'handledMessages', 'emittedMessages', 'stateWrites', 'nextMethods', 'timingKinds']
         );
-        printProtocolResults('phase', results, args.json);
-        return;
+        return projectExecution(results, () => printProtocolResults('phase', results, args.json));
     }
 
     if (args.transition) {
@@ -310,15 +314,21 @@ function run(argv = process.argv.slice(2)) {
             args.transition,
             ['name', 'state', 'driverMethod', 'handledMessages', 'nextMethods', 'transitionKind', 'timingKinds']
         );
-        printProtocolResults('transition', results, args.json);
-        return;
+        return projectExecution(results, () => printProtocolResults('transition', results, args.json));
     }
 
     const forwardedArgs = ['--feature', 'project-global', '--workspace-root', root, '--data-root', context.dataRoot, '--layout', context.layout, ...argv];
-    runFeatureQuery(forwardedArgs);
+    return executeFeatureQuery(forwardedArgs, options);
+}
+
+function run(argv = process.argv.slice(2)) {
+    const execution = executeQuery(argv);
+    execution.render();
+    return execution.payload;
 }
 
 module.exports = {
+    executeQuery,
     loadProjectSummary,
     run,
 };

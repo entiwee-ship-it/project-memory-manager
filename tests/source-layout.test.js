@@ -93,10 +93,12 @@ function testReleaseQualityGate() {
     );
     assert.equal(
         pkg.scripts['test:all'],
-        'npm test && npm run test:lookup && npm run test:freshness && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:options && npm run test:experience:contracts && npm run test:benchmark:contract'
+        'npm test && npm run test:lookup && npm run test:freshness && npm run test:query && npm run test:worker && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:options && npm run test:experience:contracts && npm run test:benchmark:contract'
     );
     assert.equal(pkg.scripts['test:lookup'], 'node tests/kb-lookup.test.js');
     assert.equal(pkg.scripts['test:freshness'], 'node tests/freshness-metadata.test.js');
+    assert.equal(pkg.scripts['test:query'], 'node tests/query-execution.test.js');
+    assert.equal(pkg.scripts['test:worker'], 'node tests/query-worker.test.js');
     assert.equal(
         pkg.scripts['test:experience:options'],
         'node tests/experience/harness-options.test.js'

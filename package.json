@@ -5,8 +5,10 @@
   "description": "Runtime helpers for the project-memory-manager Codex skill.",
   "scripts": {
     "test": "node tests/pinus-backend.test.js",
-    "test:all": "npm test && npm run test:lookup && npm run test:freshness && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:options && npm run test:experience:contracts && npm run test:benchmark:contract",
+    "test:all": "npm test && npm run test:lookup && npm run test:freshness && npm run test:query && npm run test:worker && npm run test:layout && npm run test:registry && npm run test:mcp && npm run test:agent && npm run test:feature && npm run test:path && npm run test:summary && npm run test:source-layout && npm run test:experience:options && npm run test:experience:contracts && npm run test:benchmark:contract",
     "test:freshness": "node tests/freshness-metadata.test.js",
+    "test:query": "node tests/query-execution.test.js",
+    "test:worker": "node tests/query-worker.test.js",
     "test:lookup": "node tests/kb-lookup.test.js",
     "test:layout": "node tests/workspace-layout.test.js",
     "test:registry": "node tests/workspace-registry.test.js",

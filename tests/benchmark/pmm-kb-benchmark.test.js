@@ -6,6 +6,7 @@ const { spawnSync } = require('node:child_process');
 const { createWorkspaceContext } = require('../../src/shared/workspace-layout');
 const {
     buildLayoutArgv,
+    buildMixedSelectors,
     parseArgs,
     parseWorkerArgv,
     readAndParseJson,
@@ -40,6 +41,7 @@ async function main() {
         '--iterations', '5',
         '--warmup', '2',
         '--parse-iterations', '2',
+        '--mixed-queries', '6',
         '--method', 'Sample.run',
         '--freshness-policy', 'require_fresh',
     ]);
@@ -48,6 +50,7 @@ async function main() {
     assert.equal(parsed.iterations, 5);
     assert.equal(parsed.warmup, 2);
     assert.equal(parsed.parseIterations, 2);
+    assert.equal(parsed.mixedQueries, 6);
     assert.equal(parsed.method, 'Sample.run');
     assert.equal(parsed.freshnessPolicy, 'require_fresh');
     assert.doesNotThrow(() => validateArgs(parsed));
@@ -126,6 +129,17 @@ async function main() {
         benchmarkBin,
         '--parse-worker',
         'E:/pmm-data/sample.json',
+    ]);
+
+    assert.deepEqual(buildMixedSelectors({
+        methods: { 'A.run': {}, 'B.run': {} },
+        messages: { HELLO: {} },
+        endpoints: { 'GET /api/demo': {} },
+    }, 4), [
+        { method: 'A.run' },
+        { message: 'HELLO' },
+        { endpoint: 'GET /api/demo' },
+        { method: 'B.run' },
     ]);
 
     assert.deepEqual(summarizeSamples([

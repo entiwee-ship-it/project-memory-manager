@@ -719,6 +719,9 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     });
     const first = parseTextResult(firstResponse);
     assert.equal(first._mcpCache.hit, false);
+    assert.equal(first._mcpCache.worker.used, true);
+    assert.equal(typeof first._mcpCache.worker.threadId, 'number');
+    assert.ok(first._mcpCache.queryElapsedMs >= 0);
     assert.equal(first._mcpQuery.limit, 100);
     assert.equal(first.kbFreshness.status, 'fresh');
 
@@ -732,6 +735,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     });
     const second = parseTextResult(secondResponse);
     assert.equal(second._mcpCache.hit, true);
+    assert.equal(second._mcpCache.worker.used, false);
     assert.equal(second._mcpQuery.limit, 100);
 
     fs.appendFileSync(path.join(workspaceRoot, 'official-website', 'src', 'main.js'), 'export function cacheChanged(){ return "changed"; }\n');
@@ -746,6 +750,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     });
     const sourceChanged = parseTextResult(sourceChangedResponse);
     assert.equal(sourceChanged._mcpCache.hit, false);
+    assert.equal(sourceChanged._mcpCache.worker.used, true);
     assert.equal(sourceChanged._mcpCache.invalidatedBySource, true);
     assert.equal(sourceChanged.kbFreshness.status, 'stale');
     assert.ok(sourceChanged.kbFreshness.reasonCodes.includes('source-files-changed'));
@@ -769,6 +774,7 @@ async function testQueryProjectChainCacheInvalidatesOnKbMtime() {
     });
     const third = parseTextResult(thirdResponse);
     assert.equal(third._mcpCache.hit, false);
+    assert.equal(third._mcpCache.worker.used, true);
     assert.equal(third._mcpCache.invalidatedByMtime, true);
 }
 

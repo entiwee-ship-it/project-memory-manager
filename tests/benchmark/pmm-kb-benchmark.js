@@ -10,6 +10,7 @@ const QUERY_PROJECT_BIN = path.join(REPO_ROOT, 'src', 'bin', 'query-project.js')
 const DEFAULT_ITERATIONS = 3;
 const DEFAULT_WARMUP = 1;
 const DEFAULT_PARSE_ITERATIONS = 1;
+const DEFAULT_MIXED_QUERIES = 8;
 const MAX_ITERATIONS = 50;
 
 function readOptionValue(argv, index, option) {
@@ -39,6 +40,7 @@ function parseArgs(argv = process.argv.slice(2)) {
         iterations: DEFAULT_ITERATIONS,
         warmup: DEFAULT_WARMUP,
         parseIterations: DEFAULT_PARSE_ITERATIONS,
+        mixedQueries: DEFAULT_MIXED_QUERIES,
         freshnessPolicy: 'allow_stale',
         method: '',
         skipCli: false,
@@ -68,6 +70,9 @@ function parseArgs(argv = process.argv.slice(2)) {
             index++;
         } else if (token === '--parse-iterations') {
             args.parseIterations = parseBoundedInteger(readOptionValue(argv, index, token), token, 10);
+            index++;
+        } else if (token === '--mixed-queries') {
+            args.mixedQueries = parseBoundedInteger(readOptionValue(argv, index, token), token);
             index++;
         } else if (token === '--freshness-policy') {
             args.freshnessPolicy = readOptionValue(argv, index, token);
@@ -107,6 +112,7 @@ function usage() {
         `  --iterations <n>        cold/warm query samples, default ${DEFAULT_ITERATIONS}`,
         `  --warmup <n>           warm MCP calls before measurement, default ${DEFAULT_WARMUP}`,
         `  --parse-iterations <n> artifact read/parse samples, default ${DEFAULT_PARSE_ITERATIONS}`,
+        `  --mixed-queries <n>    distinct selector samples in one MCP process, default ${DEFAULT_MIXED_QUERIES}`,
         '  --method <name>         benchmark an exact method selector instead of summary',
         '  --freshness-policy <allow_stale|require_fresh>',
         '  --skip-cli              skip query-project child-process samples',
@@ -345,17 +351,18 @@ function runMcpColdSample(args) {
     };
 }
 
-function mcpArguments(args) {
+function mcpArguments(args, selector = {}) {
     return {
         workspaceRoot: args.workspaceRoot,
         dataRoot: args.dataRoot,
         freshnessPolicy: args.freshnessPolicy,
         detail: 'compact',
-        ...(args.method ? { method: args.method } : {}),
+        ...(args.method && Object.keys(selector).length <= 0 ? { method: args.method } : {}),
+        ...selector,
     };
 }
 
-async function callMcpQuery(args, id) {
+async function callMcpQuery(args, id, selector = {}) {
     const { handleMcpRequest } = require('../../src/mcp/server');
     const response = await handleMcpRequest({
         jsonrpc: '2.0',
@@ -363,7 +370,7 @@ async function callMcpQuery(args, id) {
         method: 'tools/call',
         params: {
             name: 'query_project_chain',
-            arguments: mcpArguments(args),
+            arguments: mcpArguments(args, selector),
         },
     });
     const text = response?.result?.content?.find(item => item.type === 'text')?.text || '';
@@ -375,6 +382,56 @@ async function callMcpQuery(args, id) {
         throw new Error(payload.error || payload.message || 'MCP query failed.');
     }
     return payload;
+}
+
+function buildMixedSelectors(lookup = {}, count = DEFAULT_MIXED_QUERIES) {
+    const buckets = [
+        ['method', Object.keys(lookup.methods || {})],
+        ['message', Object.keys(lookup.messages || {})],
+        ['endpoint', Object.keys(lookup.endpoints || {})],
+        ['request', Object.keys(lookup.requests || {})],
+    ].filter(([, values]) => values.length > 0);
+    const selectors = [];
+    for (let index = 0; selectors.length < count && buckets.length > 0; index++) {
+        let added = false;
+        for (const [key, values] of buckets) {
+            const value = values[index];
+            if (!value) {
+                continue;
+            }
+            selectors.push({ [key]: value });
+            added = true;
+            if (selectors.length >= count) {
+                break;
+            }
+        }
+        if (!added) {
+            break;
+        }
+    }
+    return selectors;
+}
+
+async function runMcpMixedSamples(args, lookupPath) {
+    const lookup = JSON.parse(fs.readFileSync(lookupPath, 'utf8'));
+    const selectors = buildMixedSelectors(lookup, args.mixedQueries);
+    const samples = [];
+    for (let index = 0; index < selectors.length; index++) {
+        const selector = selectors[index];
+        const startedAt = process.hrtime.bigint();
+        const payload = await callMcpQuery(args, 30_000 + index, selector);
+        samples.push({
+            selector,
+            elapsedMs: round(elapsedMs(startedAt)),
+            workerElapsedMs: Number(payload._mcpCache?.elapsedMs || 0),
+            engineElapsedMs: Number(payload._mcpCache?.queryElapsedMs || 0),
+            workerReused: Boolean(payload._mcpCache?.worker?.reused),
+            workerGeneration: payload._mcpCache?.worker?.generation ?? null,
+            cacheHit: Boolean(payload._mcpCache?.hit),
+            freshnessStatus: payload.kbFreshness?.status || payload._mcpFreshness?.finalStatus || '',
+        });
+    }
+    return samples;
 }
 
 async function runMcpWarmSamples(args) {
@@ -402,6 +459,9 @@ async function runWorker(args) {
     process.stdout.write(`${JSON.stringify({
         workerElapsedMs: round(elapsedMs(startedAt)),
         queryElapsedMs: Number(payload._mcpCache?.elapsedMs || 0),
+        engineElapsedMs: Number(payload._mcpCache?.queryElapsedMs || 0),
+        workerReused: Boolean(payload._mcpCache?.worker?.reused),
+        workerGeneration: payload._mcpCache?.worker?.generation ?? null,
         cacheHit: Boolean(payload._mcpCache?.hit),
         freshnessStatus: payload.kbFreshness?.status || payload._mcpFreshness?.finalStatus || '',
         memory: memorySnapshot(),
@@ -456,6 +516,7 @@ async function runBenchmark(args) {
             iterations: args.iterations,
             warmup: args.warmup,
             parseIterations: args.parseIterations,
+            mixedQueries: args.mixedQueries,
         },
         warnings: [
             'cold means a new Node process; the operating-system file cache may still be warm.',
@@ -474,11 +535,15 @@ async function runBenchmark(args) {
     if (!args.skipMcp) {
         const coldSamples = Array.from({ length: args.iterations }, () => runMcpColdSample(args));
         const warmSamples = await runMcpWarmSamples(args);
+        const mixedSamples = args.mixedQueries > 0
+            ? await runMcpMixedSamples(args, artifacts.lookup)
+            : [];
         result.mcpCold = {
             samples: coldSamples,
             summary: summarizeSamples(coldSamples),
             workerSummary: summarizeSamples(coldSamples, 'workerElapsedMs'),
             querySummary: summarizeSamples(coldSamples, 'queryElapsedMs'),
+            engineSummary: summarizeSamples(coldSamples, 'engineElapsedMs'),
             cacheHits: coldSamples.filter(sample => sample.cacheHit).length,
         };
         result.mcpWarm = {
@@ -486,6 +551,14 @@ async function runBenchmark(args) {
             summary: summarizeSamples(warmSamples),
             querySummary: summarizeSamples(warmSamples, 'queryElapsedMs'),
             cacheHits: warmSamples.filter(sample => sample.cacheHit).length,
+        };
+        result.mcpMixed = {
+            samples: mixedSamples,
+            summary: summarizeSamples(mixedSamples),
+            workerSummary: summarizeSamples(mixedSamples, 'workerElapsedMs'),
+            engineSummary: summarizeSamples(mixedSamples, 'engineElapsedMs'),
+            workerReused: mixedSamples.filter(sample => sample.workerReused).length,
+            cacheHits: mixedSamples.filter(sample => sample.cacheHit).length,
         };
     }
     if (!args.skipParse) {
@@ -520,6 +593,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+    buildMixedSelectors,
     buildLayoutArgv,
     memorySnapshot,
     parseArgs,

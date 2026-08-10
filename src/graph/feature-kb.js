@@ -3,7 +3,7 @@ const path = require('path');
 const { pathExists, readJson, readJsonSafe, slugify } = require('../shared/common');
 const { hydrateLookup } = require('../shared/kb-lookup');
 
-const MAX_ARTIFACT_CACHE_ENTRIES = 4;
+const MAX_ARTIFACT_CACHE_ENTRIES = 1;
 const artifactCache = new Map();
 
 function artifactSignature(filePath) {
@@ -22,10 +22,13 @@ function artifactCacheKey(graphPath, lookupPath, feature) {
 }
 
 function cacheArtifacts(key, artifacts) {
+    artifactCache.set(key, artifacts);
+}
+
+function prepareArtifactCacheSlot() {
     while (artifactCache.size >= MAX_ARTIFACT_CACHE_ENTRIES) {
         artifactCache.delete(artifactCache.keys().next().value);
     }
-    artifactCache.set(key, artifacts);
 }
 
 function toPosixPath(value = '') {
@@ -260,6 +263,7 @@ function loadFeatureLookupArtifacts(root, record = {}, options = {}) {
         artifactCache.set(cacheKey, cached);
         return cached;
     }
+    prepareArtifactCacheSlot();
 
     // 使用安全读取
     const graph = readJsonSafe(graphPath, { 
