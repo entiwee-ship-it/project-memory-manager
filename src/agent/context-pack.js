@@ -389,7 +389,7 @@ function pickScoredNodes(graph, terms, options = {}) {
     return uniqBy(scored, item => normalizeText(item.node.file || '') || item.node.id).slice(0, limit);
 }
 
-function selectPreciseScoredNodes(scoredNodes, terms = []) {
+function selectPreciseNodes(scoredNodes, terms = []) {
     const preciseTerms = new Set(terms
         .filter(term => term?.source === 'alias' && Number(term.weight) >= 6)
         .map(term => normalizeText(term.value))
@@ -666,7 +666,7 @@ function prepareTaskContext(options = {}) {
     const { graph, lookup } = loadProjectArtifacts(context);
     const limit = options.limit || INTENT_LIMITS[intent.intent] || DEFAULT_LIMIT;
     const scoredNodes = pickScoredNodes(graph, taskInfo.terms, { limit: Math.max(limit * 3, 20) });
-    const scoredSelection = selectPreciseScoredNodes(scoredNodes, taskInfo.terms);
+    const scoredSelection = selectPreciseNodes(scoredNodes, taskInfo.terms);
     const selectedScoredNodes = scoredSelection.nodes;
     const changedFiles = intent.intent === 'review' ? parseChangedFiles(options) : [];
     const normalizedKnownFiles = knownFiles.map(file => workspaceRelative(context.workspaceRoot, file));
@@ -830,7 +830,7 @@ function buildUncertainties({ taskInfo, features, startNodes, dataAccess, extern
     return uncertainties;
 }
 
-function loadFeatureArtifactsForAgent(context, featureKey) {
+function loadFeatureArtifacts(context, featureKey) {
     const record = loadFeatureRegistry(context).find(item => item.featureKey === featureKey);
     if (!record) {
         throw new Error(`未找到 feature KB: ${featureKey}`);
@@ -838,7 +838,7 @@ function loadFeatureArtifactsForAgent(context, featureKey) {
     return loadFeatureLookupArtifacts(context.workspaceRoot, record);
 }
 
-function summarizeFeatureDataFlows(graph, lookup, workspaceRoot) {
+function summarizeDataFlows(graph, lookup, workspaceRoot) {
     const startNodes = (graph.nodes || [])
         .filter(node => ['endpoint', 'request'].includes(node.type))
         .slice(0, 4);
@@ -864,7 +864,7 @@ function explainFeatureForAgent(options = {}) {
     if (!featureKey) {
         throw new Error('缺少 featureKey');
     }
-    const artifacts = loadFeatureArtifactsForAgent(context, featureKey);
+    const artifacts = loadFeatureArtifacts(context, featureKey);
     const { feature, graph, lookup } = artifacts;
     const nodes = graph.nodes || [];
     const endpoints = collectByType(nodes, 'endpoint', 20).map(node => compactNode(node, context.workspaceRoot));
@@ -887,7 +887,7 @@ function explainFeatureForAgent(options = {}) {
         .sort((left, right) => right.degree - left.degree || left.node.name.localeCompare(right.node.name))
         .slice(0, 16)
         .map(item => compactNode(item.node, context.workspaceRoot));
-    const dataFlows = summarizeFeatureDataFlows(graph, lookup, context.workspaceRoot);
+    const dataFlows = summarizeDataFlows(graph, lookup, context.workspaceRoot);
     const riskPoints = inferRiskPoints({ endpoints, tables, externalServices, coreMethods });
     return {
         kind: 'agent-feature-card',

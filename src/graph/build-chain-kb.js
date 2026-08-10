@@ -1083,7 +1083,7 @@ function buildGraph(raw, config, projectProfile, root) {
         return unresolvedNode;
     };
 
-    const expandMountedEndpointInfos = (scriptPath, endpointInfo) => {
+    const expandMountedEndpoints = (scriptPath, endpointInfo) => {
         const mountPaths = httpMountMap.get(normalize(scriptPath)) || [];
         if (mountPaths.length <= 0) {
             return [endpointInfo];
@@ -1590,7 +1590,7 @@ function buildGraph(raw, config, projectProfile, root) {
             addEdge({ from: scriptNode.id, to: currentMethodId, type: 'contains', sourceKind: 'script', area: methodArea });
 
             for (const endpointInfo of method.httpEndpoints || []) {
-                for (const mountedEndpointInfo of expandMountedEndpointInfos(script.scriptPath, endpointInfo)) {
+                for (const mountedEndpointInfo of expandMountedEndpoints(script.scriptPath, endpointInfo)) {
                     const endpointNode = ensureEndpointNode(script.scriptPath, mountedEndpointInfo, method.line, methodArea);
                     addEdge({
                         from: endpointNode.id,
@@ -1605,10 +1605,10 @@ function buildGraph(raw, config, projectProfile, root) {
                         },
                     });
 
-                    const handlerTargetsCurrentMethod =
+                    const isCurrentMethodHandler =
                         normalize(mountedEndpointInfo.handlerSourcePath || '') === normalize(script.scriptPath)
                         && mountedEndpointInfo.handlerMethod === method.name;
-                    if (mountedEndpointInfo.handlerSourcePath && mountedEndpointInfo.handlerMethod && !handlerTargetsCurrentMethod) {
+                    if (mountedEndpointInfo.handlerSourcePath && mountedEndpointInfo.handlerMethod && !isCurrentMethodHandler) {
                         const handlerMethodNode = ensureMethodNode(mountedEndpointInfo.handlerSourcePath, mountedEndpointInfo.handlerMethod);
                         addEdge({
                             from: endpointNode.id,
@@ -1670,8 +1670,8 @@ function buildGraph(raw, config, projectProfile, root) {
                 });
             }
 
-            const resolvedImportedSignatures = new Set();
-            const unresolvedImportedSignatures = new Set();
+            const resolvedImportKeys = new Set();
+            const unresolvedImportKeys = new Set();
             for (const importedCall of method.importedCalls || []) {
                 const importedTarget = resolveImportedCallTarget(importedCall, apiNamespaceMap, methodMap);
                 if (!importedTarget) {
@@ -1683,7 +1683,7 @@ function buildGraph(raw, config, projectProfile, root) {
                         reason: 'owner_not_resolved_or_external_client',
                     }, methodArea);
                     if (unresolvedNode) {
-                        unresolvedImportedSignatures.add(`${importedCall.identifier}::${importedCall.method}`);
+                        unresolvedImportKeys.add(`${importedCall.identifier}::${importedCall.method}`);
                         addEdge({
                             from: currentMethodId,
                             to: unresolvedNode.id,
@@ -1699,7 +1699,7 @@ function buildGraph(raw, config, projectProfile, root) {
                     }
                     continue;
                 }
-                resolvedImportedSignatures.add(`${importedCall.identifier}::${importedCall.method}`);
+                resolvedImportKeys.add(`${importedCall.identifier}::${importedCall.method}`);
                 const targetMethodNode = ensureMethodNode(importedTarget.scriptPath, importedTarget.methodName);
                 addEdge({
                     from: currentMethodId,
@@ -1725,7 +1725,7 @@ function buildGraph(raw, config, projectProfile, root) {
                 const memberName = String(unresolvedCall.memberName || '').trim();
                 const firstIdentifier = ownerExpression.split('.')[0] || '';
                 const signature = `${firstIdentifier}::${memberName}`;
-                if (resolvedImportedSignatures.has(signature) || unresolvedImportedSignatures.has(signature)) {
+                if (resolvedImportKeys.has(signature) || unresolvedImportKeys.has(signature)) {
                     continue;
                 }
                 const unresolvedNode = ensureUnresolvedCallNode(script.scriptPath, unresolvedCall, methodArea);

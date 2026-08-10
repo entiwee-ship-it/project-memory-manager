@@ -110,7 +110,7 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
         budgetChars: budget,
     };
     let truncated = false;
-    let omittedPathMigrationCandidates = 0;
+    let omittedMigrationCandidates = 0;
     let attempts = 0;
     while (serializedLength(result) > targetBudget && attempts < 500) {
         const arrays = collectShrinkableArrays(result)
@@ -134,7 +134,7 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
     }
     while (serializedLength(result) > targetBudget && asArray(result.pathMigrationCandidates).length > 0) {
         result.pathMigrationCandidates.pop();
-        omittedPathMigrationCandidates += 1;
+        omittedMigrationCandidates += 1;
         truncated = true;
     }
     result._output = {
@@ -143,8 +143,8 @@ function enforceCompactBudget(payload, budget = DEFAULT_COMPACT_BUDGET) {
         budgetChars: budget,
         truncated,
     };
-    if (omittedPathMigrationCandidates > 0) {
-        result._output.omittedPathMigrationCandidates = omittedPathMigrationCandidates;
+    if (omittedMigrationCandidates > 0) {
+        result._output.omittedPathMigrationCandidates = omittedMigrationCandidates;
     }
     return result;
 }
@@ -989,14 +989,14 @@ function compactAgentBrief(brief = {}) {
     const blocked = readiness === 'blocked';
     const currentFacts = compactCurrentFacts(brief.currentFacts || {}, dataRoot, workspaceRoot);
     const pathMigrationCandidates = compactPathMigrationCandidates(brief.pathMigrationCandidates, dataRoot, workspaceRoot);
-    const hasPathMigrationCandidates = pathMigrationCandidates.length > 0;
+    const hasMigrationCandidates = pathMigrationCandidates.length > 0;
     const historicalExperience = compactHistoricalExperience(brief.historicalExperience || {
         recalledTasks: memory.recalledTasks,
         relatedFiles: memory.relatedFiles,
         validationCommands: memory.validationCommands,
         observations: memory.observations,
     }, dataRoot, workspaceRoot);
-    if (hasPathMigrationCandidates && historicalExperience.resume) {
+    if (hasMigrationCandidates && historicalExperience.resume) {
         historicalExperience.recalledTasks = [];
         historicalExperience.relatedFiles = [];
         historicalExperience.validationCommands = [];
@@ -1019,7 +1019,7 @@ function compactAgentBrief(brief = {}) {
     if (preflightSummary.repairPlan.length) {
         compactPreflight.repairPlan = preflightSummary.repairPlan;
     }
-    if (preflightSummary.nextAction && !hasPathMigrationCandidates) {
+    if (preflightSummary.nextAction && !hasMigrationCandidates) {
         compactPreflight.nextAction = preflightSummary.nextAction;
     }
     const compactGate = {
@@ -1030,7 +1030,7 @@ function compactAgentBrief(brief = {}) {
     if (brief.pmmGate?.recommendedTool) {
         compactGate.recommendedTool = brief.pmmGate.recommendedTool;
     }
-    if (!hasPathMigrationCandidates && asArray(brief.pmmGate?.reasons).length) {
+    if (!hasMigrationCandidates && asArray(brief.pmmGate?.reasons).length) {
         compactGate.reasons = asArray(brief.pmmGate?.reasons).slice(0, 3);
     }
     if (asArray(brief.pmmGate?.riskSignals).length) {
@@ -1052,10 +1052,10 @@ function compactAgentBrief(brief = {}) {
             recalledTasks: [],
             relevantRules: [],
         };
-    const projectedCurrentFacts = hasPathMigrationCandidates
+    const projectedCurrentFacts = hasMigrationCandidates
         ? { criticalFiles: currentFacts.criticalFiles || [] }
         : currentFacts;
-    const projectedHistoricalExperience = hasPathMigrationCandidates
+    const projectedHistory = hasMigrationCandidates
         ? {
             resume: historicalExperience.resume ? {
                 status: historicalExperience.resume.status,
@@ -1073,21 +1073,21 @@ function compactAgentBrief(brief = {}) {
                 } : null,
             }
             : historicalExperience);
-    const projectedPreflight = hasPathMigrationCandidates
+    const projectedPreflight = hasMigrationCandidates
         ? {
             kind: compactPreflight.kind,
             status: compactPreflight.status,
             health: { score: compactPreflight.health.score },
         }
         : compactPreflight;
-    const projectedGate = hasPathMigrationCandidates
+    const projectedGate = hasMigrationCandidates
         ? {
             decision: compactGate.decision,
             pmmRequired: compactGate.pmmRequired,
             deepPmmRequired: compactGate.deepPmmRequired,
         }
         : compactGate;
-    const projectedExecutionPlan = hasPathMigrationCandidates
+    const projectedPlan = hasMigrationCandidates
         ? {
             contextStatus: executionPlan.contextStatus,
             targetFiles: blocked ? [] : executionPlan.targetFiles.slice(0, 8),
@@ -1127,12 +1127,12 @@ function compactAgentBrief(brief = {}) {
         missingEvidence: compactMissingEvidence(brief.missingEvidence),
         sourceConfirmation: compactSourceConfirmation(brief.sourceConfirmation, dataRoot, workspaceRoot),
         currentFacts: projectedCurrentFacts,
-        historicalExperience: projectedHistoricalExperience,
-        ...(hasPathMigrationCandidates || blocked ? {} : { projectRules }),
+        historicalExperience: projectedHistory,
+        ...(hasMigrationCandidates || blocked ? {} : { projectRules }),
         pathMigrationCandidates,
         preflightSummary: projectedPreflight,
         pmmGate: projectedGate,
-        executionPlan: projectedExecutionPlan,
+        executionPlan: projectedPlan,
         ...(brief.historicalExperience || brief.projectRules ? {} : { memory: compactBriefMemory }),
         recommendedFiles: blocked ? [] : filterSourceFiles(brief.recommendedFiles, dataRoot, workspaceRoot).slice(0, 10),
         _output: {
