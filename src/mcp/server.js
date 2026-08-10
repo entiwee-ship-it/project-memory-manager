@@ -810,7 +810,7 @@ function projectGlobalConfigPath(context) {
     return path.join(context.paths.configsDir, 'project-global.json');
 }
 
-function buildProjectGlobalFreshness(context) {
+function buildGlobalFreshness(context) {
     freshnessObserver?.(context);
     const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
@@ -896,7 +896,7 @@ function clampInteger(value, fallback, max) {
     return Math.min(integer, max);
 }
 
-function resolveBuildWaitTimeoutMs(value) {
+function resolveBuildTimeout(value) {
     return clampInteger(value, DEFAULT_BUILD_WAIT_TIMEOUT_MS, MAX_BUILD_WAIT_TIMEOUT_MS);
 }
 
@@ -957,7 +957,7 @@ function statSignature(filePath) {
     }
 }
 
-function buildProjectArtifactState(args, projectGlobalFreshness = null) {
+function buildArtifactState(args, projectGlobalFreshness = null) {
     const context = createWorkspaceContext({
         workspaceRoot: args.workspaceRoot,
         dataRoot: args.dataRoot,
@@ -968,7 +968,7 @@ function buildProjectArtifactState(args, projectGlobalFreshness = null) {
         statSignature(path.join(context.paths.projectGlobalDir, 'chain.lookup.json')),
         statSignature(context.paths.projectProtocols),
     ];
-    const resolvedProjectGlobalFreshness = projectGlobalFreshness ?? buildProjectGlobalFreshness(context);
+    const resolvedFreshness = projectGlobalFreshness ?? buildGlobalFreshness(context);
     const artifactSignature = JSON.stringify(artifacts.map(artifact => ({
         file: artifact.file,
         exists: artifact.exists,
@@ -976,15 +976,15 @@ function buildProjectArtifactState(args, projectGlobalFreshness = null) {
         size: artifact.size,
     })));
     const sourceSignature = JSON.stringify({
-        status: resolvedProjectGlobalFreshness.status,
-        currentFingerprint: resolvedProjectGlobalFreshness.currentSnapshot?.fingerprint || '',
-        storedFingerprint: resolvedProjectGlobalFreshness.sourceSnapshot?.fingerprint || '',
-        reasonCodes: resolvedProjectGlobalFreshness.reasonCodes || [],
+        status: resolvedFreshness.status,
+        currentFingerprint: resolvedFreshness.currentSnapshot?.fingerprint || '',
+        storedFingerprint: resolvedFreshness.sourceSnapshot?.fingerprint || '',
+        reasonCodes: resolvedFreshness.reasonCodes || [],
     });
     return {
         context,
         artifacts,
-        projectGlobalFreshness: resolvedProjectGlobalFreshness,
+        projectGlobalFreshness: resolvedFreshness,
         artifactSignature,
         sourceSignature,
         signature: JSON.stringify({ artifactSignature, sourceSignature }),
@@ -998,7 +998,7 @@ function setFreshnessObserver(observer = null) {
     freshnessObserver = observer;
 }
 
-function evictOldestQueryCacheEntry() {
+function evictOldestQueryEntry() {
     const oldestKey = projectQueryCache.keys().next().value;
     if (oldestKey) {
         projectQueryCache.delete(oldestKey);
@@ -1043,7 +1043,7 @@ function buildWorkspaceState(args) {
     const hasAreaRoots = hasConfiguredAreaRoots(projectProfile);
     const hasProjectGlobalKb = fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.graph.json'))
         && fs.existsSync(path.join(context.paths.projectGlobalDir, 'chain.lookup.json'));
-    const projectGlobalFreshness = buildProjectGlobalFreshness(context);
+    const projectGlobalFreshness = buildGlobalFreshness(context);
     const suggestedNextAction = !fs.existsSync(context.paths.manifest)
         ? 'init_workspace'
         : (!hasProjectProfile || !hasAreaRoots)
@@ -1186,7 +1186,7 @@ function checkKbFreshness(args) {
         dataRoot: args.dataRoot,
         layout: 'external-data',
     });
-    const projectGlobal = buildProjectGlobalFreshness(context);
+    const projectGlobal = buildGlobalFreshness(context);
     const result = {
         workspaceRoot: context.workspaceRoot,
         dataRoot: context.dataRoot,
@@ -1249,13 +1249,13 @@ function buildNotFreshResult({ scope, policy, freshnessMeta, freshness, error = 
     });
 }
 
-function runProjectRebuildForQuery(args) {
+function rebuildProjectForQuery(args) {
     const prepared = ensureWorkspacePrepared(args);
     const captured = captureConsoleLog(() => buildProjectKb(layoutArgv(args)));
     return [prepared.output, captured.output].filter(Boolean).join('\n');
 }
 
-function ensureProjectFreshForQuery(args, policy) {
+function ensureProjectQueryFresh(args, policy) {
     const initial = buildWorkspaceState(args).projectGlobalFreshness;
     if (policy === 'allow_stale' || !initial?.stale) {
         return {
@@ -1284,7 +1284,7 @@ function ensureProjectFreshForQuery(args, policy) {
 
     let output = '';
     try {
-        output = runProjectRebuildForQuery(args);
+        output = rebuildProjectForQuery(args);
     } catch (error) {
         const finalFreshness = buildWorkspaceState(args).projectGlobalFreshness;
         const freshnessMeta = buildFreshnessMeta({
@@ -1326,12 +1326,12 @@ function ensureProjectFreshForQuery(args, policy) {
     return { ok: true, freshnessMeta, finalFreshness };
 }
 
-function runFeatureRebuildForQuery(args) {
+function rebuildFeatureForQuery(args) {
     const argv = [...layoutArgv(args), '--feature-key', args.feature, '--json'];
     return captureConsoleLog(() => buildFeatureIndexCli(argv)).output;
 }
 
-function ensureFeatureFreshForQuery(args, policy) {
+function ensureFeatureQueryFresh(args, policy) {
     const context = createWorkspaceContext({
         workspaceRoot: args.workspaceRoot,
         dataRoot: args.dataRoot,
@@ -1365,7 +1365,7 @@ function ensureFeatureFreshForQuery(args, policy) {
 
     let output = '';
     try {
-        output = runFeatureRebuildForQuery(args);
+        output = rebuildFeatureForQuery(args);
     } catch (error) {
         const finalFreshness = buildFeatureFreshness(context, args.feature);
         const freshnessMeta = buildFreshnessMeta({
@@ -1523,7 +1523,7 @@ function publicJob(job) {
 async function startBuildProjectIndex(args) {
     const job = createJob('build_project_index', args);
     if (args.wait === true) {
-        const timeoutMs = resolveBuildWaitTimeoutMs(args.timeoutMs);
+        const timeoutMs = resolveBuildTimeout(args.timeoutMs);
         const outcome = await runBuildJobWithTimeout(job, timeoutMs);
         const payload = {
             ...publicJob(job),
@@ -1613,7 +1613,7 @@ function attachAgentMcpMetadata(payload, freshnessMeta, queryMeta) {
 
 function runAgentProjectTool(args, toolName, fn) {
     const freshnessPolicy = resolveFreshnessPolicy(args);
-    const freshnessGate = ensureProjectFreshForQuery(args, freshnessPolicy);
+    const freshnessGate = ensureProjectQueryFresh(args, freshnessPolicy);
     if (!freshnessGate.ok) {
         return freshnessGate.result;
     }
@@ -1657,7 +1657,7 @@ function analyzeChangeImpactTool(args) {
     return runAgentProjectTool(args, 'analyze_change_impact', analyzeChangeImpact);
 }
 
-function explainFeatureForAgentTool(args) {
+function explainFeatureTool(args) {
     const feature = String(args.featureKey || args.feature || '').trim();
     if (!feature) {
         return textResult({
@@ -1667,7 +1667,7 @@ function explainFeatureForAgentTool(args) {
         });
     }
     const freshnessPolicy = resolveFreshnessPolicy(args);
-    const freshnessGate = ensureFeatureFreshForQuery({ ...args, feature }, freshnessPolicy);
+    const freshnessGate = ensureFeatureQueryFresh({ ...args, feature }, freshnessPolicy);
     if (!freshnessGate.ok) {
         return freshnessGate.result;
     }
@@ -1684,7 +1684,7 @@ function hasWorkspaceRoot(args = {}) {
     return Boolean(String(args.workspaceRoot || '').trim());
 }
 
-function attachGateOnlyMcpMetadata(payload, args, toolName) {
+function attachGateMetadata(payload, args, toolName) {
     const enriched = {
         ...payload,
         _mcpFreshness: {
@@ -1715,11 +1715,11 @@ function runExecutionLoopTool(args, toolName, fn) {
             ...args,
             layout: 'external-data',
         });
-        return attachGateOnlyMcpMetadata(payload, args, toolName);
+        return attachGateMetadata(payload, args, toolName);
     }
 
     const freshnessPolicy = resolveFreshnessPolicy(args);
-    const freshnessGate = ensureProjectFreshForQuery(args, freshnessPolicy);
+    const freshnessGate = ensureProjectQueryFresh(args, freshnessPolicy);
     if (!freshnessGate.ok) {
         return freshnessGate.result;
     }
@@ -1745,7 +1745,7 @@ function planTaskExecutionTool(args) {
     return runExecutionLoopTool(args, 'plan_task_execution', planTaskExecution);
 }
 
-function prepareCocosEditBriefTool(args) {
+function prepareCocosBriefTool(args) {
     if (!hasWorkspaceRoot(args)) {
         return textResult({
             ok: false,
@@ -1895,7 +1895,7 @@ function prepareAgentBriefTool(args) {
     }));
 }
 
-function summarizeProjectMemoryTool(args) {
+function summarizeMemoryTool(args) {
     if (!hasWorkspaceRoot(args)) {
         return textResult({
             ok: false,
@@ -1914,7 +1914,7 @@ function summarizeProjectMemoryTool(args) {
     return textResult(projectAgentOutput(enriched, args, 'summarize_project_memory'));
 }
 
-function updateProjectPlaybookTool(args) {
+function updatePlaybookTool(args) {
     if (!hasWorkspaceRoot(args)) {
         return textResult({
             ok: false,
@@ -2043,14 +2043,14 @@ function appendQuerySelectorArgs(argv, args, options) {
 function queryProjectChain(args) {
     const options = resolveMcpQueryOptions(args);
     const freshnessPolicy = resolveFreshnessPolicy(args);
-    const freshnessGate = ensureProjectFreshForQuery(args, freshnessPolicy);
+    const freshnessGate = ensureProjectQueryFresh(args, freshnessPolicy);
     if (!freshnessGate.ok) {
         return freshnessGate.result;
     }
     const argv = [...layoutArgv(args), '--json'];
     appendQuerySelectorArgs(argv, args, options);
 
-    const artifactState = buildProjectArtifactState(args, freshnessGate.finalFreshness);
+    const artifactState = buildArtifactState(args, freshnessGate.finalFreshness);
     const queryMeta = {
         limit: hasQuerySelector(args) ? options.limit : null,
         depth: options.depth,
@@ -2118,7 +2118,7 @@ function queryProjectChain(args) {
 
     const payload = parseJsonOutput(result.stdout);
     while (projectQueryCache.size >= MAX_QUERY_CACHE_ENTRIES) {
-        evictOldestQueryCacheEntry();
+        evictOldestQueryEntry();
     }
     const cachedAt = new Date().toISOString();
     projectQueryCache.set(cacheKey, {
@@ -2144,7 +2144,7 @@ function queryProjectChain(args) {
 function queryFeatureChain(args) {
     const options = resolveMcpQueryOptions(args);
     const freshnessPolicy = resolveFreshnessPolicy(args);
-    const freshnessGate = ensureFeatureFreshForQuery(args, freshnessPolicy);
+    const freshnessGate = ensureFeatureQueryFresh(args, freshnessPolicy);
     if (!freshnessGate.ok) {
         return freshnessGate.result;
     }
@@ -2237,7 +2237,7 @@ async function handleMcpRequest(request) {
                                                                         : name === 'prepare_task_context'
                                                                             ? prepareTaskContextTool(args)
                                                                             : name === 'explain_feature_for_agent'
-                                                                                ? explainFeatureForAgentTool(args)
+                                                                                ? explainFeatureTool(args)
                                                                                 : name === 'analyze_change_impact'
                                                                                     ? analyzeChangeImpactTool(args)
                                                                                     : name === 'decide_pmm_usage'
@@ -2245,7 +2245,7 @@ async function handleMcpRequest(request) {
                                                                                         : name === 'plan_task_execution'
                                                                                             ? planTaskExecutionTool(args)
                                                                                             : name === 'prepare_cocos_edit_brief'
-                                                                                                ? prepareCocosEditBriefTool(args)
+                                                                                                ? prepareCocosBriefTool(args)
                                                                                             : name === 'validate_edit_scope'
                                                                                                 ? validateEditScopeTool(args)
                                                                                                 : name === 'review_patch_for_agent'
@@ -2259,9 +2259,9 @@ async function handleMcpRequest(request) {
                                                                                                             : name === 'prepare_agent_brief'
                                                                                                                 ? prepareAgentBriefTool(args)
                                                                                                                 : name === 'summarize_project_memory'
-                                                                                                                    ? summarizeProjectMemoryTool(args)
+                                                                                                                    ? summarizeMemoryTool(args)
                                                                                                                     : name === 'update_project_playbook'
-                                                                                                                        ? updateProjectPlaybookTool(args)
+                                                                                                                        ? updatePlaybookTool(args)
                                                                                                                         : name === 'query_project_chain'
                                                                                                                             ? queryProjectChain(args)
                                                                                                                             : name === 'query_feature_chain'

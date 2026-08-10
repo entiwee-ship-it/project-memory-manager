@@ -194,7 +194,7 @@ function expandConfiguredTargets(root, inputs = []) {
     ).sort((left, right) => left.localeCompare(right));
 }
 
-function discoverPrefabsFromAssetRoots(assetRoots) {
+function discoverAssetPrefabs(assetRoots) {
     const { listFilesRecursive } = require('../shared/common');
     const discovered = [];
     for (const root of assetRoots || []) {
@@ -236,7 +236,7 @@ function deriveExtractInputs(config, root) {
     // 如果 prefabs 为空，自动从 assetRoots 扫描
     const finalPrefabs = expandedPrefabs.length > 0 
         ? expandedPrefabs 
-        : discoverPrefabsFromAssetRoots(expandedAssetRoots);
+        : discoverAssetPrefabs(expandedAssetRoots);
 
     return {
         componentRoots: expandConfiguredTargets(root, componentInputs),
@@ -368,7 +368,7 @@ function buildApiNamespaceMap(raw) {
     return map;
 }
 
-function resolveImportedCallTarget(importedCall, apiNamespaceMap, methodMap) {
+function resolveImportTarget(importedCall, apiNamespaceMap, methodMap) {
     const sourcePath = normalize(importedCall?.sourcePath || '');
     const method = String(importedCall?.method || '').trim();
     if (!sourcePath || !method) {
@@ -476,7 +476,7 @@ function buildMethodRouteMap(methodMap) {
     return routeMap;
 }
 
-function resolveNetworkRequestRoute(request = {}) {
+function resolveRequestRoute(request = {}) {
     if (request.route) {
         return String(request.route).trim();
     }
@@ -510,7 +510,7 @@ function joinHttpPath(basePath, subPath) {
     return combined.startsWith('/') ? combined : `/${combined}`;
 }
 
-function normalizeHttpPathForMatch(pathValue) {
+function normalizeMatchPath(pathValue) {
     let value = String(pathValue || '').trim().toLowerCase();
     if (!value) {
         return '';
@@ -671,7 +671,7 @@ function validateNormalizedConfig(config = {}) {
     return missing;
 }
 
-function ensureCanonicalOutputCompat(root, outputs = {}) {
+function ensureOutputCompat(root, outputs = {}) {
     const compatPairs = [
         ['scan', 'scan.raw.json', 'scan.json'],
         ['graph', 'chain.graph.json', 'graph.json'],
@@ -704,7 +704,7 @@ function ensureCanonicalOutputCompat(root, outputs = {}) {
 }
 
 function writeJsonWithCompat(root, key, value, outputs = {}) {
-    const compatibility = ensureCanonicalOutputCompat(root, outputs)[key];
+    const compatibility = ensureOutputCompat(root, outputs)[key];
     
     // 使用原子写入，避免部分写入导致的文件损坏
     writeJsonAtomic(compatibility.canonicalPath, value);
@@ -729,7 +729,7 @@ function writeJsonWithCompat(root, key, value, outputs = {}) {
  * 创建 KB 构建事务管理器
  * 确保所有文件一致写入，失败时可回滚
  */
-function createKbBuildTransaction(root, outputPaths) {
+function createBuildTransaction(root, outputPaths) {
     const backupSuffix = `.backup-${Date.now()}`;
     const filesToRestore = [];
     const filesCreated = [];
@@ -1089,7 +1089,7 @@ function buildGraph(raw, config, projectProfile, root) {
             return [endpointInfo];
         }
         return mountPaths.map(basePath => {
-            const pathAlreadyMounted = normalizeHttpPathForMatch(endpointInfo.path) === normalizeHttpPathForMatch(joinHttpPath(basePath, endpointInfo.path));
+            const pathAlreadyMounted = normalizeMatchPath(endpointInfo.path) === normalizeMatchPath(joinHttpPath(basePath, endpointInfo.path));
             return {
                 ...endpointInfo,
                 path: pathAlreadyMounted ? endpointInfo.path : joinHttpPath(basePath, endpointInfo.path),
@@ -1673,7 +1673,7 @@ function buildGraph(raw, config, projectProfile, root) {
             const resolvedImportKeys = new Set();
             const unresolvedImportKeys = new Set();
             for (const importedCall of method.importedCalls || []) {
-                const importedTarget = resolveImportedCallTarget(importedCall, apiNamespaceMap, methodMap);
+                const importedTarget = resolveImportTarget(importedCall, apiNamespaceMap, methodMap);
                 if (!importedTarget) {
                     const unresolvedNode = ensureUnresolvedCallNode(script.scriptPath, {
                         ownerExpression: importedCall.memberPath
@@ -1838,7 +1838,7 @@ function buildGraph(raw, config, projectProfile, root) {
                     request.callee,
                     requestName
                 );
-                const requestRoute = resolveNetworkRequestRoute(request);
+                const requestRoute = resolveRequestRoute(request);
                 addNode({
                     id: requestId,
                     type: 'request',
@@ -1959,7 +1959,7 @@ function buildGraph(raw, config, projectProfile, root) {
                 }
 
                 for (const callbackImportedCall of request.callbackImportedCalls || []) {
-                    const callbackTarget = resolveImportedCallTarget(callbackImportedCall, apiNamespaceMap, methodMap);
+                    const callbackTarget = resolveImportTarget(callbackImportedCall, apiNamespaceMap, methodMap);
                     if (!callbackTarget) {
                         continue;
                     }
@@ -2092,13 +2092,13 @@ function buildGraph(raw, config, projectProfile, root) {
     const httpEndpoints = nodes.filter(node => node.type === 'endpoint');
     for (const requestNode of httpRequests) {
         const requestMethod = String(requestNode.meta?.httpMethod || '').toUpperCase();
-        const requestPath = normalizeHttpPathForMatch(requestNode.meta?.target || requestNode.meta?.path || requestNode.name.replace(/^[A-Z]+\s+/, ''));
+        const requestPath = normalizeMatchPath(requestNode.meta?.target || requestNode.meta?.path || requestNode.name.replace(/^[A-Z]+\s+/, ''));
         if (!requestMethod || !requestPath) {
             continue;
         }
         for (const endpointNode of httpEndpoints) {
             const endpointMethod = String(endpointNode.meta?.method || '').toUpperCase();
-            const endpointPath = normalizeHttpPathForMatch(endpointNode.meta?.path || endpointNode.name.replace(/^[A-Z]+\s+/, ''));
+            const endpointPath = normalizeMatchPath(endpointNode.meta?.path || endpointNode.name.replace(/^[A-Z]+\s+/, ''));
             if (requestMethod !== endpointMethod || requestPath !== endpointPath) {
                 continue;
             }
@@ -2385,7 +2385,7 @@ function run(argv = process.argv.slice(2)) {
     const profile = readJsonSafe(context.paths.projectProfile, { required: false, defaultValue: null });
     const outputs = config.outputs || {};
     const extractInputs = deriveExtractInputs(config, root);
-    const outputPaths = ensureCanonicalOutputCompat(root, outputs);
+    const outputPaths = ensureOutputCompat(root, outputs);
 
     const scanPath = outputPaths.scan.canonicalPath;
     const graphPath = outputPaths.graph.canonicalPath;
@@ -2431,7 +2431,7 @@ function run(argv = process.argv.slice(2)) {
     }
 
     // 创建事务管理器
-    const transaction = createKbBuildTransaction(root, outputPaths);
+    const transaction = createBuildTransaction(root, outputPaths);
     
     const originalCwd = process.cwd();
     try {

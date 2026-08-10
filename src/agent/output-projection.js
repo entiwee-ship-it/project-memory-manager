@@ -704,7 +704,7 @@ function compactMigrationConfirmation(confirmation = {}, dataRoot = '', workspac
     return result;
 }
 
-function compactPathMigrationCandidates(items = [], dataRoot = '', workspaceRoot = '') {
+function compactMigrationCandidates(items = [], dataRoot = '', workspaceRoot = '') {
     return asArray(items).map(item => {
         const historicalFile = isSourceCandidate(item?.historicalFile, dataRoot, workspaceRoot)
             ? item.historicalFile
@@ -849,7 +849,7 @@ function compactCurrentFacts(facts = {}, dataRoot = '', workspaceRoot = '') {
     };
 }
 
-function compactHistoricalExperience(experience = {}, dataRoot = '', workspaceRoot = '') {
+function compactHistory(experience = {}, dataRoot = '', workspaceRoot = '') {
     const recalledTasks = asArray(experience.recalledTasks);
     const resume = experience.resume && typeof experience.resume === 'object'
         ? {
@@ -988,9 +988,9 @@ function compactAgentBrief(brief = {}) {
     const readiness = brief.readiness || '';
     const blocked = readiness === 'blocked';
     const currentFacts = compactCurrentFacts(brief.currentFacts || {}, dataRoot, workspaceRoot);
-    const pathMigrationCandidates = compactPathMigrationCandidates(brief.pathMigrationCandidates, dataRoot, workspaceRoot);
+    const pathMigrationCandidates = compactMigrationCandidates(brief.pathMigrationCandidates, dataRoot, workspaceRoot);
     const hasMigrationCandidates = pathMigrationCandidates.length > 0;
-    const historicalExperience = compactHistoricalExperience(brief.historicalExperience || {
+    const historicalExperience = compactHistory(brief.historicalExperience || {
         recalledTasks: memory.recalledTasks,
         relatedFiles: memory.relatedFiles,
         validationCommands: memory.validationCommands,
@@ -1176,7 +1176,7 @@ function compactTaskContext(context = {}) {
         return tableFiles.some(file => criticalFiles.includes(file)) || relatedToTask(table);
     });
     const currentFacts = compactCurrentFacts(context.currentFacts || {}, dataRoot, workspaceRoot);
-    const compatibilityEntrypoints = Object.fromEntries(
+    const legacyEntrypoints = Object.fromEntries(
         Object.entries(currentFacts.keyEntrypoints).map(([key, items]) => [
             key,
             items.map(item => ({ name: item?.name || '' })).filter(item => item.name),
@@ -1213,7 +1213,7 @@ function compactTaskContext(context = {}) {
             inferredEntrypoints: asArray(context.taskUnderstanding?.inferredEntrypoints).slice(0, 4),
         },
         ...legacyFacts,
-        keyEntrypoints: context.currentFacts ? compatibilityEntrypoints : legacyFacts.keyEntrypoints,
+        keyEntrypoints: context.currentFacts ? legacyEntrypoints : legacyFacts.keyEntrypoints,
         criticalFiles,
         editBoundary: {
             primaryFiles: filterSourceFiles(context.editBoundary?.primaryFiles, dataRoot, workspaceRoot).slice(0, 8),
@@ -1268,7 +1268,7 @@ function compactChangeImpact(impact = {}) {
     };
 }
 
-function compactExecutionPlanResult(plan = {}) {
+function compactPlanResult(plan = {}) {
     const dataRoot = plan.dataRoot || '';
     const workspaceRoot = plan.workspaceRoot || '';
     return {
@@ -1284,7 +1284,7 @@ function compactExecutionPlanResult(plan = {}) {
     };
 }
 
-function compactEditScopeValidation(scope = {}) {
+function compactScopeValidation(scope = {}) {
     const dataRoot = scope.dataRoot || scope.impactSummary?.dataRoot || '';
     const workspaceRoot = scope.workspaceRoot || scope.impactSummary?.workspaceRoot || '';
     return {
@@ -1317,7 +1317,7 @@ function compactPatchReview(review = {}) {
         kind: review.kind || 'agent-patch-review',
         task: review.task || '',
         verdict: review.verdict || '',
-        scope: compactEditScopeValidation(review.scope || {}),
+        scope: compactScopeValidation(review.scope || {}),
         findings: asArray(review.findings).slice(0, 8).map(finding => ({
             severity: finding.severity || '',
             title: finding.title || '',
@@ -1347,7 +1347,7 @@ function compactRecallMemory(memory = {}) {
     };
 }
 
-function compactProjectMemorySummary(summary = {}) {
+function compactMemorySummary(summary = {}) {
     const dataRoot = summary.dataRoot || '';
     const workspaceRoot = summary.workspaceRoot || '';
     return {
@@ -1499,7 +1499,7 @@ function compactErrorResult(payload = {}) {
     };
 }
 
-function compactWorkspaceIdentity(identity = {}) {
+function compactIdentity(identity = {}) {
     if (!identity || typeof identity !== 'object') {
         return identity || null;
     }
@@ -1531,7 +1531,7 @@ function compactWorkspaceState(state = {}) {
         hasProjectGlobalKb: Boolean(state.hasProjectGlobalKb),
         projectGlobalFreshness: compactFreshness(state.projectGlobalFreshness),
         legacyProjectMemoryExists: Boolean(state.legacyProjectMemoryExists),
-        workspaceIdentity: compactWorkspaceIdentity(state.workspaceIdentity),
+        workspaceIdentity: compactIdentity(state.workspaceIdentity),
         areas: state.areas || null,
         stacks: state.stacks || null,
         suggestedNextAction: state.suggestedNextAction || '',
@@ -1620,15 +1620,15 @@ function projectAgentOutput(payload, options = {}, toolName = '') {
     } else if (toolName === 'analyze_change_impact' || payload?.kind === 'agent-change-impact') {
         projected = compactChangeImpact(payload);
     } else if (toolName === 'plan_task_execution' || payload?.kind === 'agent-task-execution-plan') {
-        projected = compactExecutionPlanResult(payload);
+        projected = compactPlanResult(payload);
     } else if (toolName === 'validate_edit_scope' || payload?.kind === 'agent-edit-scope-validation') {
-        projected = compactEditScopeValidation(payload);
+        projected = compactScopeValidation(payload);
     } else if (toolName === 'review_patch_for_agent' || payload?.kind === 'agent-patch-review') {
         projected = compactPatchReview(payload);
     } else if (toolName === 'recall_task_memory' || payload?.kind === 'agent-memory-recall') {
         projected = compactRecallMemory(payload);
     } else if (toolName === 'summarize_project_memory' || payload?.kind === 'agent-project-memory-summary') {
-        projected = compactProjectMemorySummary(payload);
+        projected = compactMemorySummary(payload);
     } else if (toolName === 'query_project_chain' || toolName === 'query_feature_chain') {
         projected = compactProjectQuery(payload);
     } else if (toolName === 'get_current_state') {

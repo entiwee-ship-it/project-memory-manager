@@ -319,7 +319,7 @@ function addNextEvidence(candidate, node, info, workspaceRoot) {
     }
 }
 
-function addRelatedRootsFromEdges(candidate, seedNodeIds, graph, workspaceRoot) {
+function addEdgeRelatedRoots(candidate, seedNodeIds, graph, workspaceRoot) {
     const nodesById = new Map((graph.nodes || []).map(node => [node.id, node]));
     const seedIds = new Set(seedNodeIds);
     const relatedIds = new Set();
@@ -346,7 +346,7 @@ function addRelatedRootsFromEdges(candidate, seedNodeIds, graph, workspaceRoot) 
     }
 }
 
-function addNextAppRouterCandidates(candidatesByKey, graph, workspaceRoot) {
+function addNextRouteCandidates(candidatesByKey, graph, workspaceRoot) {
     const grouped = new Map();
 
     for (const node of graph.nodes || []) {
@@ -375,7 +375,7 @@ function addNextAppRouterCandidates(candidatesByKey, graph, workspaceRoot) {
         for (const { node, info } of group.nodes) {
             addNextEvidence(candidate, node, info, workspaceRoot);
         }
-        addRelatedRootsFromEdges(candidate, group.nodes.map(item => item.node.id), graph, workspaceRoot);
+        addEdgeRelatedRoots(candidate, group.nodes.map(item => item.node.id), graph, workspaceRoot);
         candidatesByKey.set(featureKey, candidate);
     }
 }
@@ -430,7 +430,7 @@ function projectFeatureName(prefix = '') {
     return titleizeKey(`${prefix ? `${prefix}-` : ''}admin`);
 }
 
-function addAdminFullstackCandidates(candidatesByKey, graph, workspaceRoot) {
+function addAdminCandidates(candidatesByKey, graph, workspaceRoot) {
     const adminNodes = [];
     const roots = new Set();
     const areas = new Set();
@@ -564,8 +564,8 @@ function discoverFeatureCandidates(options = {}) {
             candidatesByKey.set(seed.featureKey, candidate);
         }
     }
-    addAdminFullstackCandidates(candidatesByKey, graph, workspaceRoot);
-    addNextAppRouterCandidates(candidatesByKey, graph, workspaceRoot);
+    addAdminCandidates(candidatesByKey, graph, workspaceRoot);
+    addNextRouteCandidates(candidatesByKey, graph, workspaceRoot);
 
     return Array.from(candidatesByKey.values())
         .map(finalizeCandidate)

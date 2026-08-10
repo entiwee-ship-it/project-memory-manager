@@ -66,7 +66,7 @@ function collectProjectScanRoots(projectProfile, root) {
     const assetRoots = [];
     const methodRoots = [];
     const prefabs = [];
-    const projectGlobalExcludedRoots = [
+    const excludedRoots = [
         'codex-work',
         'codex-tools',
         'codex-tools/project-memory-data',
@@ -77,7 +77,7 @@ function collectProjectScanRoots(projectProfile, root) {
         const relativeTarget = normalize(path.relative(root, path.resolve(targetPath)));
         const isOutsideWorkspace = relativeTarget === '..' || relativeTarget.startsWith('../') || path.isAbsolute(relativeTarget);
         return (
-            projectGlobalExcludedRoots.some(excluded => relativeTarget === excluded || relativeTarget.startsWith(`${excluded}/`)) ||
+            excludedRoots.some(excluded => relativeTarget === excluded || relativeTarget.startsWith(`${excluded}/`)) ||
             hasDefaultIgnoredPathSegment(relativeTarget) ||
             (isOutsideWorkspace && hasDefaultIgnoredPathSegment(targetPath))
         );
@@ -291,7 +291,7 @@ function augmentGraphWithProtocols(graph, protocols) {
     };
 }
 
-function updateProjectGlobalReport(report, graph, lookup, protocols) {
+function updateGlobalReport(report, graph, lookup, protocols) {
     const nodesByType = Object.fromEntries(
         Object.entries(lookup.nodesByType || {}).map(([type, ids]) => [type, Array.isArray(ids) ? ids.length : 0])
     );
@@ -395,7 +395,7 @@ function run(argv = process.argv.slice(2)) {
 
     const augmentedGraph = augmentGraphWithProtocols(graph, protocols);
     const augmentedLookup = buildLookup(augmentedGraph);
-    const augmentedReport = updateProjectGlobalReport(report, augmentedGraph, augmentedLookup, protocols);
+    const augmentedReport = updateGlobalReport(report, augmentedGraph, augmentedLookup, protocols);
 
     // 使用原子写入
     writeJsonAtomic(graphPath, augmentedGraph);

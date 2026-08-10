@@ -292,7 +292,7 @@ function candidateReason(confidence, ambiguous) {
     return '只有弱路径或符号相似证据，不能据此恢复当前编辑目标。';
 }
 
-function normalizeConfirmationEvidence(evidence = []) {
+function normalizeConfirmEvidence(evidence = []) {
     const seen = new Set();
     return asArray(evidence).map(item => {
         if (typeof item === 'string') {
@@ -356,7 +356,7 @@ function confirmMigrationCandidate(candidate = {}, confirmation = {}, options = 
     const submittedStatus = String(
         confirmation.confirmationStatus || confirmation.status || ''
     ).trim().toLowerCase();
-    const evidence = normalizeConfirmationEvidence(confirmation.evidence);
+    const evidence = normalizeConfirmEvidence(confirmation.evidence);
     const candidateMatches = confirmationKey(candidate.historicalFile, candidate.currentCandidate)
         === confirmationKey(historicalFile, currentCandidate);
     const currentFileExists = typeof options.fileExists === 'function'

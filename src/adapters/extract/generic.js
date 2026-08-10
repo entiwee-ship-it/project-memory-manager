@@ -228,7 +228,7 @@ function isProjectRootPath(specifier) {
 
 function resolveAliasPath(specifier, context) {
     const normalized = normalizeSlashes(specifier);
-    const configResolved = resolveConfiguredAliasPath(normalized, context);
+    const configResolved = resolveConfigAlias(normalized, context);
     if (configResolved) {
         return configResolved;
     }
@@ -258,7 +258,7 @@ function resolveAliasPath(specifier, context) {
     return null;
 }
 
-function resolveConfiguredAliasPath(specifier, context) {
+function resolveConfigAlias(specifier, context) {
     const pathConfig = loadPathConfig(context?.cwd || process.cwd());
     if (!pathConfig || pathConfig.mappings.length <= 0) {
         return null;

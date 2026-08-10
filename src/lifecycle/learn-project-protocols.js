@@ -235,7 +235,7 @@ function ensureMessageBucket(bucketMap, messageName, protocol = '') {
     return bucket;
 }
 
-function protocolFromMessageRoute(routeInfo = {}) {
+function protocolFromRoute(routeInfo = {}) {
     return routeInfo.protocol || (routeInfo.kind === 'table-msg' ? 'table-msg' : routeInfo.kind || '');
 }
 
@@ -265,7 +265,7 @@ function learnMessagePatterns(raw, indexes) {
         const methodRef = makeMethodRef(rawMethodRecord, indexes.graphMethodMap);
 
         for (const routeInfo of method.messageRoutes || []) {
-            const bucket = ensureMessageBucket(bucketMap, routeInfo.route, protocolFromMessageRoute(routeInfo));
+            const bucket = ensureMessageBucket(bucketMap, routeInfo.route, protocolFromRoute(routeInfo));
             if (!bucket) {
                 continue;
             }
@@ -274,7 +274,7 @@ function learnMessagePatterns(raw, indexes) {
                 ...methodRef,
                 role,
                 kind: routeInfo.kind || '',
-                protocol: protocolFromMessageRoute(routeInfo),
+                protocol: protocolFromRoute(routeInfo),
             };
             if (role === 'dispatcher') {
                 bucket.dispatchers.push(entry);
@@ -469,7 +469,7 @@ function learnTimingPatterns(raw, indexes, messagePatterns = []) {
     );
 }
 
-function learnStateMachinePatterns(messagePatterns = [], indexes) {
+function learnStatePatterns(messagePatterns = [], indexes) {
     const stateMap = new Map();
 
     for (const pattern of messagePatterns) {
@@ -680,7 +680,7 @@ function learnProjectProtocols(raw, graph, lookup, root) {
     const indexes = buildMethodIndexes(raw, graph);
     const messagePatterns = learnMessagePatterns(raw, indexes);
     const dispatcherPatterns = learnDispatcherPatterns(messagePatterns);
-    const stateMachinePatterns = learnStateMachinePatterns(messagePatterns, indexes);
+    const stateMachinePatterns = learnStatePatterns(messagePatterns, indexes);
     const timingPatterns = learnTimingPatterns(raw, indexes, messagePatterns);
     const phasePatterns = learnPhasePatterns(raw, indexes, messagePatterns, timingPatterns);
     const transitionPatterns = learnTransitionPatterns(phasePatterns, timingPatterns);

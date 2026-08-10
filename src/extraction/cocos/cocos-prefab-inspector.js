@@ -174,7 +174,7 @@ function assetDbUrl(workspaceRoot, filePath) {
     return `db://${relative}`;
 }
 
-function componentNameFromGraphNode(node) {
+function componentNameFromNode(node) {
     const name = String(node?.name || '');
     const at = name.indexOf('@');
     return at >= 0 ? name.slice(0, at) : name.replace(/\.ts$/i, '');
@@ -186,7 +186,7 @@ function buildBaseComponentMappings(graph, prefabPath = '') {
         .filter(node => node.type === 'component' && node.meta?.rawType)
         .map(node => ({
             rawType: String(node.meta.rawType),
-            componentName: componentNameFromGraphNode(node),
+            componentName: componentNameFromNode(node),
             scriptPath: /\.[cm]?[jt]sx?$/i.test(node.file || '') ? toPosix(node.file) : '',
             nodePath: node.meta.nodePath || '',
             prefabPath: node.meta.prefabPath || '',
@@ -347,7 +347,7 @@ function buildNodeIndex(documents) {
     return { nodeIndexes, parentByChild, componentIndexes, rootIndexes };
 }
 
-function inspectNestedPrefabInstances(documents, nodePathByIndex) {
+function inspectNestedPrefabs(documents, nodePathByIndex) {
     const nested = [];
     for (let prefabInfoIndex = 0; prefabInfoIndex < documents.length; prefabInfoIndex += 1) {
         const prefabInfo = documents[prefabInfoIndex];
@@ -418,7 +418,7 @@ function inspectCocosDocuments(documents, options = {}) {
     };
     rootIndexes.forEach(index => visitNode(index));
     nodeIndexes.forEach(index => visitNode(index));
-    const unresolvedNestedPrefabs = inspectNestedPrefabInstances(documents, nodePathByIndex);
+    const unresolvedNestedPrefabs = inspectNestedPrefabs(documents, nodePathByIndex);
     const partial = unresolvedNestedPrefabs.length > 0;
 
     const components = [];

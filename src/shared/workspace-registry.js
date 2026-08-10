@@ -187,7 +187,7 @@ function readWorkspaceManifest(manifestPath, dataRoot) {
     }, dataRoot, 'manifest');
 }
 
-function discoverWorkspaceManifests(dataRoot = '') {
+function discoverManifests(dataRoot = '') {
     const resolvedDataRoot = resolveDataRoot(dataRoot);
     const workspacesDir = path.join(resolvedDataRoot, 'workspaces');
     if (!pathExists(workspacesDir)) {
@@ -240,7 +240,7 @@ function collectWorkspaceEntries(dataRoot = '') {
         byKey.set(entryKey(entry), entry);
     }
 
-    for (const manifestEntry of discoverWorkspaceManifests(resolvedDataRoot)) {
+    for (const manifestEntry of discoverManifests(resolvedDataRoot)) {
         const key = entryKey(manifestEntry);
         const existing = byKey.get(key);
         if (existing) {
@@ -430,7 +430,7 @@ function listRegisteredWorkspaces(options = {}) {
     };
 }
 
-function normalizeComparableRemote(value) {
+function normalizeRemote(value) {
     return redactGitRemote(value).replace(/\.git$/i, '').toLowerCase();
 }
 
@@ -449,7 +449,7 @@ function scoreWorkspace(entry, query) {
         score += 80;
         reasons.push('workspaceId');
     }
-    if (query.gitRemote && entry.gitRemote && normalizeComparableRemote(entry.gitRemote) === normalizeComparableRemote(query.gitRemote)) {
+    if (query.gitRemote && entry.gitRemote && normalizeRemote(entry.gitRemote) === normalizeRemote(query.gitRemote)) {
         score += 60;
         reasons.push('gitRemote');
     }

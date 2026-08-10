@@ -573,7 +573,7 @@ function buildEditBoundary(files = [], features = []) {
     };
 }
 
-function summarizeTaskUnderstanding(taskInfo, features, nodes) {
+function buildTaskSummary(taskInfo, features, nodes) {
     return {
         rawTask: taskInfo.raw,
         extractedTerms: termValues(taskInfo.terms).slice(0, 24),
@@ -603,7 +603,7 @@ function parseKnownFiles(options = {}) {
     return uniq(values);
 }
 
-function prepareSimpleTaskContext(context, options, intent, taskInfo, knownFiles) {
+function prepareSimpleContext(context, options, intent, taskInfo, knownFiles) {
     const criticalFiles = knownFiles.map(file => workspaceRelative(context.workspaceRoot, file));
     const validationCommands = inferValidationCommands(context.workspaceRoot, context, { features: [] });
     const keyEntrypoints = { endpoints: [], requests: [], methods: [] };
@@ -629,7 +629,7 @@ function prepareSimpleTaskContext(context, options, intent, taskInfo, knownFiles
             validationCommands,
         }),
         sourceConfirmation: [],
-        taskUnderstanding: summarizeTaskUnderstanding(taskInfo, [], []),
+        taskUnderstanding: buildTaskSummary(taskInfo, [], []),
         relevantFeatures: [],
         keyEntrypoints,
         criticalFiles,
@@ -661,7 +661,7 @@ function prepareTaskContext(options = {}) {
     if (intent.intent === 'simple' && knownFiles.length > 0 && knownFiles.every(file => pathExists(
         path.isAbsolute(file) ? file : path.join(context.workspaceRoot, file)
     ))) {
-        return prepareSimpleTaskContext(context, options, intent, taskInfo, knownFiles);
+        return prepareSimpleContext(context, options, intent, taskInfo, knownFiles);
     }
     const { graph, lookup } = loadProjectArtifacts(context);
     const limit = options.limit || INTENT_LIMITS[intent.intent] || DEFAULT_LIMIT;
@@ -776,7 +776,7 @@ function prepareTaskContext(options = {}) {
         currentFacts,
         coverage,
         sourceConfirmation: [],
-        taskUnderstanding: summarizeTaskUnderstanding(taskInfo, compactFeatures, startNodes),
+        taskUnderstanding: buildTaskSummary(taskInfo, compactFeatures, startNodes),
         relevantFeatures: compactFeatures,
         keyEntrypoints,
         criticalFiles,
@@ -980,7 +980,7 @@ function nodeMatchesChangedFile(node, changedFile, workspaceRoot) {
     return Boolean(nodeFile && changed && (nodeFile === changed || nodeFile.endsWith(`/${changed}`) || changed.endsWith(`/${nodeFile}`)));
 }
 
-function featureMatchesChangedFile(feature, changedFile) {
+function featureMatchesFile(feature, changedFile) {
     const changed = normalizeText(changedFile);
     if (!changed) {
         return false;
@@ -1079,7 +1079,7 @@ function analyzeChangeImpact(options = {}) {
     const relatedFiles = relatedNodes.map(node => workspaceRelative(context.workspaceRoot, node.file || '')).filter(Boolean);
     const affectedFeatures = featureCatalog
         .map(feature => {
-            const direct = changedFiles.some(file => featureMatchesChangedFile(feature, file));
+            const direct = changedFiles.some(file => featureMatchesFile(feature, file));
             const directScore = scoreFeature(feature, [], changedFiles);
             const relatedScore = Math.min(scoreFeature(feature, [], relatedFiles), 20);
             const score = (direct ? 100 : 0) + directScore + (direct ? 0 : relatedScore);

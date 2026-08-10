@@ -148,7 +148,7 @@ function recordStrongSearchText(record = {}) {
     ].filter(Boolean).join(' '));
 }
 
-function recordSemanticSearchText(record = {}) {
+function buildSemanticText(record = {}) {
     return normalizeText([
         record.task,
         record.outcome,
@@ -169,7 +169,7 @@ function isStrongRecallTerm(term = {}) {
     return true;
 }
 
-function isTaskSemanticRecallTerm(term = {}) {
+function isSemanticRecallTerm(term = {}) {
     const value = normalizeText(term.value || term);
     if (!value || GENERIC_RECALL_TERMS.has(value) || Number(term.weight || 0) <= 0.5) {
         return false;
@@ -192,7 +192,7 @@ function isTaskSemanticRecallTerm(term = {}) {
 function scoreRecord(record, queryTerms = [], queryFiles = []) {
     const text = recordSearchText(record);
     const strongText = recordStrongSearchText(record);
-    const semanticText = recordSemanticSearchText(record);
+    const semanticText = buildSemanticText(record);
     const changedFiles = splitFiles(record.changedFiles || []);
     const reasons = [];
     let matchScore = 0;
@@ -214,7 +214,7 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
             if (isStrongRecallTerm(term)) {
                 strongMatchScore += contribution;
             }
-            if (isTaskSemanticRecallTerm(term)) {
+            if (isSemanticRecallTerm(term)) {
                 semanticMatchScore += contribution;
                 semanticMatchCount += 1;
             }
@@ -225,7 +225,7 @@ function scoreRecord(record, queryTerms = [], queryFiles = []) {
             if (isStrongRecallTerm(term) && strongText.includes(normalized)) {
                 strongMatchScore += contribution;
             }
-            if (isTaskSemanticRecallTerm(term) && semanticText.includes(normalized)) {
+            if (isSemanticRecallTerm(term) && semanticText.includes(normalized)) {
                 semanticMatchScore += contribution;
                 semanticMatchCount += 1;
             }
@@ -609,7 +609,7 @@ function extractCommitReference(...values) {
     return match ? match[1] : '';
 }
 
-function historicalExperienceFromMemory(memory, intent) {
+function buildHistoricalExperience(memory, intent) {
     const recalledTasks = memory.recalledTasks || [];
     const first = recalledTasks[0] || null;
     const remainingRisks = first
@@ -818,7 +818,7 @@ function prepareAgentBrief(options = {}) {
     const preflight = agentPreflight(options);
     const pmmGate = decidePmmUsage(options);
     const memory = recallTaskMemory({ ...options, task, intent: intent.intent });
-    const historicalExperience = historicalExperienceFromMemory(memory, intent);
+    const historicalExperience = buildHistoricalExperience(memory, intent);
     const projectRules = { relevantRules: memory.relevantRules || [] };
     const freshness = preflightFreshness(preflight);
     if (preflight.status === 'blocked' || freshness !== 'fresh') {

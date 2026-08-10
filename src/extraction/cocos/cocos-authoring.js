@@ -341,21 +341,21 @@ function findAssetCandidates(graph, query = '', limit = 8) {
         }));
 }
 
-function findRelevantFieldPatterns(authoringFeatureProfile = null, componentName = '', fieldName = '') {
+function findFieldPatterns(authoringFeatureProfile = null, componentName = '', fieldName = '') {
     return (authoringFeatureProfile?.fieldBindingPatterns || [])
         .filter(item => item.componentName === componentName && item.field === fieldName)
         .sort((left, right) => right.count - left.count || right.confidence - left.confidence);
 }
 
-function getRelevantAssetPatterns(authoringFeatureProfile = null, assetKind = '') {
+function getAssetPatterns(authoringFeatureProfile = null, assetKind = '') {
     return (authoringFeatureProfile?.assetPatterns || [])
         .filter(item => !assetKind || item.assetKind === assetKind)
         .sort((left, right) => right.count - left.count || right.confidence - left.confidence);
 }
 
-function findAssetCandidatesForField(artifacts, query = '', fieldDef = null, authoringFeatureProfile = null, limit = 8) {
+function findFieldAssets(artifacts, query = '', fieldDef = null, authoringFeatureProfile = null, limit = 8) {
     const preferredAssetKind = String(fieldDef?.baseType || '');
-    const preferredDirectories = getRelevantAssetPatterns(authoringFeatureProfile, preferredAssetKind)
+    const preferredDirectories = getAssetPatterns(authoringFeatureProfile, preferredAssetKind)
         .map(item => normalize(item.directory))
         .filter(Boolean);
     const candidates = findAssetCandidates(artifacts.graph, query, Math.max(limit * 3, limit));
@@ -403,7 +403,7 @@ function summarizeFieldDef(fieldDef) {
     };
 }
 
-function buildAttachComponentPlan({ prefab, nodePath, componentName, scriptRecord, existingComponent }) {
+function buildComponentPlan({ prefab, nodePath, componentName, scriptRecord, existingComponent }) {
     return {
         kind: 'attach-component',
         status: existingComponent ? 'already-satisfied' : 'required',
@@ -484,7 +484,7 @@ function buildFieldBindingPlan({ prefab, componentNodePath, componentName, field
     };
 }
 
-function summarizeFieldConvention(componentName, fieldName, fieldPatterns = [], assetPatterns = []) {
+function summarizeConvention(componentName, fieldName, fieldPatterns = [], assetPatterns = []) {
     const bestFieldPattern = fieldPatterns[0] || null;
     const bestAssetPattern = assetPatterns[0] || null;
     if (!bestFieldPattern && bestAssetPattern) {
@@ -515,7 +515,7 @@ function findExistingEvent(prefab, sourceNodePath, componentName, handlerName) {
     ) || null;
 }
 
-function findExistingFieldBinding(prefab, componentName, nodePath, fieldName, targetQuery = '') {
+function findFieldBinding(prefab, componentName, nodePath, fieldName, targetQuery = '') {
     return (prefab?.bindingFacts?.fieldBindings || []).find(item => {
         const matchesOwner = item.componentName === componentName && item.nodePath === nodePath && item.field === fieldName;
         if (!matchesOwner) {
@@ -556,7 +556,7 @@ function readScriptUuid(scriptPath = '') {
     }
 }
 
-function buildPrefabScriptUuidCatalog(scan = {}) {
+function buildScriptUuidCatalog(scan = {}) {
     const byUuid = new Map();
     for (const script of scan.scripts || []) {
         const uuid = readScriptUuid(script.scriptPath);
@@ -595,7 +595,7 @@ function buildPrefabStructure(prefab, scan = {}) {
     const rootNodeId = objects?.[0]?.data?.__id__ ?? 1;
     const keyNodeByPath = new Map((prefab.keyNodes || []).map(node => [node.path, node]));
     const scriptCatalog = buildScriptCatalog(scan);
-    const scriptUuidCatalog = buildPrefabScriptUuidCatalog(scan);
+    const scriptUuidCatalog = buildScriptUuidCatalog(scan);
     const nodePathById = new Map();
     const nodeNameById = new Map();
 
@@ -893,7 +893,7 @@ function applyProfileFilters(bundle, filters = {}) {
     const filteredComponents = bundle.structure.components.filter(item =>
         matchesNodeFilter(item.nodePath, nodeQuery) && matchesComponentFilter(item.componentName, item.rawType, componentQuery)
     );
-    const filteredCustomComponents = bundle.customComponents.filter(item =>
+    const visibleCustomComponents = bundle.customComponents.filter(item =>
         matchesNodeFilter(item.nodePath, nodeQuery) && matchesComponentFilter(item.componentName, item.rawType, componentQuery)
     );
     const filteredBindingAudit = bundle.bindingAudit.filter(item =>
@@ -911,7 +911,7 @@ function applyProfileFilters(bundle, filters = {}) {
 
     const relevantNodePaths = new Set([
         ...filteredComponents.map(item => item.nodePath),
-        ...filteredCustomComponents.map(item => item.nodePath),
+        ...visibleCustomComponents.map(item => item.nodePath),
         ...filteredBindingAudit.map(item => item.nodePath),
         ...filteredEvents.map(item => item.sourceNodePath),
         ...filteredEvents.map(item => item.targetNodePath),
@@ -931,13 +931,13 @@ function applyProfileFilters(bundle, filters = {}) {
         nodes: filteredNodes,
         components: filteredComponents,
         specialComponents: filteredComponents.filter(item => item.isSpecialComponent),
-        customComponents: filteredCustomComponents,
+        customComponents: visibleCustomComponents,
         eventBindings: filteredEvents,
         bindingAudit: filteredBindingAudit,
         matches: {
             nodes: filteredNodes.length,
             components: filteredComponents.length,
-            customComponents: filteredCustomComponents.length,
+            customComponents: visibleCustomComponents.length,
             bindingAudit: filteredBindingAudit.length,
         },
     };
@@ -976,7 +976,7 @@ function planClickEvent(artifacts, options) {
     const existingEvent = findExistingEvent(prefab, options.node, componentName, options.handler);
 
     const changes = [
-        buildAttachComponentPlan({
+        buildComponentPlan({
             prefab,
             nodePath: targetNodePath,
             componentName,
@@ -1075,23 +1075,23 @@ function planFieldBinding(artifacts, options) {
             suggestions: findFieldCandidates(scriptRecord, options.field),
         });
     }
-    const fieldPatterns = findRelevantFieldPatterns(authoringFeatureProfile, componentName, fieldDef.fieldName);
+    const fieldPatterns = findFieldPatterns(authoringFeatureProfile, componentName, fieldDef.fieldName);
     const assetPatterns = inferBindableFieldKind(fieldDef) === 'asset'
-        ? getRelevantAssetPatterns(authoringFeatureProfile, fieldDef.baseType)
+        ? getAssetPatterns(authoringFeatureProfile, fieldDef.baseType)
         : [];
 
     const targetQuery = options.targetNode || options.targetComponent || options.targetAsset || '';
-    const existingBinding = findExistingFieldBinding(prefab, componentName, componentNodePath, fieldDef.fieldName, targetQuery);
+    const existingBinding = findFieldBinding(prefab, componentName, componentNodePath, fieldDef.fieldName, targetQuery);
     const targetAsset = options.targetAsset ? findAssetCandidate(artifacts.graph, options.targetAsset) : null;
     if (options.targetAsset && !targetAsset) {
         throw createAuthoringError(`未找到 target asset: ${options.targetAsset}`, {
             code: 'asset_not_found',
-            suggestions: findAssetCandidatesForField(artifacts, options.targetAsset, fieldDef, authoringFeatureProfile),
+            suggestions: findFieldAssets(artifacts, options.targetAsset, fieldDef, authoringFeatureProfile),
         });
     }
 
     const changes = [
-        buildAttachComponentPlan({
+        buildComponentPlan({
             prefab,
             nodePath: componentNodePath,
             componentName,
@@ -1111,7 +1111,7 @@ function planFieldBinding(artifacts, options) {
     ];
     const bindingChange = changes.find(item => item.kind === 'bind-field');
     if (bindingChange) {
-        bindingChange.learnedFromProject = summarizeFieldConvention(componentName, fieldDef.fieldName, fieldPatterns, assetPatterns);
+        bindingChange.learnedFromProject = summarizeConvention(componentName, fieldDef.fieldName, fieldPatterns, assetPatterns);
     }
 
     return {

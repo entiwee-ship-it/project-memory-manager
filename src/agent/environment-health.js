@@ -451,7 +451,7 @@ function checkDataRoot({ context, findings, repairPlan }) {
  * @param {Array<object>} params.repairPlan 修复计划数组。
  * @returns {object} workspace registry 检查项。
  */
-function checkWorkspaceRegistered({ context, dataRootExists, diagnostics, findings, repairPlan }) {
+function checkWorkspaceRegistry({ context, dataRootExists, diagnostics, findings, repairPlan }) {
     if (!dataRootExists) {
         return makeCheck(
             'workspace_registered',
@@ -515,7 +515,7 @@ function checkWorkspaceRegistered({ context, dataRootExists, diagnostics, findin
  * @param {Array<object>} diagnostics 诊断数组。
  * @returns {object} KB freshness 结果。
  */
-function buildProjectGlobalFreshness(context, sourceVersion, diagnostics) {
+function buildGlobalFreshness(context, sourceVersion, diagnostics) {
     const graphPath = path.join(context.paths.projectGlobalDir, 'chain.graph.json');
     const lookupPath = path.join(context.paths.projectGlobalDir, 'chain.lookup.json');
     const graph = readJsonDiagnostic(graphPath, null, diagnostics, 'project_global_graph_unreadable');
@@ -568,7 +568,7 @@ function checkKbFreshness({ context, dataRootExists, sourceVersion, diagnostics,
 
     let freshness;
     try {
-        freshness = buildProjectGlobalFreshness(context, sourceVersion, diagnostics);
+        freshness = buildGlobalFreshness(context, sourceVersion, diagnostics);
     } catch (error) {
         diagnostics.push({
             code: 'kb_freshness_diagnostic_failed',
@@ -798,7 +798,7 @@ function agentPreflight(options = {}) {
     checks.push(checkSkillInstallation({ sourceVersion, options, diagnostics, findings, repairPlan }));
     const dataRootResult = checkDataRoot({ context, findings, repairPlan });
     checks.push(dataRootResult.check);
-    checks.push(checkWorkspaceRegistered({
+    checks.push(checkWorkspaceRegistry({
         context,
         dataRootExists: dataRootResult.dataRootExists,
         diagnostics,

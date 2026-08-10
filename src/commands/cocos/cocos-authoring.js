@@ -192,7 +192,7 @@ function ensureFeatureFresh(root, featureKey, autoActions = []) {
     return getFeatureRecord(root, featureKey);
 }
 
-function ensureAuthoringProfileFresh(root, featureKey, autoActions = []) {
+function ensureProfileFresh(root, featureKey, autoActions = []) {
     const profile = loadProjectAuthoringProfile(root);
     const featureProfile = profile?.features?.[featureKey] || null;
     const stale = !profile || !featureProfile || !isBuiltWithCurrentSkill(profile);
@@ -466,7 +466,7 @@ function run(argv = process.argv.slice(2)) {
     const autoActions = [];
     try {
         ensureFeatureFresh(root, args.feature, autoActions);
-        ensureAuthoringProfileFresh(root, args.feature, autoActions);
+        ensureProfileFresh(root, args.feature, autoActions);
 
         let artifacts = loadFeatureArtifacts(root, args.feature);
         let featureProfile = loadFeatureAuthoringProfile(root, args.feature);

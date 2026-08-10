@@ -81,7 +81,7 @@ function loadPrefabDocument(prefabPath, scriptMetaCatalog) {
     const componentRefsByNodeId = new Map();
     const componentById = new Map();
     const componentByNodeAndName = new Map();
-    const componentPrefabInfoTemplate = findPrefabInfoTemplate(objects);
+    const prefabInfoTemplate = findPrefabInfoTemplate(objects);
     const clickEventTemplate = findClickEventTemplate(objects);
 
     const visit = (nodeId, parentPath = '') => {
@@ -130,7 +130,7 @@ function loadPrefabDocument(prefabPath, scriptMetaCatalog) {
         nodeIdByPath,
         componentById,
         componentByNodeAndName,
-        componentPrefabInfoTemplate,
+        componentPrefabInfoTemplate: prefabInfoTemplate,
         clickEventTemplate,
     };
 }
@@ -293,7 +293,7 @@ function setFieldNodeReference(component, fieldName, targetNodeId) {
     component.object[fieldName] = { __id__: targetNodeId };
 }
 
-function setFieldComponentReference(component, fieldName, targetComponentId) {
+function setComponentReference(component, fieldName, targetComponentId) {
     component.object[fieldName] = { __id__: targetComponentId };
 }
 
@@ -555,7 +555,7 @@ function applyFieldBindingChange({ artifacts, plan, componentNodePath, component
     } else if (bindingKind === 'component') {
         const samePrefabTarget = resolveTargetComponent(doc, targetComponent, targetComponent);
         if (samePrefabTarget?.component) {
-            setFieldComponentReference(ownerComponent, fieldName, samePrefabTarget.component.id);
+            setComponentReference(ownerComponent, fieldName, samePrefabTarget.component.id);
             changes.push({ file: normalize(plan.prefab.prefabPath), kind: 'prefab', action: 'bind-field' });
         } else {
             const nestedTargets = findNestedPrefabTargets(doc, scriptMetaCatalog, targetComponent);

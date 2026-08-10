@@ -56,7 +56,7 @@ function collectKnownFiles(options = {}) {
         .filter(Boolean));
 }
 
-function collectChangedInputFiles(options = {}) {
+function collectChangedFiles(options = {}) {
     return parseChangedFiles(options);
 }
 
@@ -141,7 +141,7 @@ function isReviewSupportFile(file = '') {
         || /(?:^|\/)changelog\.md$/.test(normalized);
 }
 
-function hasRuntimeCompletenessSignal(gate, changedFiles = []) {
+function hasRuntimeSignal(gate, changedFiles = []) {
     const hardRiskKeys = new Set(['api', 'data', 'auth', 'external-service', 'cross-module']);
     if ((gate.riskSignals || []).some(signal => hardRiskKeys.has(signal.key))) {
         return true;
@@ -149,14 +149,14 @@ function hasRuntimeCompletenessSignal(gate, changedFiles = []) {
     return changedFiles.some(file => /(?:^|\/)app\/api\/|route\.(ts|js)$|(?:^|\/)api\/|(?:^|\/)prisma\/|schema\.prisma|(?:^|\/)db\/|lib\/api-client|settings|chat/i.test(file));
 }
 
-function shouldRequireRuntimeFiles({ gate, changedFiles }) {
+function requiresRuntimeFiles({ gate, changedFiles }) {
     if (!changedFiles.length) {
         return false;
     }
     if (changedFiles.every(isReviewSupportFile) && REVIEW_SUPPORT_TASK_PATTERN.test(gate.task || '')) {
         return false;
     }
-    return hasRuntimeCompletenessSignal(gate, changedFiles);
+    return hasRuntimeSignal(gate, changedFiles);
 }
 
 function mergeKnownFilesIntoBoundary(boundary = {}, knownFiles = []) {
@@ -380,7 +380,7 @@ function pathIsWithinBoundary(file, boundary = {}) {
 function validateEditScope(options = {}) {
     const gate = decidePmmUsage(options);
     const knownFiles = collectKnownFiles(options);
-    const actualChangedFiles = collectChangedInputFiles(options);
+    const actualChangedFiles = collectChangedFiles(options);
     const changedFiles = actualChangedFiles.length
         ? actualChangedFiles
         : (knownFiles.length ? knownFiles : collectInputFiles(options));
@@ -393,7 +393,7 @@ function validateEditScope(options = {}) {
         : { primaryFiles: knownFiles.length ? knownFiles : gate.files, relatedRoots: [] };
     const boundary = mergeKnownFilesIntoBoundary(contextBoundary, knownFiles);
     const boundaryOutOfScopeFiles = changedFiles.filter(file => !pathIsWithinBoundary(file, boundary));
-    const informationalOutOfScopeFiles = boundaryOutOfScopeFiles.filter(isReviewSupportFile);
+    const reviewSupportFiles = boundaryOutOfScopeFiles.filter(isReviewSupportFile);
     const outOfScopeFiles = boundaryOutOfScopeFiles.filter(file => !isReviewSupportFile(file));
     const hardRiskKeys = new Set(['api', 'data', 'auth', 'external-service', 'cross-module']);
     const riskyFiles = changedFiles.filter(file => {
@@ -401,7 +401,7 @@ function validateEditScope(options = {}) {
         return signalKeys.some(key => hardRiskKeys.has(key))
             || (gate.decision !== 'optional_skip_allowed' && signalKeys.includes('commerce'));
     });
-    const missingExpectedFiles = context && !context.unavailable && shouldRequireRuntimeFiles({ gate, changedFiles })
+    const missingExpectedFiles = context && !context.unavailable && requiresRuntimeFiles({ gate, changedFiles })
         ? (context.criticalFiles || [])
             .filter(file => /(?:api|route|prisma|lib\/api-client|settings|chat)/i.test(file))
             .filter(file => !changedFiles.some(changed => normalizeText(changed) === normalizeText(file)))
@@ -423,7 +423,7 @@ function validateEditScope(options = {}) {
         verdict,
         pmmGate: gate,
         outOfScopeFiles,
-        informationalOutOfScopeFiles,
+        informationalOutOfScopeFiles: reviewSupportFiles,
         riskyFiles,
         missingExpectedFiles,
         impactSummary: impact?.unavailable ? { unavailable: true, error: impact.error } : (impact ? {
@@ -520,7 +520,7 @@ function recordTaskOutcome(options = {}) {
         dataRoot: options.dataRoot,
         layout: options.layout,
     });
-    const changedFiles = collectChangedInputFiles(options);
+    const changedFiles = collectChangedFiles(options);
     const record = {
         kind: 'agent-task-outcome',
         recordedAt: new Date().toISOString(),

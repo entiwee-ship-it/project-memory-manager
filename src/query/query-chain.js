@@ -802,7 +802,7 @@ function effectiveTraversalDepth(args = {}) {
     return isFullstackMode(args) ? Math.max(requestedDepth, 4) : requestedDepth;
 }
 
-function isUnresolvedTraversalItem(item) {
+function isUnresolvedItem(item) {
     return item?.node?.type === 'unresolved-call' || item?.edge?.type === 'unresolved_calls';
 }
 
@@ -825,7 +825,7 @@ function isHttpMainlineNode(node, startNode) {
 function shapeTraversalResult(rawTraversal, lookup, startNode, args = {}) {
     let traversal = rawTraversal;
     if (!args.includeUnresolved) {
-        traversal = traversal.filter(item => !isUnresolvedTraversalItem(item));
+        traversal = traversal.filter(item => !isUnresolvedItem(item));
     }
 
     const focus = String(args.focus || '').trim().toLowerCase();
@@ -1064,7 +1064,7 @@ function summarizeNode(node, lookup) {
     return summary;
 }
 
-function isPrefabComponentAttachment(node) {
+function isPrefabAttachment(node) {
     if (!node || node.type !== 'component') {
         return false;
     }
@@ -1145,7 +1145,7 @@ function pushGroupedComponent(groupMap, key, node) {
     group.instances.push(item);
 }
 
-function groupedComponentsToArray(groupMap) {
+function componentGroupsToArray(groupMap) {
     return [...groupMap.values()].map(group => ({
         ...group,
         nodePaths: group.nodePaths.sort((left, right) => left.localeCompare(right)),
@@ -1219,11 +1219,11 @@ function componentGroupForDetail(group, detail, args = {}) {
     };
 }
 
-function buildPrefabComponentSummary(graph, args) {
+function buildComponentSummary(graph, args) {
     const prefabPath = args.file || args.name || '';
     const detail = normalizeDetail(args);
     const componentNodes = (graph.nodes || []).filter(node => {
-        if (!isPrefabComponentAttachment(node)) {
+        if (!isPrefabAttachment(node)) {
             return false;
         }
         return matchPath(node.meta?.prefabPath || node.file, prefabPath);
@@ -1244,9 +1244,9 @@ function buildPrefabComponentSummary(graph, args) {
         }
     }
 
-    const customScriptGroups = groupedComponentsToArray(customScripts);
-    const builtinGroups = groupedComponentsToArray(builtinComponents);
-    const unresolvedGroups = groupedComponentsToArray(unresolvedComponents);
+    const customScriptGroups = componentGroupsToArray(customScripts);
+    const builtinGroups = componentGroupsToArray(builtinComponents);
+    const unresolvedGroups = componentGroupsToArray(unresolvedComponents);
     const counts = {
         componentInstances: componentNodes.length,
         customScripts: customScriptGroups.length,
@@ -1292,7 +1292,7 @@ function buildScriptUsageSummary(graph, args) {
     const excludePath = args.excludePrefab || args.excludeFile || '';
     const detail = normalizeDetail(args);
     const componentNodes = (graph.nodes || []).filter(node => {
-        if (!isPrefabComponentAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
+        if (!isPrefabAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
             return false;
         }
         if (!matchPath(node.file, scriptPath)) {
@@ -1389,10 +1389,10 @@ function buildScriptUsageSummary(graph, args) {
     };
 }
 
-function collectScriptUsageGroups(graph, scriptPath, args = {}) {
+function collectUsageGroups(graph, scriptPath, args = {}) {
     const excludePath = args.excludePrefab || args.excludeFile || '';
     const componentNodes = (graph.nodes || []).filter(node => {
-        if (!isPrefabComponentAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
+        if (!isPrefabAttachment(node) || classifyPrefabComponent(node) !== 'custom-script') {
             return false;
         }
         if (!matchPath(node.file, scriptPath)) {
@@ -1429,10 +1429,10 @@ function collectScriptUsageGroups(graph, scriptPath, args = {}) {
         .sort((left, right) => left.prefabPath.localeCompare(right.prefabPath));
 }
 
-function buildPrefabScriptUsageSummary(graph, args) {
+function buildPrefabUsageSummary(graph, args) {
     const prefabPath = args.file || args.name || '';
     const detail = normalizeDetail(args);
-    const componentSummary = buildPrefabComponentSummary(graph, {
+    const componentSummary = buildComponentSummary(graph, {
         ...args,
         detail: 'full',
         limit: null,
@@ -1442,8 +1442,8 @@ function buildPrefabScriptUsageSummary(graph, args) {
     });
     const scripts = componentSummary.customScripts || [];
     const scriptRows = scripts.map(script => {
-        const allUsage = collectScriptUsageGroups(graph, script.scriptPath, {});
-        const otherUsage = collectScriptUsageGroups(graph, script.scriptPath, {
+        const allUsage = collectUsageGroups(graph, script.scriptPath, {});
+        const otherUsage = collectUsageGroups(graph, script.scriptPath, {
             excludePrefab: args.excludePrefab || prefabPath,
         });
         const row = {
@@ -1599,7 +1599,7 @@ function inferBusinessGroup(result) {
     };
 }
 
-function buildGroupedSearchResults(results, args = {}) {
+function buildSearchGroups(results, args = {}) {
     const groups = new Map();
     for (const result of results || []) {
         const groupInfo = inferBusinessGroup(result);
@@ -1660,7 +1660,7 @@ function splitAmbiguousCandidate(candidate) {
     };
 }
 
-function resolveAmbiguousCandidateNode(graph, lookup, candidate) {
+function resolveCandidateNode(graph, lookup, candidate) {
     const parsed = splitAmbiguousCandidate(candidate);
     if (getOwnEntry(lookup.nodesById, parsed.raw)) {
         return getOwnEntry(lookup.nodesById, parsed.raw);
@@ -1806,7 +1806,7 @@ function buildAmbiguousRecommendations(graph, lookup, ambiguous = [], options = 
     const seen = new Set();
     const nodes = [];
     for (const candidate of ambiguous) {
-        const node = resolveAmbiguousCandidateNode(graph, lookup, candidate);
+        const node = resolveCandidateNode(graph, lookup, candidate);
         if (!node || seen.has(node.id)) {
             continue;
         }
@@ -1871,7 +1871,7 @@ function withAmbiguousRecommendations(result, graph, lookup, options = {}) {
     };
 }
 
-function looksLikeNaturalLanguageQuery(query) {
+function isNaturalLanguageQuery(query) {
     const value = String(query || '').trim();
     if (!value) {
         return false;
@@ -1883,7 +1883,7 @@ function selectorUsageHint(selectorType, query) {
     if (selectorType !== 'message') {
         return {};
     }
-    const likelySelectorMisuse = looksLikeNaturalLanguageQuery(query);
+    const likelySelectorMisuse = isNaturalLanguageQuery(query);
     return {
         selectorMeaning: 'protocol-message',
         naturalLanguageSupported: false,
@@ -1894,7 +1894,7 @@ function selectorUsageHint(selectorType, query) {
     };
 }
 
-function buildSelectorSuggestions(base) {
+function suggestSelectors(base) {
     return [
         {
             query: `${base} --name "<关键词>" --grouped --json`,
@@ -1932,7 +1932,7 @@ function buildTypeAwareNotFoundResult(graph, featureKey, selectorType, query, op
             selectorType,
             query,
             ...usageHint,
-            suggestions: buildSelectorSuggestions(base),
+            suggestions: suggestSelectors(base),
         };
     }
     const suggestions = [];
@@ -2210,7 +2210,7 @@ function printTraversal(result, asJson) {
         });
 }
 
-function buildRecommendedCommands(featureKey, lookup = {}) {
+function recommendCommands(featureKey, lookup = {}) {
     const commands = [
         `node src/bin/query-feature.js --feature ${featureKey}`,
         `node src/bin/query-feature.js --feature ${featureKey} --downstream <query>`,
@@ -2276,7 +2276,7 @@ function buildFeatureSummary(feature, graph, lookup, context = null) {
     const nodesByType = Object.fromEntries(
         Object.entries(lookup.nodesByType || {}).map(([type, ids]) => [type, Array.isArray(ids) ? ids.length : 0])
     );
-    const examples = buildRecommendedCommands(feature.featureKey, lookup);
+    const examples = recommendCommands(feature.featureKey, lookup);
     const artifacts = buildArtifactGuide(feature);
     const kbVersionStatus = buildKbVersionStatus(graph, {
         root: context?.workspaceRoot || process.cwd(),
@@ -2353,7 +2353,7 @@ function filterResolvedStart(resolved, graph, lookup, args = {}) {
     }
     if (resolved?.ambiguous) {
         const nodes = resolved.ambiguous
-            .map(candidate => resolveAmbiguousCandidateNode(graph, lookup, candidate))
+            .map(candidate => resolveCandidateNode(graph, lookup, candidate))
             .filter(node => nodeMatchesQueryFilters(node, args));
         if (nodes.length === 1) {
             return { id: nodes[0].id };
@@ -2714,7 +2714,7 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
     if (args.type === 'prefab-component') {
-        printDetailedResult(buildPrefabComponentSummary(graph, args), args.json);
+        printDetailedResult(buildComponentSummary(graph, args), args.json);
         return;
     }
     if (args.type === 'script-usage') {
@@ -2722,13 +2722,13 @@ function run(argv = process.argv.slice(2)) {
         return;
     }
     if (args.type === 'prefab-script-usage') {
-        printDetailedResult(buildPrefabScriptUsageSummary(graph, args), args.json);
+        printDetailedResult(buildPrefabUsageSummary(graph, args), args.json);
         return;
     }
     if (args.type || args.name || args.tag || args.file || args.hasHandler) {
         const results = searchNodes(graph, lookup, args);
         if (args.grouped) {
-            printDetailedResult(buildGroupedSearchResults(results, args), args.json);
+            printDetailedResult(buildSearchGroups(results, args), args.json);
             return;
         }
         printSearchResults(results, args.json);
