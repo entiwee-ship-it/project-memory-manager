@@ -32,7 +32,7 @@ npm --version
 统一使用绝对路径。Windows 上建议在配置里使用 `/`，Node 能识别，也能减少 TOML 转义问题。
 
 ```powershell
-$pmmSource = "E:/xile-workspace/codex-tools/project-memory-manager"
+$pmmSource = "E:/xile-workspace/GitHub/project-memory-manager"
 $pmmData = "E:/xile-workspace/codex-tools/project-memory-data"
 $project = "E:/xile-workspace/qyProject"
 ```
@@ -98,7 +98,7 @@ C:/Users/<User>/.codex/config.toml
 ```toml
 [mcp_servers.project_memory_manager]
 command = "node"
-args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
+args = ["E:/xile-workspace/GitHub/project-memory-manager/src/bin/mcp.js"]
 startup_timeout_sec = 120
 
 [mcp_servers.project_memory_manager.env]

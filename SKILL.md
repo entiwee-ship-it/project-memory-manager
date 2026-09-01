@@ -155,7 +155,7 @@ node src/bin/rebuild-kbs.js --workspace-root <project-root> --data-root <pmm-dat
 如果 MCP 配置仍指向旧路径，改成：
 
 ```text
-E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js
+E:/xile-workspace/GitHub/project-memory-manager/src/bin/mcp.js
 ```
 
 ## 生成文件规则

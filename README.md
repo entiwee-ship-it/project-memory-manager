@@ -48,7 +48,7 @@ node src/bin/mcp.js
 Codex MCP 配置应指向：
 
 ```toml
-args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
+args = ["E:/xile-workspace/GitHub/project-memory-manager/src/bin/mcp.js"]
 ```
 
 常用 MCP 工具：

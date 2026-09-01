@@ -88,7 +88,7 @@ Codex 配置示例：
 ```toml
 [mcp_servers.project_memory_manager]
 command = "node"
-args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
+args = ["E:/xile-workspace/GitHub/project-memory-manager/src/bin/mcp.js"]
 startup_timeout_sec = 120
 
 [mcp_servers.project_memory_manager.env]
