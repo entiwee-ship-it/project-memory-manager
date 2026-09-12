@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.85.3] - 2026-09-12
+
+### 修复
+- `shared/lock.js` 不再吞掉过期锁的释放失败。此前强制删除过期锁时 `fs.unlinkSync` 的异常被空 `catch` 丢弃，随后统一抛出「无法获取锁，另一个操作正在进行中」，把「删除锁失败」误报成并发冲突，导致真实原因不可见。现在会保留读取失败和删除失败的原因，在诊断信息中新增「阻塞原因」段落，并在删除失败时把标题改为「无法获取锁：过期锁释放失败」。
+- 锁文件缺少有效时间戳时按过期处理。此前 `new Date(startTime).getTime()` 得到 `NaN` 会让过期判断恒为 false，锁将永久阻塞。
+
+### 测试
+- 新增 `npm run test:lock-diagnostics`（`tests/lock-diagnostics.test.js`），覆盖删除失败时的诊断信息、损坏锁文件的释放与重新获取、无效时间戳按过期处理，以及未过期锁保持原判定。
+
 ## [0.85.2] - 2026-09-12
 
 ### 修复
