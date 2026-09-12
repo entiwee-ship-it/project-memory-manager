@@ -19,6 +19,11 @@ const { run: buildProjectKb } = require('../build/build-project');
 const { run: buildCocosAuthoringProfile } = require('../cocos/build-cocos-authoring-profile');
 const { run: refreshMemoryIndexes } = require('../../lifecycle/refresh-memory-indexes');
 
+// 单次全量重建要遍历整个目标项目，实测 qyProject 需要约 170 秒，远超 shared/lock 的默认
+// 60 秒超时。若沿用默认值，第二个并发重建会在 60 秒后把仍在运行的锁判为过期并抢走，
+// 使锁失去互斥意义并可能同时写入同一份 KB，因此这里显式声明覆盖真实重建时长的超时。
+const REBUILD_LOCK_TIMEOUT = 30 * 60 * 1000;
+
 function parseArgs(argv) {
     const layoutArgs = parseLayoutArgs(argv);
     const args = {
@@ -231,7 +236,7 @@ function run(argv = process.argv.slice(2)) {
     
     return withLock(lockPath, () => {
         return doRebuild(args, context);
-    }, { wait: false });
+    }, { wait: false, timeout: REBUILD_LOCK_TIMEOUT });
 }
 
 function doRebuild(args, rootOrContext) {
@@ -346,6 +351,7 @@ module.exports = {
     collectConfigPaths,
     rebuildFeature,
     run,
+    REBUILD_LOCK_TIMEOUT,
 };
 
 if (require.main === module) {

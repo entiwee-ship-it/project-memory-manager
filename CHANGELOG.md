@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.85.2] - 2026-09-12
+
+### 修复
+- `rebuild-kbs` 的重建锁改用覆盖真实重建时长的超时（30 分钟）。此前沿用 `shared/lock` 默认的 60 秒，而实测 qyProject 全量重建约需 170 秒，第二个并发重建会在 60 秒后把仍在运行的锁判为过期并抢走，使锁失去互斥意义并可能同时写入同一份 KB。
+
+### 测试
+- 新增 `npm run test:rebuild-lock`（`tests/rebuild-lock.test.js`），覆盖重建锁超时余量、已持有 61 秒的锁在默认超时与重建超时下的不同判定，以及锁文件超时记录、互斥和释放行为。
+
 ## [0.85.1] - 2026-09-12
 
 ### 修复
