@@ -1,6 +1,11 @@
 # PMM Experience Value Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **状态：已完成（2026-07-11，随 0.84.0 发布）。**
+> 8 个 Task 的交付物全部落地，硬门禁全部达标，最终指标与剩余风险见文末「完成报告（2026-07-11）」。
+> 执行期间没有逐项维护复选框，文中的 `- [x]` 是收口时依据完成报告统一回填的，不代表当时逐步勾选过。
+> 判断本计划剩余工作量时，以本节状态和完成报告为准，不要按复选框数量推断。
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make PMM measurably improve real code-development understanding, safety, continuity, and review quality on 12 completed qyProject tasks, with explicit readiness gates instead of treating token reduction as the primary success signal.
 
@@ -105,7 +110,7 @@ For entries described as “actual ... found”, Task 1 must resolve and commit 
 - Create after baseline run: `tests/experience/baselines/2026-07-11-current.json`
 - Modify: `package.json`
 
-- [ ] **Step 1: Verify every source answer without writing qyProject**
+- [x] **Step 1: Verify every source answer without writing qyProject**
 
 Run these exact read-only searches from `E:/xile-workspace/qyProject` and copy only confirmed paths/methods into fixtures:
 
@@ -121,7 +126,7 @@ rg -n "recharge_ladder|mallRuntimeConfig|mallRechargeProductSnapshot|typeOfExpen
 
 Expected: each fixture has non-empty exact `requiredFiles`; every listed path exists; no source file is modified.
 
-- [ ] **Step 2: Write fixture schema tests first**
+- [x] **Step 2: Write fixture schema tests first**
 
 Implement `loadExperienceFixtures()` and `validateExperienceFixture()` in `fixture-manifest.js`, then assert:
 
@@ -138,7 +143,7 @@ for (const fixture of fixtures) {
 }
 ```
 
-- [ ] **Step 3: Run the fixture test and verify RED**
+- [x] **Step 3: Run the fixture test and verify RED**
 
 Run:
 
@@ -148,7 +153,7 @@ node tests/experience/pmm-experience-harness.test.js --fixtures-only
 
 Expected: FAIL because the Harness and fixture files do not exist yet, then FAIL on each unresolved/invalid fixture until all source answers are exact.
 
-- [ ] **Step 4: Implement deterministic scoring helpers**
+- [x] **Step 4: Implement deterministic scoring helpers**
 
 Export exactly:
 
@@ -176,7 +181,7 @@ workflowImproved = pmmSearchRounds + selectorRounds + correctionRounds
 
 Files in `acceptedFiles` are relevant but do not increase required-file recall. Files matching `forbiddenDomains` are always noise. Empty recommendations have `noiseRatio=0` but cannot pass recall.
 
-- [ ] **Step 5: Implement Harness execution boundaries**
+- [x] **Step 5: Implement Harness execution boundaries**
 
 The Harness must call production exports (`prepareAgentBrief`, `prepareTaskContext`, `validateEditScope`, `reviewPatchForAgent`, `recallTaskMemory`) with:
 
@@ -193,7 +198,7 @@ const reportRoot = path.join(os.tmpdir(), 'pmm-experience-value');
 
 The Harness must assert `git -C QY_ROOT status --porcelain` is byte-for-byte unchanged before and after execution.
 
-- [ ] **Step 6: Add scripts and verify current behavior fails hard gates**
+- [x] **Step 6: Add scripts and verify current behavior fails hard gates**
 
 Add:
 
@@ -213,7 +218,7 @@ npm run test:experience
 
 Expected: baseline command exits 0 after writing factual metrics; gate command FAILS because current PMM does not yet satisfy all Experience Value thresholds. The failure output must name each failed task and metric.
 
-- [ ] **Step 7: Confirm production isolation**
+- [x] **Step 7: Confirm production isolation**
 
 Run:
 
@@ -223,7 +228,7 @@ rg -n "tests/experience|01-login-pinus-session|mall-runtime-product-snapshot" sr
 
 Expected: no matches.
 
-- [ ] **Step 8: Commit the red baseline contract**
+- [x] **Step 8: Commit the red baseline contract**
 
 ```powershell
 git add tests/experience package.json
@@ -237,7 +242,7 @@ git commit -m "测试 PMM 真实开发体验基线"
 - Create: `tests/agent-task-intent.test.js`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write classification tests**
+- [x] **Step 1: Write classification tests**
 
 Assert these exact contracts:
 
@@ -252,7 +257,7 @@ assert.equal(classifyTaskIntent({ task: '把按钮文案改成确定', knownFile
 
 Also assert low-confidence ambiguous work defaults to `implement` and includes `reasons` plus `missingInputs`.
 
-- [ ] **Step 2: Run the intent test and verify RED**
+- [x] **Step 2: Run the intent test and verify RED**
 
 Run:
 
@@ -262,7 +267,7 @@ node tests/agent-task-intent.test.js
 
 Expected: FAIL with `Cannot find module '../src/agent/task-intent'`.
 
-- [ ] **Step 3: Implement the classifier**
+- [x] **Step 3: Implement the classifier**
 
 Export:
 
@@ -287,7 +292,7 @@ Return:
 
 Use deterministic weighted cues. Explicit `intent` wins after validation. `changedFiles` plus review words wins `review`; resume words plus a task/history identifier wins `resume`; symptom/failure words win `debug`; explanation/trace words win `understand`; edit/build words win `implement`; only a low-risk request with one or two `knownFiles` and no API/data/auth/transaction cue may return `simple`.
 
-- [ ] **Step 4: Run GREEN and Agent regression**
+- [x] **Step 4: Run GREEN and Agent regression**
 
 ```powershell
 node tests/agent-task-intent.test.js
@@ -296,7 +301,7 @@ npm run test:agent
 
 Expected: PASS.
 
-- [ ] **Step 5: Register test and commit**
+- [x] **Step 5: Register test and commit**
 
 Append `node tests/agent-task-intent.test.js` to `test:agent`, then:
 
@@ -312,7 +317,7 @@ git commit -m "增加 PMM 任务意图分类"
 - Create: `tests/agent-brief-readiness.test.js`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write readiness RED tests**
+- [x] **Step 1: Write readiness RED tests**
 
 Cover these exact outcomes:
 
@@ -329,7 +334,7 @@ assert.equal(evaluateBriefReadiness({
 
 Assert that non-applicable dimensions are `null`, not `false`.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 node tests/agent-brief-readiness.test.js
@@ -337,7 +342,7 @@ node tests/agent-brief-readiness.test.js
 
 Expected: FAIL because `brief-readiness.js` does not exist.
 
-- [ ] **Step 3: Implement readiness profiles**
+- [x] **Step 3: Implement readiness profiles**
 
 Export:
 
@@ -368,7 +373,7 @@ For high-risk `implement|debug|review`, set `backend` and `data` applicable when
 { dimension: 'backend', reason: 'high-risk task has no endpoint or backend implementation evidence', recommendedSelector: { type: 'endpoint' } }
 ```
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
 ```powershell
 node tests/agent-brief-readiness.test.js
@@ -384,7 +389,7 @@ git commit -m "增加 PMM Brief 证据就绪门禁"
 - Modify: `tests/agent-context-pack.test.js`
 - Test: `tests/experience/pmm-experience-harness.test.js`
 
-- [ ] **Step 1: Write failing context contracts**
+- [x] **Step 1: Write failing context contracts**
 
 Add assertions that `prepareTaskContext()` returns:
 
@@ -406,7 +411,7 @@ Add assertions that `prepareTaskContext()` returns:
 
 Keep existing top-level fields during this phase for compatibility, but assert `currentFacts` is built from the same arrays and contains no `outcome`, `observations`, or playbook rule text.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```powershell
 node tests/agent-context-pack.test.js
@@ -414,7 +419,7 @@ node tests/agent-context-pack.test.js
 
 Expected: FAIL because `intent`, `currentFacts`, `coverage`, and `sourceConfirmation` do not exist.
 
-- [ ] **Step 3: Integrate classification and coverage**
+- [x] **Step 3: Integrate classification and coverage**
 
 At the beginning of `prepareTaskContext(options)`, call:
 
@@ -424,7 +429,7 @@ const intent = classifyTaskIntent(options);
 
 After evidence collection, call `buildCoverage()` with actual endpoint/request/method/table/external-service/caller/validation arrays. Do not manufacture evidence from task terms. Add selector recommendations only when multiple high-scoring nodes share the same normalized name or when the top two score difference is below the ambiguity threshold.
 
-- [ ] **Step 4: Use mode-specific fact limits**
+- [x] **Step 4: Use mode-specific fact limits**
 
 Apply these deterministic defaults unless `options.limit` is explicit:
 
@@ -441,7 +446,7 @@ const INTENT_LIMITS = {
 
 For `simple`, skip graph traversal when all `knownFiles` exist and Usage Gate allows skip; still return validation and scope-review guidance. For `review`, seed ranking with `changedFiles`. For `resume`, do not claim completed state in current facts.
 
-- [ ] **Step 5: Run targeted GREEN and Experience delta**
+- [x] **Step 5: Run targeted GREEN and Experience delta**
 
 ```powershell
 node tests/agent-context-pack.test.js
@@ -450,7 +455,7 @@ npm run test:experience
 
 Expected: context tests PASS. Experience may still FAIL, but file/evidence failures must not regress from the saved baseline.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/agent/context-pack.js tests/agent-context-pack.test.js
@@ -465,7 +470,7 @@ git commit -m "按任务意图组织 PMM 当前事实"
 - Modify: `tests/agent-execution-loop.test.js`
 - Test: `tests/experience/pmm-experience-harness.test.js`
 
-- [ ] **Step 1: Write failing brief separation tests**
+- [x] **Step 1: Write failing brief separation tests**
 
 Assert every non-blocked brief has exactly these three sections:
 
@@ -481,7 +486,7 @@ assert.equal(JSON.stringify(brief.historicalExperience).includes('kbFreshness'),
 
 Assert `brief.intent`, `brief.readiness`, `brief.confidence`, `brief.coverage`, `brief.missingEvidence`, and `brief.sourceConfirmation` always exist.
 
-- [ ] **Step 2: Write mode-specific RED tests**
+- [x] **Step 2: Write mode-specific RED tests**
 
 Assert:
 
@@ -495,7 +500,7 @@ assert.ok(review.currentFacts.changedFiles.length > 0);
 
 For resume, record an outcome containing completed state, validation, observations, and next action, then assert all four are returned from the same record and no unrelated recent record appears.
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 ```powershell
 node tests/agent-memory-recall.test.js
@@ -504,7 +509,7 @@ node tests/agent-execution-loop.test.js
 
 Expected: FAIL on missing separated sections and mode-specific fields.
 
-- [ ] **Step 4: Refactor `prepareAgentBrief()` minimally**
+- [x] **Step 4: Refactor `prepareAgentBrief()` minimally**
 
 Use this assembly order:
 
@@ -532,7 +537,7 @@ projectRules = { relevantRules: memory.relevantRules };
 
 Do not let `memory.recalledTasks` raise source confidence or satisfy current-fact coverage.
 
-- [ ] **Step 5: Tighten recall by intent**
+- [x] **Step 5: Tighten recall by intent**
 
 Implement these rules:
 
@@ -542,7 +547,7 @@ Implement these rules:
 - `understand|implement|debug`: preserve current semantic threshold and cap results at three.
 - no positive match: return an empty array, even when recent records exist.
 
-- [ ] **Step 6: Run GREEN and Experience delta**
+- [x] **Step 6: Run GREEN and Experience delta**
 
 ```powershell
 npm run test:agent
@@ -551,7 +556,7 @@ npm run test:experience
 
 Expected: Agent tests PASS. Historical precision and resume completeness pass; remaining failures are file coverage, noise, workflow, or plan adoption only.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/agent/memory-recall.js tests/agent-memory-recall.test.js tests/agent-execution-loop.test.js
@@ -565,7 +570,7 @@ git commit -m "按任务模式生成 PMM Agent Brief"
 - Modify: `tests/agent-token-efficiency.test.js`
 - Modify: `tests/mcp-server.test.js`
 
-- [ ] **Step 1: Write compact projection RED tests**
+- [x] **Step 1: Write compact projection RED tests**
 
 For `prepare_agent_brief`, assert compact output preserves:
 
@@ -582,11 +587,11 @@ assert.ok(Object.hasOwn(compactBrief, 'projectRules'));
 
 Assert the serialized compact brief remains at or below 4,000 characters.
 
-- [ ] **Step 2: Write MCP compatibility RED tests**
+- [x] **Step 2: Write MCP compatibility RED tests**
 
 Call `prepare_agent_brief` through `handleMcpRequest()` and assert compact/full responses carry identical intent/readiness values. Assert blocked preflight always projects `readiness: 'blocked'` and does not include executable target files.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```powershell
 npm run test:token-roi
@@ -595,7 +600,7 @@ npm run test:mcp
 
 Expected: FAIL because the compact projection does not yet preserve the new quality fields/sections.
 
-- [ ] **Step 4: Update projection structurally**
+- [x] **Step 4: Update projection structurally**
 
 Modify `compactAgentBrief()` to preserve the six quality fields before budget reduction. Bound arrays in this priority order:
 
@@ -604,7 +609,7 @@ Modify `compactAgentBrief()` to preserve the six quality fields before budget re
 3. Reduce historical observations and project rules before current facts.
 4. Remove duplicate legacy top-level fields only after full compatibility tests confirm `detail=full` is unchanged.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 npm run test:token-roi

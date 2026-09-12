@@ -1,6 +1,11 @@
 # PMM Repo Restructure Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **状态：已完成（2026-06-03，随 0.23.0 发布）。**
+> `scripts/` 旧入口已删除，`src/bin/*.js` 新入口、docs 分层和本地 MCP 路径迁移均已落地；`tests/source-layout.test.js` 持续断言 `scripts/` 与根级 `project-memory/` 不存在。
+> 执行期间没有逐项维护复选框，文中的 `- [x]` 是收口时依据 0.23.0 发布记录和当前源码结构统一回填的。
+> 判断本计划剩余工作量时，以本节状态为准，不要按复选框数量推断。
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Restructure PMM from a flat `scripts/` skill layout into a clean `src/` application layout with new `src/bin/*.js` entrypoints, updated docs, and no old CLI compatibility layer.
 
@@ -58,7 +63,7 @@ Delete:
 - Create: `tests/source-layout.test.js`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write the failing source layout test**
+- [x] **Step 1: Write the failing source layout test**
 
 Create `tests/source-layout.test.js`:
 
@@ -136,7 +141,7 @@ testPackageAndVersionUseNewEntrypoints();
 console.log('source-layout validation passed');
 ```
 
-- [ ] **Step 2: Add the package script**
+- [x] **Step 2: Add the package script**
 
 Modify `package.json` scripts:
 
@@ -144,7 +149,7 @@ Modify `package.json` scripts:
 "test:source-layout": "node tests/source-layout.test.js"
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run:
 
@@ -154,7 +159,7 @@ npm run test:source-layout
 
 Expected: FAIL because `scripts/` exists and `src/bin/*.js` does not exist.
 
-- [ ] **Step 4: Commit the failing test**
+- [x] **Step 4: Commit the failing test**
 
 ```powershell
 git add package.json tests/source-layout.test.js
@@ -175,7 +180,7 @@ git commit -m "添加源码布局重构回归测试"
 - Move: `scripts/adapters/extract/*` -> `src/adapters/extract/*`
 - Move: `scripts/adapters/topology/*` -> `src/adapters/topology/*`
 
-- [ ] **Step 1: Create directories**
+- [x] **Step 1: Create directories**
 
 Run:
 
@@ -184,7 +189,7 @@ New-Item -ItemType Directory -Force -Path `
   src/shared,src/graph,src/discovery,src/extraction/vue,src/adapters/extract,src/adapters/topology | Out-Null
 ```
 
-- [ ] **Step 2: Move files with git**
+- [x] **Step 2: Move files with git**
 
 Run:
 
@@ -203,7 +208,7 @@ git mv scripts/adapters/topology/generic.js src/adapters/topology/generic.js
 git mv scripts/adapters/topology/index.js src/adapters/topology/index.js
 ```
 
-- [ ] **Step 3: Update require paths in moved adapter files**
+- [x] **Step 3: Update require paths in moved adapter files**
 
 Required replacements:
 
@@ -220,7 +225,7 @@ src/discovery/feature-discovery.js:
 
 Use `rg "lib/common|./common|../lib" src/adapters src/discovery src/graph src/shared` and edit every hit.
 
-- [ ] **Step 4: Run focused require checks**
+- [x] **Step 4: Run focused require checks**
 
 Run:
 
@@ -230,7 +235,7 @@ node -e "require('./src/shared/common'); require('./src/shared/workspace-layout'
 
 Expected: `shared modules load`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src scripts
@@ -248,13 +253,13 @@ git commit -m "迁移共享模块和适配器目录"
 - Modify: all moved require paths
 - Modify: tests importing `../scripts/build_chain_kb` or `../scripts/extract_*`
 
-- [ ] **Step 1: Create directories**
+- [x] **Step 1: Create directories**
 
 ```powershell
 New-Item -ItemType Directory -Force -Path src/extraction,src/extraction/summary,src/graph | Out-Null
 ```
 
-- [ ] **Step 2: Move files**
+- [x] **Step 2: Move files**
 
 ```powershell
 git mv scripts/extract_feature_facts.js src/extraction/extract-feature-facts.js
@@ -262,7 +267,7 @@ git mv scripts/extract_structured_summary.js src/extraction/summary/extract-stru
 git mv scripts/build_chain_kb.js src/graph/build-chain-kb.js
 ```
 
-- [ ] **Step 3: Update internal require paths**
+- [x] **Step 3: Update internal require paths**
 
 Apply these mappings:
 
@@ -284,7 +289,7 @@ src/graph/build-chain-kb.js:
 
 If `learn_project_protocols`, `refresh_memory_indexes`, or `show_skill_version` are not moved yet, leave a temporary relative path to the old file only until the task that moves that file. Remove the temporary path in the same implementation session before deleting `scripts/`.
 
-- [ ] **Step 4: Update tests**
+- [x] **Step 4: Update tests**
 
 Required import replacements:
 
@@ -305,7 +310,7 @@ tests/structured-summary.test.js:
   ../scripts/extract_structured_summary -> ../src/extraction/summary/extract-structured-summary
 ```
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 ```powershell
 npm test
@@ -319,7 +324,7 @@ pinus-backend validation passed
 structured summary tests: 19 passed, 0 failed
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src tests scripts
@@ -336,13 +341,13 @@ git commit -m "迁移抽取和图构建模块"
 - Move query scripts into `src/commands/query/` and `src/query/`
 - Create matching `src/bin/*.js`
 
-- [ ] **Step 1: Create command and bin directories**
+- [x] **Step 1: Create command and bin directories**
 
 ```powershell
 New-Item -ItemType Directory -Force -Path src/bin,src/commands/lifecycle,src/commands/build,src/commands/query,src/query,src/lifecycle | Out-Null
 ```
 
-- [ ] **Step 2: Move lifecycle files**
+- [x] **Step 2: Move lifecycle files**
 
 ```powershell
 git mv scripts/init_project_memory.js src/commands/lifecycle/init-workspace.js
@@ -353,7 +358,7 @@ git mv scripts/refresh_memory_indexes.js src/lifecycle/refresh-memory-indexes.js
 git mv scripts/learn_project_protocols.js src/lifecycle/learn-project-protocols.js
 ```
 
-- [ ] **Step 3: Move build and discovery files**
+- [x] **Step 3: Move build and discovery files**
 
 ```powershell
 git mv scripts/build_project_kb.js src/commands/build/build-project.js
@@ -361,7 +366,7 @@ git mv scripts/build_feature_index.js src/commands/build/build-feature.js
 git mv scripts/discover_features.js src/commands/build/discover-features.js
 ```
 
-- [ ] **Step 4: Move query files**
+- [x] **Step 4: Move query files**
 
 ```powershell
 git mv scripts/query_project_kb.js src/commands/query/query-project.js
@@ -372,7 +377,7 @@ git mv scripts/view_method_body.js src/commands/query/view-method-body.js
 git mv scripts/analyze_call_chain.js src/commands/query/analyze-call-chain.js
 ```
 
-- [ ] **Step 5: Create bin entrypoints**
+- [x] **Step 5: Create bin entrypoints**
 
 Create each file with this pattern:
 
@@ -411,7 +416,7 @@ src/bin/view-method-body.js -> ../commands/query/view-method-body
 src/bin/analyze-call-chain.js -> ../commands/query/analyze-call-chain
 ```
 
-- [ ] **Step 6: Update require paths**
+- [x] **Step 6: Update require paths**
 
 Use these mappings:
 
@@ -430,7 +435,7 @@ Use these mappings:
 ./show_skill_version -> ../../maintenance/show-version
 ```
 
-- [ ] **Step 7: Run focused CLI checks**
+- [x] **Step 7: Run focused CLI checks**
 
 ```powershell
 node src/bin/build-project.js --help
@@ -440,7 +445,7 @@ node src/bin/discover-features.js --help
 
 Expected: Commands either print usage/help or fail with a usage message, not `MODULE_NOT_FOUND`.
 
-- [ ] **Step 8: Run tests**
+- [x] **Step 8: Run tests**
 
 ```powershell
 npm test
@@ -450,7 +455,7 @@ npm run test:path
 
 Expected: all pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add src tests scripts
@@ -468,13 +473,13 @@ git commit -m "迁移生命周期构建和查询命令"
 - Move maintenance scripts to `src/maintenance/` and `src/commands/maintenance/`
 - Create remaining `src/bin/*.js`
 
-- [ ] **Step 1: Create directories**
+- [x] **Step 1: Create directories**
 
 ```powershell
 New-Item -ItemType Directory -Force -Path src/mcp,src/commands/cocos,src/commands/diagnostics,src/commands/maintenance,src/maintenance | Out-Null
 ```
 
-- [ ] **Step 2: Move files**
+- [x] **Step 2: Move files**
 
 ```powershell
 git mv scripts/mcp_server.js src/mcp/server.js
@@ -496,7 +501,7 @@ git mv scripts/install_to_kimi_cli.js src/maintenance/install-kimi.js
 git mv scripts/requirements-validation.txt src/maintenance/requirements-validation.txt
 ```
 
-- [ ] **Step 3: Create bin entrypoints**
+- [x] **Step 3: Create bin entrypoints**
 
 Required mapping:
 
@@ -518,7 +523,7 @@ src/bin/clean-temp.js -> ../maintenance/clean-temp
 src/bin/install-kimi.js -> ../maintenance/install-kimi
 ```
 
-- [ ] **Step 4: Update MCP imports**
+- [x] **Step 4: Update MCP imports**
 
 `src/mcp/server.js` must import:
 
@@ -534,7 +539,7 @@ src/bin/install-kimi.js -> ../maintenance/install-kimi
 ../maintenance/show-version
 ```
 
-- [ ] **Step 5: Update tests**
+- [x] **Step 5: Update tests**
 
 Required replacements:
 
@@ -552,7 +557,7 @@ tests/workspace-layout.test.js:
   ../scripts/build_project_kb -> ../src/commands/build/build-project
 ```
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 ```powershell
 npm run test:mcp
@@ -562,7 +567,7 @@ npm run test:path
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src tests scripts
@@ -580,7 +585,7 @@ git commit -m "迁移MCP和维护工具入口"
 - Modify: `skill-version.json`
 - Modify: tests that still mention `scripts/`
 
-- [ ] **Step 1: Confirm no tracked files remain under scripts except the directory itself**
+- [x] **Step 1: Confirm no tracked files remain under scripts except the directory itself**
 
 ```powershell
 git ls-files scripts
@@ -588,7 +593,7 @@ git ls-files scripts
 
 Expected: no output after Tasks 2-5.
 
-- [ ] **Step 2: Remove root runtime memory**
+- [x] **Step 2: Remove root runtime memory**
 
 ```powershell
 git rm -r project-memory
@@ -596,7 +601,7 @@ git rm -r project-memory
 
 Expected: removes `project-memory/state/project-profile.json`.
 
-- [ ] **Step 3: Update package scripts**
+- [x] **Step 3: Update package scripts**
 
 `package.json` scripts must be:
 
@@ -613,7 +618,7 @@ Expected: removes `project-memory/state/project-profile.json`.
 }
 ```
 
-- [ ] **Step 4: Update `skill-version.json`**
+- [x] **Step 4: Update `skill-version.json`**
 
 Set:
 
@@ -623,7 +628,7 @@ Set:
 
 Keep `version` unchanged until the docs and tests pass; bump version in Task 8.
 
-- [ ] **Step 5: Update generated examples in tests**
+- [x] **Step 5: Update generated examples in tests**
 
 Replace assertions expecting `scripts/query_kb.js` with `src/bin/query-feature.js`.
 
@@ -633,7 +638,7 @@ Known file:
 tests/pinus-backend.test.js
 ```
 
-- [ ] **Step 6: Run layout test**
+- [x] **Step 6: Run layout test**
 
 ```powershell
 npm run test:source-layout
@@ -641,7 +646,7 @@ npm run test:source-layout
 
 Expected: `source-layout validation passed`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add package.json skill-version.json tests project-memory
@@ -677,13 +682,13 @@ git commit -m "移除旧脚本入口和根记忆目录"
 - Modify: `examples/*.md`
 - Modify: `assets/templates/*.md`
 
-- [ ] **Step 1: Create documentation directories**
+- [x] **Step 1: Create documentation directories**
 
 ```powershell
 New-Item -ItemType Directory -Force -Path docs/user,docs/developer,docs/reference,docs/guides | Out-Null
 ```
 
-- [ ] **Step 2: Rewrite README scope**
+- [x] **Step 2: Rewrite README scope**
 
 `README.md` must contain these top-level sections only:
 
@@ -702,7 +707,7 @@ New-Item -ItemType Directory -Force -Path docs/user,docs/developer,docs/referenc
 
 All commands in README must use `src/bin/*.js`.
 
-- [ ] **Step 3: Rewrite SKILL scope**
+- [x] **Step 3: Rewrite SKILL scope**
 
 `SKILL.md` must focus on Codex runtime behavior:
 
@@ -721,7 +726,7 @@ All commands in README must use `src/bin/*.js`.
 
 Remove long production cleanup, Kimi installation, and Cocos command blocks from `SKILL.md`; replace them with links to `docs/`.
 
-- [ ] **Step 4: Create `docs/reference/cli.md`**
+- [x] **Step 4: Create `docs/reference/cli.md`**
 
 Document the new commands exactly:
 
@@ -739,7 +744,7 @@ node src/bin/rebuild-kbs.js
 node src/bin/validate-package.js
 ```
 
-- [ ] **Step 5: Replace old script paths**
+- [x] **Step 5: Replace old script paths**
 
 Run:
 
@@ -749,7 +754,7 @@ rg "scripts/[A-Za-z0-9_./-]+\\.js" README.md SKILL.md docs references examples a
 
 Expected after edits: no old command paths remain except historical changelog entries in `CHANGELOG.md`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add README.md SKILL.md docs references examples assets tests
@@ -764,7 +769,7 @@ git commit -m "重写源码结构相关文档"
 - Modify: `skill-version.json`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Bump version**
+- [x] **Step 1: Bump version**
 
 Set in `skill-version.json`:
 
@@ -778,7 +783,7 @@ Add capability:
 "src-layout-restructure"
 ```
 
-- [ ] **Step 2: Add changelog entry**
+- [x] **Step 2: Add changelog entry**
 
 Add under `[未发布]`:
 
@@ -794,7 +799,7 @@ Add under `[未发布]`:
 - 重写 README、SKILL 和 docs 导航，明确 MCP-first 与 external-data 边界。
 ```
 
-- [ ] **Step 3: Run complete local validation**
+- [x] **Step 3: Run complete local validation**
 
 ```powershell
 npm test
@@ -820,7 +825,7 @@ validate-package passes for project-memory-manager@0.23.0
 git diff --check exits 0
 ```
 
-- [ ] **Step 4: Rebuild real qyProject KB**
+- [x] **Step 4: Rebuild real qyProject KB**
 
 ```powershell
 node src/bin/build-project.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --layout external-data --json
@@ -836,7 +841,7 @@ discover-features includes qyproject-admin
 build-feature exits 0 for qyproject-admin
 ```
 
-- [ ] **Step 5: Verify real captcha chain**
+- [x] **Step 5: Verify real captcha chain**
 
 ```powershell
 node src/bin/query-feature.js --workspace-root E:/xile-workspace/qyProject --data-root E:/xile-workspace/codex-tools/project-memory-data --layout external-data --feature qyproject-admin --request captcha --downstream --depth 5 --json
@@ -851,7 +856,7 @@ captcha.generateCaptcha
 captcha.saveCaptcha
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add .
@@ -865,7 +870,7 @@ git commit -m "发布源码结构重构版本"
 **Files:**
 - Modify local Codex MCP config if it references `scripts/mcp_server.js`
 
-- [ ] **Step 1: Locate MCP config**
+- [x] **Step 1: Locate MCP config**
 
 Run:
 
@@ -875,7 +880,7 @@ Select-String -Path C:\Users\Administrator\.codex\config.toml -Pattern "project-
 
 Expected: current PMM MCP server entry is visible.
 
-- [ ] **Step 2: Update MCP path**
+- [x] **Step 2: Update MCP path**
 
 Replace:
 
@@ -891,7 +896,7 @@ args = ["E:/xile-workspace/codex-tools/project-memory-manager/src/bin/mcp.js"]
 
 If the config uses backslashes, keep the local style but point to `src/bin/mcp.js`.
 
-- [ ] **Step 3: Push main**
+- [x] **Step 3: Push main**
 
 ```powershell
 git push origin main
@@ -899,7 +904,7 @@ git push origin main
 
 Expected: `main -> main`.
 
-- [ ] **Step 4: Final status**
+- [x] **Step 4: Final status**
 
 ```powershell
 git status --short --branch
@@ -913,7 +918,7 @@ Expected:
 <commit> (HEAD -> main, origin/main, origin/HEAD) 发布源码结构重构版本
 ```
 
-- [ ] **Step 5: Tell user restart requirement**
+- [x] **Step 5: Tell user restart requirement**
 
 Final message must state:
 
@@ -925,10 +930,10 @@ Final message must state:
 
 ## Self-Review Checklist
 
-- [ ] Spec requirement "no old compatibility" is covered by Task 6.
-- [ ] Spec requirement "new src/bin entrypoints" is covered by Tasks 1, 4, 5, and 6.
-- [ ] Spec requirement "docs restructure" is covered by Task 7.
-- [ ] Spec requirement "root project-memory removed" is covered by Task 6.
-- [ ] Spec requirement "real qyProject verification" is covered by Task 8.
-- [ ] Spec requirement "MCP config migration" is covered by Task 9.
-- [ ] No implementation task leaves a temporary `scripts/` dependency after Task 6.
+- [x] Spec requirement "no old compatibility" is covered by Task 6.
+- [x] Spec requirement "new src/bin entrypoints" is covered by Tasks 1, 4, 5, and 6.
+- [x] Spec requirement "docs restructure" is covered by Task 7.
+- [x] Spec requirement "root project-memory removed" is covered by Task 6.
+- [x] Spec requirement "real qyProject verification" is covered by Task 8.
+- [x] Spec requirement "MCP config migration" is covered by Task 9.
+- [x] No implementation task leaves a temporary `scripts/` dependency after Task 6.

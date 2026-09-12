@@ -1,6 +1,11 @@
 # PMM Usage Experience v0.26 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **状态：已完成（2026-06-04，随 0.26.0 发布）。**
+> 对应能力已登记在 `skill-version.json`，包括 `unresolved-call-explainability`、`inline-http-callback-handler-linking`、`grouped-query-recommendations` 和 `query-filter-disambiguation`。
+> 执行期间没有逐项维护复选框，文中的 `- [x]` 是收口时依据能力清单统一回填的。
+> 判断本计划剩余工作量时，以本节状态为准，不要按复选框数量推断。
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement the next usage-experience fixes from the 2026-06-04 PMM report.
 
@@ -18,8 +23,8 @@
 - Modify: `tests/fixtures/admin-fullstack-sample/cms-server/src/services/captchaService.ts`
 - Modify: `tests/fixtures/admin-fullstack-sample/cms-client/src/views/login/Login.vue`
 
-- [ ] Add failing assertions for `mode=fullstack`, `focus=fullstack`, grouped endpoint search, `includeUnresolved`, `detail=counts`, `prefab-script-usage`, and inline HTTP callback handler.
-- [ ] Run `npm test` and confirm these assertions fail for missing behavior.
+- [x] Add failing assertions for `mode=fullstack`, `focus=fullstack`, grouped endpoint search, `includeUnresolved`, `detail=counts`, `prefab-script-usage`, and inline HTTP callback handler.
+- [x] Run `npm test` and confirm these assertions fail for missing behavior.
 
 ### Task 2: Query Controls
 
@@ -28,11 +33,11 @@
 - Modify: `src/commands/query/query-project.js`
 - Modify: `src/mcp/server.js`
 
-- [ ] Parse and forward `mode`, `fullstack`, `focus`, `includeUnresolved`, `grouped`, `groupLimit`, `instanceLimit`, and `nodePathLimit`.
-- [ ] Implement fullstack traversal depth and focus filtering.
-- [ ] Implement broad search grouped recommendations.
-- [ ] Implement `detail=counts` and explicit limit metadata.
-- [ ] Implement `prefab-script-usage` batch summary.
+- [x] Parse and forward `mode`, `fullstack`, `focus`, `includeUnresolved`, `grouped`, `groupLimit`, `instanceLimit`, and `nodePathLimit`.
+- [x] Implement fullstack traversal depth and focus filtering.
+- [x] Implement broad search grouped recommendations.
+- [x] Implement `detail=counts` and explicit limit metadata.
+- [x] Implement `prefab-script-usage` batch summary.
 
 ### Task 3: Graph Facts
 
@@ -40,9 +45,9 @@
 - Modify: `src/extraction/extract-feature-facts.js`
 - Modify: `src/graph/build-chain-kb.js`
 
-- [ ] Extract unresolved member calls with owner, member, and reason.
-- [ ] Build opt-in `unresolved-call` nodes and edges.
-- [ ] Label inline HTTP endpoint callbacks and connect endpoint to synthetic callback method.
+- [x] Extract unresolved member calls with owner, member, and reason.
+- [x] Build opt-in `unresolved-call` nodes and edges.
+- [x] Label inline HTTP endpoint callbacks and connect endpoint to synthetic callback method.
 
 ### Task 4: Docs, Version, Validation
 
@@ -53,8 +58,8 @@
 - Modify: `docs/reference/mcp-tools.md`
 - Modify: `docs/user/query-guide.md`
 
-- [ ] Update PMM version and capability list.
-- [ ] Document new query controls and examples.
-- [ ] Run full PMM verification.
-- [ ] Rebuild qyProject KB and replay report checks.
-- [ ] Commit with a Chinese message and push `main`.
+- [x] Update PMM version and capability list.
+- [x] Document new query controls and examples.
+- [x] Run full PMM verification.
+- [x] Rebuild qyProject KB and replay report checks.
+- [x] Commit with a Chinese message and push `main`.
