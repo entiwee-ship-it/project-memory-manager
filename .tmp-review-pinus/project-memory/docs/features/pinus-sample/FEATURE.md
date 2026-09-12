@@ -1,2 +1,0 @@
-# Pinus Sample
-

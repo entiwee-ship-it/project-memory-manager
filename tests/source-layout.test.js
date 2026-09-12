@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 
@@ -19,6 +20,29 @@ function readText(relativePath) {
 function testNoLegacyRuntimeRoots() {
     assert.equal(exists('scripts'), false, 'legacy scripts directory must be removed');
     assert.equal(exists('project-memory'), false, 'root project-memory runtime data must not live in source repo');
+}
+
+/**
+ * 校验根级 .tmp-* 过程目录没有进入版本库。
+ *
+ * 这些目录是审查、调试和临时 KB 构建的产物，只允许在本地存在。历史上曾出现
+ * `.tmp-review-pinus` 连同生成的 KB 和目标项目源码拷贝一起被提交，因此这里同时
+ * 校验「没有已跟踪的 .tmp-* 路径」和「.gitignore 覆盖了根级 .tmp-*」。
+ */
+function testNoCommittedTempWorkspaces() {
+    const trackedPaths = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith('.tmp-'));
+    assert.deepEqual(
+        trackedPaths,
+        [],
+        `temp workspace paths must not be tracked by git: ${trackedPaths.slice(0, 5).join(', ')}`
+    );
+
+    const ignoreRules = readText('.gitignore')
+        .split(/\r?\n/)
+        .map((line) => line.trim());
+    assert.equal(ignoreRules.includes('.tmp-*/'), true, '.gitignore must ignore root .tmp-* directories');
 }
 
 function testRequiredSourceDirectories() {
@@ -128,6 +152,7 @@ function testReleaseQualityGate() {
 }
 
 testNoLegacyRuntimeRoots();
+testNoCommittedTempWorkspaces();
 testRequiredSourceDirectories();
 testRequiredBins();
 testPackageAndVersionUseNewEntrypoints();

@@ -5,3 +5,7 @@ node_modules/
 scripts/__pycache__/
 **/__pycache__/
 *.pyc
+
+# 根级 .tmp-* 是审查、调试和临时 KB 构建产物目录，只允许本地存在，不得进入版本库。
+.tmp-*/
+**/.tmp-*/
