@@ -5,13 +5,20 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [0.85.0] - 2026-09-12
 
 ### 改进
 - `query_project_chain` 复用 freshness gate 已生成的 project-global 状态，避免 cache lookup 前重复执行完整 source snapshot 扫描。
 - Experience harness 的 `--skip-path-check` 现在同时作用于合同检查和完整 12 任务运行，并新增独立参数合同测试，避免评分阶段意外恢复真实路径校验。
 - 新增只读大型 KB benchmark，输出 CLI/MCP 冷热查询、JSON 读取解析、Node/V8 版本和内存快照，不会初始化、登记或重建目标 workspace。
 - qy-server Pinus 真实集成与可移植 fixture 兼容当前 `app/application`、`app/servers/pkweb`、`app/infrastructure` 目录，并继续兼容旧目录候选；`registerMany` 只从真实调用参数提取消息绑定，避免普通二元数组误报。
+
+### 修复
+- 移除误提交进源码仓库的 `.tmp-review-pinus/`，该目录连同生成的 KB 和目标项目源码拷贝共 20 个跟踪文件被提交，仓库内代码、测试和文档均无引用。
+- `.gitignore` 增加根级 `.tmp-*/` 与 `**/.tmp-*/` 规则，`tests/source-layout.test.js` 新增 `testNoCommittedTempWorkspaces`，校验没有 `.tmp-*` 路径被 git 跟踪且忽略规则存在，避免同类过程目录再次进入版本库。
+
+### 文档
+- 为三份已完成计划补充标题状态声明并回填复选框：`2026-07-11-pmm-experience-value`（随 0.84.0）、`2026-06-03-pmm-repo-restructure`（随 0.23.0）、`2026-06-04-pmm-usage-experience-v0-26`（随 0.26.0）。此前复选框从未维护，按数量统计会误判出大量剩余工作。
 
 ## [0.84.0] - 2026-08-03
 
