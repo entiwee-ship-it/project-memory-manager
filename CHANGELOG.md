@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.85.1] - 2026-09-12
+
+### 修复
+- `install-kimi` 现在能识别实际使用的技能目录：候选列表补上 `~/.kimi/skills` 和 `~/.kimi-code/skills`，并改为返回全部命中目录而不是第一个。旧列表在本机返回 `null`，一个已安装副本都找不到，导致 Kimi 副本长期停留在旧版本。
+- `install-kimi` 实现了错误提示中承诺过的 `--skills-dir <路径>` 参数，可重复传入以显式指定多个技能根目录。
+- `install-kimi` 改为逐目录处理并汇总结果，单个目录安装失败不再中断其余目录；已存在且未指定 `--update` / `--force` 时跳过该目录而非直接退出。
+
+### 测试
+- 新增 `npm run test:install-kimi`（`tests/install-kimi-paths.test.js`），覆盖候选目录顺序、多目录发现、不存在候选目录过滤和 `--skills-dir` 解析，并纳入 `test:all`。
+
 ## [0.85.0] - 2026-09-12
 
 ### 改进
