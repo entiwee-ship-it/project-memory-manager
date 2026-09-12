@@ -194,6 +194,77 @@ node src/bin/rebuild-kbs.js --workspace-root $project --data-root $pmmData
 
 如果只是重建 KB 导致 PMM 数据根目录内容变化，通常不需要重启 Codex。如果 PMM 源码、已安装 skill 内容或 MCP 配置变化，就需要重启 Codex。
 
+## 8.1 多 Agent 副本拓扑
+
+使用多个 AI 编码助手（Codex、Claude、Kimi 等）时，PMM skill 需要安装到每个助手的 skill 目录。安装形态分两种：
+
+**完整安装**（含 `src/`、`tests/`、`SKILL.md`、`skill-version.json` 等，约 320 个文件）：
+
+| 位置 | 说明 |
+| --- | --- |
+| `~/.agents/skills/project-memory-manager` | `skills` CLI 的**权威源**，`sourceType: github` |
+| `~/.codex/skills/project-memory-manager` | 由权威源分发 |
+| `~/.cc-switch/skills/project-memory-manager` | 由权威源分发；`~/.claude/skills/project-memory-manager` 是指向它的**符号链接** |
+
+**精简安装**（仅 `SKILL.md` + `skill-version.json`，2 个文件）：
+
+| 位置 | 说明 |
+| --- | --- |
+| `~/.kimi/skills/project-memory-manager` | Kimi 客户端 |
+| `~/.kimi-code/skills/project-memory-manager` | Kimi Code 客户端 |
+
+更新精简副本时只复制 `SKILL.md` 和 `skill-version.json` 两个文件，**不要**用整仓克隆覆盖，否则会改变其安装形态。
+
+### 手工同步全部副本
+
+当 PMM 源码仓库更新后，用以下脚本把改动分发到全部副本（在源码仓库根目录执行）：
+
+```bash
+SRC="$HOME/.agents/skills/project-memory-manager"
+
+# 1. 更新权威源（完整形态）
+cp src/shared/lock.js "$SRC/src/shared/lock.js"
+cp tests/lock-diagnostics.test.js "$SRC/tests/lock-diagnostics.test.js"
+cp tests/rebuild-lock.test.js "$SRC/tests/rebuild-lock.test.js"
+cp CHANGELOG.md "$SRC/CHANGELOG.md"
+cp skill-version.json "$SRC/skill-version.json"
+
+# 2. 同步完整副本
+for dir in "$HOME/.codex/skills/project-memory-manager" "$HOME/.cc-switch/skills/project-memory-manager"; do
+  for f in src/shared/lock.js tests/lock-diagnostics.test.js tests/rebuild-lock.test.js CHANGELOG.md skill-version.json; do
+    cp "$f" "$dir/$f"
+  done
+done
+
+# 3. 同步精简副本（仅两个文件）
+for dir in "$HOME/.kimi/skills/project-memory-manager" "$HOME/.kimi-code/skills/project-memory-manager"; do
+  cp SKILL.md "$dir/SKILL.md"
+  cp skill-version.json "$dir/skill-version.json"
+done
+```
+
+上面的文件列表是示例——按实际改动的文件调整 `for f in ...` 里的路径。如果只改了 `SKILL.md`，完整副本和精简副本都只需要复制它。
+
+## 8.2 `skills` CLI 已知行为
+
+`npx skills update` 有三个已知行为，可能导致副本静默漂移：
+
+**1. 报失败但部分成功**
+
+`npx skills update project-memory-manager -g -y` 耗时约 5 分钟后可能报 `Failed to update`，但实际部分副本已更新——权威源（`~/.agents`）和 `.codex` 通常会成功，`.cc-switch` 可能没跟上，`~/.agents/.skill-lock.json` 的 `skillFolderHash` 和 `updatedAt` 也不会刷新。
+
+> 判断是否更新成功**必须逐个核对 `skill-version.json` 的版本号**，不能只看 CLI 的退出信息。
+
+**2. 合并式更新**
+
+CLI 执行的是合并式更新——**不会删除上游已移除的文件**。如果旧版本曾携带过临时目录（如 `.tmp-review-pinus/`），更新后这些目录会残留在所有副本中，需要手工清理。
+
+**3. 子集安装**
+
+安装副本是 git 仓库的子集（约 339 个文件 vs 仓库 1228 个），CLI 会刻意排除 `.git/`、`node_modules/` 等目录。**不要用整仓 `git clone` 覆盖安装目录**，否则会装进 CLI 刻意排除的文件。
+
+基于以上三个行为，升级时推荐用 **8.1 节的手工同步** 而非 `skills update`，或至少在 `skills update` 后按 8.1 节的方法逐个核对版本号并补齐遗漏的副本。
+
 ## 9. 故障排查
 
 如果技能列表里看不到 `project-memory-manager`：
@@ -201,6 +272,12 @@ node src/bin/rebuild-kbs.js --workspace-root $project --data-root $pmmData
 - 执行 `npx skills ls -g -a codex`。
 - 重新执行 `npx skills add ... --skill project-memory-manager ... --full-depth`。
 - 重启 Codex。
+
+如果 `skills update` 后副本版本不一致（参见 8.2 节）：
+
+- 逐个检查 `~/.agents`、`~/.codex`、`~/.cc-switch`、`~/.kimi`、`~/.kimi-code` 下的 `skill-version.json`。
+- 用 8.1 节的手工同步补齐遗漏的副本。
+- 检查是否有上游已删除的残留目录（如 `.tmp-review-pinus/`），手工清理。
 
 如果 MCP 工具没有出现：
 
