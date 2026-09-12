@@ -14,12 +14,39 @@ function ensureDir(dirPath) {
 }
 
 /**
+ * 判断锁记录的持有进程是否仍然存活。
+ *
+ * @param pid 锁文件中记录的进程号。
+ * @returns true 表示存活，false 表示已退出，null 表示无法判断。
+ */
+function isProcessAlive(pid) {
+    if (!Number.isInteger(pid) || pid <= 0) {
+        return null;
+    }
+    try {
+        // 信号 0 只做存在性探测，不会真正投递信号。
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        if (error.code === 'ESRCH') {
+            return false;
+        }
+        // EPERM 等情况说明进程存在但当前用户无权发信号，按存活处理更安全。
+        return true;
+    }
+}
+
+/**
  * 读取锁文件并判断它是否已过期。
+ *
+ * 过期判定优先依据持有进程的存活状态：持有进程已退出说明锁是残留，可以立即回收；
+ * 持有进程仍在运行则锁必须被尊重，否则超过声明超时的长时间操作会被并发进程抢锁。
+ * 只有无法判断进程存活时才退回时间戳判定，避免永久阻塞。
  *
  * @param lockFilePath 锁文件路径。
  * @returns 判定结果。
  * @returns 判定结果.lockInfo 解析出的锁信息，无法解析时为 null。
- * @returns 判定结果.expired 锁是否已过期，含无法解析和缺少有效时间戳的情况。
+ * @returns 判定结果.expired 锁是否已过期。
  * @returns 判定结果.reason 按过期处理的原因说明，正常解析且未过期时为空字符串。
  */
 function inspectLock(lockFilePath) {
@@ -36,10 +63,20 @@ function inspectLock(lockFilePath) {
         };
     }
 
+    const ownerAlive = isProcessAlive(lockInfo.pid);
+    if (ownerAlive === false) {
+        return { lockInfo, expired: true, reason: `锁持有进程 ${lockInfo.pid} 已退出` };
+    }
+    if (ownerAlive === true) {
+        // 持有进程仍在运行，锁继续有效。若进程实际卡死，诊断信息会给出 pid 和起始时间，
+        // 由使用者判断是否手工删除锁文件。
+        return { lockInfo, expired: false, reason: '' };
+    }
+
     const lockTime = new Date(lockInfo.startTime).getTime();
     if (!Number.isFinite(lockTime)) {
-        // 时间戳无效时无法判断持有时长，按过期处理，否则会永久阻塞。
-        return { lockInfo, expired: true, reason: '锁文件缺少有效时间戳' };
+        // 时间戳无效且无法判断持有进程时按过期处理，否则会永久阻塞。
+        return { lockInfo, expired: true, reason: '锁文件缺少有效时间戳且无法判断持有进程' };
     }
 
     const lockTimeout = lockInfo.timeout || LOCK_TIMEOUT;
@@ -113,6 +150,11 @@ function acquireLock(lockFilePath, options = {}) {
 
                 // 把真实阻塞原因写进诊断信息，避免把「过期锁释放失败」误报成并发冲突。
                 const reasonBlock = blockingReason ? `\n阻塞原因:\n  ${blockingReason}\n` : '';
+                // 锁仍有效时给出持有进程信息，便于区分正常并发与进程卡死。
+                const holder = inspection.lockInfo;
+                const holderBlock = holder && Number.isInteger(holder.pid)
+                    ? `\n持有进程:\n  pid ${holder.pid}，起始 ${holder.startTime}\n`
+                    : '';
 
                 if (wait) {
                     // 等待模式：轮询
@@ -122,6 +164,7 @@ function acquireLock(lockFilePath, options = {}) {
                             `锁文件: ${lockFilePath}\n` +
                             `超时: ${timeout}ms\n` +
                             reasonBlock +
+                            holderBlock +
                             `\n可能原因:\n` +
                             `  1. 另一个进程正在执行相同操作\n` +
                             `  2. 之前的进程崩溃，未释放锁\n` +
@@ -146,6 +189,7 @@ function acquireLock(lockFilePath, options = {}) {
                         `[SKILL-DIAGNOSIS] ${headline}\n` +
                         `锁文件: ${lockFilePath}\n` +
                         reasonBlock +
+                        holderBlock +
                         `\n可能原因:\n` +
                         `  1. 另一个 AI/进程正在构建 KB\n` +
                         `  2. 之前的操作异常退出，未清理锁\n` +
@@ -195,5 +239,6 @@ module.exports = {
     getProjectLockPath,
     withLock,
     inspectLock,
+    isProcessAlive,
     LOCK_TIMEOUT,
 };
